@@ -233,6 +233,11 @@ typedef struct {
   f32 dt; /* Delta time in seconds */
   u64 frame_count;
 
+  /* Modal state */
+  ui_id active_modal;    /* Modal active in this frame */
+  ui_id next_modal;      /* Modal to be active next frame */
+  ui_id current_modal;   /* Currently processing modal (in BeginModal/EndModal) */
+
   /* Hover animations */
   ui_id hover_anim_id;
   smooth_value hover_anim;
@@ -271,6 +276,13 @@ b32 UI_Selectable(const char *label, b32 selected);
 
 /* Separator - horizontal divider */
 void UI_Separator(void);
+
+/* Panel - reusable panel background (VSCode style) */
+void UI_DrawPanel(rect bounds);
+
+/* Modal Management - Blocks interaction outside the modal */
+void UI_BeginModal(const char *name);
+void UI_EndModal(void);
 
 /* ===== Focus Management ===== */
 

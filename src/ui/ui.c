@@ -402,8 +402,13 @@ void UI_BeginFrame(ui_context *ctx, ui_input *input, f32 dt) {
   /* Store last frame's focus */
   ctx->last_focused = ctx->focused;
 
-  /* Reset focus tracking for this frame */
+/* Reset focus tracking for this frame */
   ctx->focus_count = 0;
+
+  /* Update modal state */
+  ctx->active_modal = ctx->next_modal;
+  ctx->next_modal = UI_ID_NONE; /* Reset for this frame, modals must call BeginModal to keep active */
+  ctx->current_modal = UI_ID_NONE;
 }
 
 void UI_EndFrame(ui_context *ctx) {
@@ -412,7 +417,11 @@ void UI_EndFrame(ui_context *ctx) {
     UI_EndLayout();
   }
 
-  /* Handle arrow key navigation */
+  /* Handle arrow key navigation - BLOCK if modal is active and we are not processing it?
+     Actually, focus navigation might need to be restricted to modal only.
+     For now, we let it be, assuming modal elements are the only ones getting focus.
+  */
+
   if (ctx->input.key_pressed[KEY_DOWN]) {
     /* Move focus forward */
     if (ctx->focus_count > 0) {
@@ -466,6 +475,11 @@ b32 UI_IsActive(ui_id id) { return g_ui_ctx->active == id; }
 /* Register element in focus order */
 static void RegisterFocusable(ui_id id) {
   ui_context *ctx = g_ui_ctx;
+  /* If modal is active, only register elements if we are in that modal */
+  if (ctx->active_modal != UI_ID_NONE && ctx->current_modal != ctx->active_modal) {
+    return;
+  }
+  
   if (ctx->focus_count < 256) {
     ctx->focus_order[ctx->focus_count++] = id;
   }
@@ -474,6 +488,14 @@ static void RegisterFocusable(ui_id id) {
 /* Update hot/active state for an element */
 static b32 UpdateInteraction(ui_id id, rect bounds) {
   ui_context *ctx = g_ui_ctx;
+
+  /* Check modal blocking */
+  if (ctx->active_modal != UI_ID_NONE) {
+    if (ctx->current_modal != ctx->active_modal) {
+      /* Block interaction */
+      return false;
+    }
+  }
 
   /* Clip bounds to current clip rect - elements outside clip shouldn't receive
    * input */
@@ -1064,4 +1086,33 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
   UI_AdvanceLayout(bounds.w, height);
 
   return changed;
+}
+/* ===== Modal Management ===== */
+
+void UI_BeginModal(const char *name) {
+  ui_context *ctx = g_ui_ctx;
+  ui_id id = UI_GenID(name);
+  
+  ctx->current_modal = id;
+  ctx->next_modal = id; /* Keep alive for next frame */
+}
+
+void UI_EndModal(void) {
+  ui_context *ctx = g_ui_ctx;
+  ctx->current_modal = UI_ID_NONE;
+}
+
+/* ===== Panels ===== */
+
+void UI_DrawPanel(rect bounds) {
+  ui_context *ctx = g_ui_ctx;
+  const theme *th = ctx->theme;
+  
+  /* Background */
+  Render_DrawRectRounded(ctx->renderer, bounds, th->radius_md, th->panel);
+  
+  /* Border */
+  rect border = {bounds.x - 1, bounds.y - 1, bounds.w + 2, bounds.h + 2};
+  Render_DrawRectRounded(ctx->renderer, border, th->radius_md + 1, th->border);
+  Render_DrawRectRounded(ctx->renderer, bounds, th->radius_md, th->panel);
 }

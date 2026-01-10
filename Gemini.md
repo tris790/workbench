@@ -4,7 +4,7 @@ This document serves as the coding style guide and project documentation for Wor
 
 ## Project Overview
 
-Workbench is a developer tool that serves as a **file explorer on steroids** - a keyboard-focused, professional-grade file management application with integrated terminal, command palette, and extensibility.
+Workbench is a developer tool that serves as a **file explorer on steroids** - a keyboard-focused, professional-grade file management application with integrated terminal, command palette, and extensibility. It is a desktop application.
 
 ### Target Platforms
 - **Primary**: Arch Linux + KDE Wayland (native, no XWayland)

@@ -35,6 +35,12 @@ typedef struct {
   struct wl_seat *seat;
   struct wl_keyboard *keyboard;
   struct wl_pointer *pointer;
+  struct wl_data_device_manager *data_device_manager;
+  struct wl_data_device *data_device;
+  struct wl_data_source *clipboard_source;
+  char *clipboard_content;
+  struct wl_data_offer *selection_offer;
+  u32 last_serial;
   b32 initialized;
 } linux_platform;
 
@@ -104,6 +110,21 @@ static const struct xdg_surface_listener xdg_surface_listener = {
     .configure = XdgSurfaceConfigure,
 };
 
+static void DestroyShmBuffers(platform_window *window) {
+  for (i32 i = 0; i < 2; i++) {
+    if (window->shm_data[i] && window->shm_data[i] != MAP_FAILED) {
+      munmap(window->shm_data[i], window->shm_size);
+      window->shm_data[i] = NULL;
+    }
+    if (window->buffers[i]) {
+      wl_buffer_destroy(window->buffers[i]);
+      window->buffers[i] = NULL;
+    }
+  }
+}
+
+static i32 CreateShmBuffer(platform_window *window, i32 index);
+
 static void XdgToplevelConfigure(void *data, struct xdg_toplevel *toplevel,
                                  i32 width, i32 height,
                                  struct wl_array *states) {
@@ -113,8 +134,15 @@ static void XdgToplevelConfigure(void *data, struct xdg_toplevel *toplevel,
 
   if (width > 0 && height > 0) {
     if (window->width != width || window->height != height) {
+      
+      /* Resize buffers */
+      DestroyShmBuffers(window);
+      
       window->width = width;
       window->height = height;
+      
+      CreateShmBuffer(window, 0);
+      CreateShmBuffer(window, 1);
 
       platform_event event = {0};
       event.type = EVENT_WINDOW_RESIZE;
@@ -225,9 +253,9 @@ static void KeyboardEnter(void *data, struct wl_keyboard *keyboard, u32 serial,
                           struct wl_surface *surface, struct wl_array *keys) {
   (void)data;
   (void)keyboard;
-  (void)serial;
   (void)surface;
   (void)keys;
+  g_platform.last_serial = serial;
 }
 
 static void KeyboardLeave(void *data, struct wl_keyboard *keyboard, u32 serial,
@@ -241,8 +269,8 @@ static void KeyboardLeave(void *data, struct wl_keyboard *keyboard, u32 serial,
 static void KeyboardKey(void *data, struct wl_keyboard *keyboard, u32 serial,
                         u32 time, u32 key, u32 state) {
   (void)keyboard;
-  (void)serial;
   (void)time;
+  g_platform.last_serial = serial;
   platform_window *window = (platform_window *)data;
 
   platform_event event = {0};
@@ -301,8 +329,8 @@ static void PointerEnter(void *data, struct wl_pointer *pointer, u32 serial,
                          struct wl_surface *surface, wl_fixed_t sx,
                          wl_fixed_t sy) {
   (void)pointer;
-  (void)serial;
   (void)surface;
+  g_platform.last_serial = serial;
   platform_window *window = (platform_window *)data;
   window->mouse_x = wl_fixed_to_int(sx);
   window->mouse_y = wl_fixed_to_int(sy);
@@ -335,8 +363,8 @@ static void PointerMotion(void *data, struct wl_pointer *pointer, u32 time,
 static void PointerButton(void *data, struct wl_pointer *pointer, u32 serial,
                           u32 time, u32 button, u32 state) {
   (void)pointer;
-  (void)serial;
   (void)time;
+  g_platform.last_serial = serial;
   platform_window *window = (platform_window *)data;
 
   platform_event event = {0};
@@ -432,6 +460,131 @@ static const struct wl_pointer_listener pointer_listener = {
     .axis_relative_direction = PointerAxisRelativeDirection,
 };
 
+/* ===== Clipboard Callbacks ===== */
+
+static void DataSourceTarget(void *data, struct wl_data_source *source,
+                             const char *mime_type) {
+  (void)data;
+  (void)source;
+  (void)mime_type;
+}
+
+static void DataSourceSend(void *data, struct wl_data_source *source,
+                           const char *mime_type, i32 fd) {
+  (void)data;
+  (void)source;
+  if (strcmp(mime_type, "text/plain;charset=utf-8") == 0 ||
+      strcmp(mime_type, "text/plain") == 0) {
+    if (g_platform.clipboard_content) {
+      write(fd, g_platform.clipboard_content,
+            strlen(g_platform.clipboard_content));
+    }
+  }
+  close(fd);
+}
+
+static void DataSourceCancelled(void *data, struct wl_data_source *source) {
+  (void)data;
+  if (g_platform.clipboard_source == source) {
+    g_platform.clipboard_source = NULL;
+  }
+  wl_data_source_destroy(source);
+  /* Note: We don't free clipboard_content here because we might want to keep it
+   * for internal use, though technically we lost ownership. For now, we'll keep it
+   * until next copy or shutdown. */
+}
+
+static void DataSourceDndDropPerformed(void *data, struct wl_data_source *source) {
+  (void)data; (void)source;
+}
+
+static void DataSourceDndFinished(void *data, struct wl_data_source *source) {
+  (void)data; (void)source;
+}
+
+static void DataSourceAction(void *data, struct wl_data_source *source, u32 dnd_action) {
+  (void)data; (void)source; (void)dnd_action;
+}
+
+static const struct wl_data_source_listener data_source_listener = {
+    .target = DataSourceTarget,
+    .send = DataSourceSend,
+    .cancelled = DataSourceCancelled,
+    .dnd_drop_performed = DataSourceDndDropPerformed,
+    .dnd_finished = DataSourceDndFinished,
+    .action = DataSourceAction,
+};
+
+static void DataOfferOffer(void *data, struct wl_data_offer *offer,
+                           const char *mime_type) {
+  (void)data;
+  if (strcmp(mime_type, "text/plain;charset=utf-8") == 0 ||
+      strcmp(mime_type, "text/plain") == 0) {
+    /* Mark offer as containing text */
+    wl_data_offer_set_user_data(offer, (void *)(intptr_t)1);
+  }
+}
+
+static void DataOfferSourceActions(void *data, struct wl_data_offer *offer, u32 source_actions) {
+  (void)data; (void)offer; (void)source_actions;
+}
+
+static void DataOfferAction(void *data, struct wl_data_offer *offer, u32 dnd_action) {
+  (void)data; (void)offer; (void)dnd_action;
+}
+
+static const struct wl_data_offer_listener data_offer_listener = {
+    .offer = DataOfferOffer,
+    .source_actions = DataOfferSourceActions,
+    .action = DataOfferAction,
+};
+
+static void DataDeviceDataOffer(void *data, struct wl_data_device *device,
+                                struct wl_data_offer *offer) {
+  (void)data;
+  (void)device;
+  wl_data_offer_add_listener(offer, &data_offer_listener, NULL);
+}
+
+static void DataDeviceEnter(void *data, struct wl_data_device *device,
+                            u32 serial, struct wl_surface *surface,
+                            wl_fixed_t x, wl_fixed_t y, struct wl_data_offer *id) {
+  (void)data; (void)device; (void)serial; (void)surface; (void)x; (void)y; (void)id;
+}
+
+static void DataDeviceLeave(void *data, struct wl_data_device *device) {
+  (void)data; (void)device;
+}
+
+static void DataDeviceMotion(void *data, struct wl_data_device *device,
+                             u32 time, wl_fixed_t x, wl_fixed_t y) {
+  (void)data; (void)device; (void)time; (void)x; (void)y;
+}
+
+static void DataDeviceDrop(void *data, struct wl_data_device *device) {
+  (void)data; (void)device;
+}
+
+static void DataDeviceSelection(void *data, struct wl_data_device *device,
+                                struct wl_data_offer *offer) {
+  (void)data;
+  (void)device;
+  if (g_platform.selection_offer) {
+    wl_data_offer_destroy(g_platform.selection_offer);
+  }
+  g_platform.selection_offer = offer;
+}
+
+static const struct wl_data_device_listener data_device_listener = {
+    .data_offer = DataDeviceDataOffer,
+    .enter = DataDeviceEnter,
+    .leave = DataDeviceLeave,
+    .motion = DataDeviceMotion,
+    .drop = DataDeviceDrop,
+    .selection = DataDeviceSelection,
+};
+
+
 /* ===== Seat Callbacks ===== */
 
 static platform_window *g_current_window = NULL;
@@ -492,6 +645,9 @@ static void RegistryGlobal(void *data, struct wl_registry *registry, u32 name,
              0) {
     g_platform.decoration_manager = wl_registry_bind(
         registry, name, &zxdg_decoration_manager_v1_interface, Min(version, 1));
+  } else if (strcmp(interface, wl_data_device_manager_interface.name) == 0) {
+    g_platform.data_device_manager = wl_registry_bind(
+        registry, name, &wl_data_device_manager_interface, Min(version, 3));
   }
 }
 
@@ -689,6 +845,13 @@ b32 Platform_Init(void) {
 
   wl_display_roundtrip(g_platform.display);
 
+  if (g_platform.seat && g_platform.data_device_manager) {
+    g_platform.data_device = wl_data_device_manager_get_data_device(
+        g_platform.data_device_manager, g_platform.seat);
+    wl_data_device_add_listener(g_platform.data_device, &data_device_listener,
+                                NULL);
+  }
+
   if (!g_platform.compositor || !g_platform.xdg_wm_base || !g_platform.shm) {
     fprintf(stderr, "Missing required Wayland interfaces\n");
     return false;
@@ -720,6 +883,17 @@ void Platform_Shutdown(void) {
     wl_registry_destroy(g_platform.registry);
   if (g_platform.display)
     wl_display_disconnect(g_platform.display);
+
+  if (g_platform.clipboard_content)
+    free(g_platform.clipboard_content);
+  if (g_platform.clipboard_source)
+    wl_data_source_destroy(g_platform.clipboard_source);
+  if (g_platform.selection_offer)
+    wl_data_offer_destroy(g_platform.selection_offer);
+  if (g_platform.data_device)
+    wl_data_device_destroy(g_platform.data_device);
+  if (g_platform.data_device_manager)
+    wl_data_device_manager_destroy(g_platform.data_device_manager);
 
   memset(&g_platform, 0, sizeof(g_platform));
 }
@@ -847,13 +1021,7 @@ void Platform_DestroyWindow(platform_window *window) {
   if (!window)
     return;
 
-  for (i32 i = 0; i < 2; i++) {
-    if (window->shm_data[i] && window->shm_data[i] != MAP_FAILED) {
-      munmap(window->shm_data[i], window->shm_size);
-    }
-    if (window->buffers[i])
-      wl_buffer_destroy(window->buffers[i]);
-  }
+  DestroyShmBuffers(window);
   if (window->decoration)
     zxdg_toplevel_decoration_v1_destroy(window->decoration);
   if (window->xdg_toplevel)
@@ -1043,6 +1211,17 @@ u64 Platform_GetTimeMs(void) {
   return (u64)ts.tv_sec * 1000 + (u64)ts.tv_nsec / 1000000;
 }
 
+/* ===== File System Extras ===== */
+
+void Platform_OpenFile(const char *path) {
+  char command[2048];
+  /* Use xdg-open to open file with default application */
+  /* Redirect output to silence spurious messages */
+  snprintf(command, sizeof(command), "xdg-open \"%s\" > /dev/null 2>&1 &", path);
+  int result = system(command);
+  (void)result;
+}
+
 void Platform_SleepMs(u32 ms) {
   struct timespec ts;
   ts.tv_sec = ms / 1000;
@@ -1053,15 +1232,83 @@ void Platform_SleepMs(u32 ms) {
 /* ===== Clipboard (stub for now) ===== */
 
 char *Platform_GetClipboard(memory_arena *arena) {
-  (void)arena;
-  /* TODO: Implement using wl_data_device */
+  if (!g_platform.selection_offer) {
   return NULL;
+  }
+
+  /* Check if text is available */
+  if ((intptr_t)wl_data_offer_get_user_data(g_platform.selection_offer) != 1) {
+    return NULL;
+  }
+
+  int fds[2];
+  if (pipe(fds) != 0) {
+    return NULL;
+  }
+
+  wl_data_offer_receive(g_platform.selection_offer, "text/plain", fds[1]);
+  close(fds[1]);
+
+  /* Flush request to server */
+  wl_display_roundtrip(g_platform.display);
+
+  /* Read from pipe */
+  usize capacity = 1024;
+  char *buffer = malloc(capacity);
+  usize len = 0;
+
+  while (true) {
+    ssize_t r = read(fds[0], buffer + len, capacity - len - 1);
+    if (r < 0) {
+        break;
+    }
+    if (r == 0) {
+        break; /* EOF */
+    }
+    len += r;
+    if (len >= capacity - 1) {
+      capacity *= 2;
+      buffer = realloc(buffer, capacity);
+    }
+  }
+  buffer[len] = '\0';
+  close(fds[0]);
+
+  /* Copy to arena */
+  char *result = ArenaPushArray(arena, char, len + 1);
+  memcpy(result, buffer, len + 1);
+  free(buffer);
+
+  return result;
 }
 
 b32 Platform_SetClipboard(const char *text) {
-  (void)text;
-  /* TODO: Implement using wl_data_device */
+  if (!g_platform.data_device_manager || !g_platform.seat) {
   return false;
+  }
+
+  /* Update stored content */
+  if (g_platform.clipboard_content) {
+    free(g_platform.clipboard_content);
+  }
+  g_platform.clipboard_content = strdup(text);
+
+  /* Create new source */
+  /* If we already have a source, we could reuse it or destroy it? 
+     Usually new copy = new source */
+  if (g_platform.clipboard_source) {
+      wl_data_source_destroy(g_platform.clipboard_source);
+  }
+
+  g_platform.clipboard_source = wl_data_device_manager_create_data_source(g_platform.data_device_manager);
+  wl_data_source_add_listener(g_platform.clipboard_source, &data_source_listener, NULL);
+  
+  wl_data_source_offer(g_platform.clipboard_source, "text/plain;charset=utf-8");
+  wl_data_source_offer(g_platform.clipboard_source, "text/plain");
+
+  wl_data_device_set_selection(g_platform.data_device, g_platform.clipboard_source, g_platform.last_serial); 
+  
+  return true;
 }
 
 /* ===== Process (stub for now) ===== */

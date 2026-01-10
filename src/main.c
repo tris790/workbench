@@ -6,6 +6,8 @@
  */
 
 #include "animation.h"
+#include "commands.h"
+#include "components/command_palette.h"
 #include "components/explorer.h"
 #include "font.h"
 #include "layout.h" /* Now using layout system */
@@ -94,6 +96,15 @@ int main(int argc, char **argv) {
     }
   }
 
+  /* Initialize Command Palette */
+  command_palette_state palette;
+  panel *initial_panel = Layout_GetActivePanel(&layout);
+  CommandPalette_Init(&palette, initial_panel ? &initial_panel->explorer.fs : NULL);
+
+  /* Initialize Commands Module */
+  Commands_Init(&layout);
+  Commands_Register(&palette);
+
   u64 last_time = Platform_GetTimeMs();
 
   /* Main loop */
@@ -125,13 +136,27 @@ int main(int argc, char **argv) {
         break;
 
       case EVENT_KEY_DOWN:
-        if (event.data.keyboard.key == KEY_ESCAPE) {
-          panel *p = Layout_GetActivePanel(&layout);
-          if (p && p->explorer.mode != EXPLORER_MODE_NORMAL) {
-            Explorer_Cancel(&p->explorer);
+        /* Command palette keybindings */
+        if (event.data.keyboard.key == KEY_P && 
+            (event.data.keyboard.modifiers & MOD_CTRL)) {
+          if (event.data.keyboard.modifiers & MOD_SHIFT) {
+            CommandPalette_Open(&palette, PALETTE_MODE_COMMAND);
           } else {
-            printf("Escape pressed, exiting...\n");
-            goto cleanup;
+            CommandPalette_Open(&palette, PALETTE_MODE_FILE);
+          }
+        }
+        
+        
+        if (event.data.keyboard.key == KEY_ESCAPE) {
+          /* Let CommandPalette_Update handle ESC if palette is open */
+          if (!CommandPalette_IsOpen(&palette)) {
+            panel *p = Layout_GetActivePanel(&layout);
+            if (p && p->explorer.mode != EXPLORER_MODE_NORMAL) {
+              Explorer_Cancel(&p->explorer);
+            } else {
+              printf("Escape pressed, exiting...\n");
+              goto cleanup;
+            }
           }
         }
         /* Toggle Dual Panel Mode with F4 */
@@ -220,123 +245,20 @@ int main(int argc, char **argv) {
       UI_BeginFrame(&ui, &input, dt);
 
       /* Calculate layout bounds early for update */
-      i32 sidebar_width = 250;
-      i32 layout_width = win_width - sidebar_width;
-      if (layout_width < MIN_PANEL_WIDTH)
-        layout_width = MIN_PANEL_WIDTH;
-      rect layout_bounds = {0, 0, layout_width, win_height};
+      rect layout_bounds = {0, 0, win_width, win_height};
 
       /* Update layout logic (handles splitter interaction, animation) */
-      Layout_Update(&layout, &ui, layout_bounds);
+      /* Skip input processing for layout when command palette is open */
+      if (!CommandPalette_IsOpen(&palette)) {
+        Layout_Update(&layout, &ui, layout_bounds);
+      }
 
-      /* ===== Layout System (Left/Main Area) ===== */
-      /* Give layout e.g. 70% of width or flexible */
-      /* Actually let's assume layout takes full left side for now, keeping
-       * sidebar on right */
-
-      /* Let's keep the existing structure: Explorer(s) on Left, Controls on
-       * Right? Current code had Explorer Panel (width 350) and content area
-       * (Rest). But the requirement is "Panel Layout", which usually implies
-       * the explorers ARE the content. The buttons on the right were "Main
-       * Content Area" in existing code. Let's make the Layout take the majority
-       * of the space (Left), and keep the buttons on the Right as a "Sidebar".
-       */
+      /* ===== Layout System (Full Window) ===== */
       Layout_Render(&layout, &ui, layout_bounds);
 
-      /* ===== Separator Line ===== */
-      Render_DrawRect(&renderer, (rect){layout_width, 0, 1, win_height},
-                      th->border);
-
-      /* ===== Sidebar (Right Side) ===== */
-      UI_BeginLayout(
-          UI_LAYOUT_VERTICAL,
-          (rect){layout_width + 10, 10, sidebar_width - 20, win_height - 20});
-
-      UI_Label("Workbench Controls");
-      UI_Spacer(16);
-
-      /* Control Buttons acting on ACTIVE panel */
-      panel *active_panel = Layout_GetActivePanel(&layout);
-
-      /* Buttons in vertical layout for sidebar */
-      if (UI_Button("Home")) {
-        if (active_panel)
-          FS_NavigateHome(&active_panel->explorer.fs);
-      }
-      UI_Spacer(8);
-      if (UI_Button("Refresh")) {
-        if (active_panel)
-          Explorer_Refresh(&active_panel->explorer);
-      }
-      UI_Spacer(8);
-      if (UI_Button("New File")) {
-        if (active_panel)
-          Explorer_StartCreateFile(&active_panel->explorer);
-      }
-      UI_Spacer(8);
-      if (UI_Button("New Folder")) {
-        if (active_panel)
-          Explorer_StartCreateDir(&active_panel->explorer);
-      }
-      UI_Spacer(8);
-      if (UI_Button(layout.mode == LAYOUT_MODE_SINGLE
-                        ? "C: Split View (F4)"
-                        : "C: Single View (F4)")) {
-        Layout_ToggleMode(&layout);
-      }
-
-      UI_Spacer(16);
-      UI_Separator();
-      UI_Spacer(16);
-
-      /* Show current selection info from ACTIVE panel */
-      fs_entry *selected =
-          active_panel ? Explorer_GetSelected(&active_panel->explorer) : NULL;
-      if (selected) {
-        char buf[512];
-        snprintf(buf, sizeof(buf), "Selected: %s", selected->name);
-        UI_Label(buf);
-
-        UI_Spacer(8);
-
-        if (selected->is_directory) {
-          UI_PushStyleColor(UI_STYLE_TEXT_COLOR, th->text_muted);
-          UI_Label("Directory");
-          UI_PopStyle();
-        } else {
-          char size_str[32];
-          FS_FormatSize(selected->size, size_str, sizeof(size_str));
-          snprintf(buf, sizeof(buf), "Size: %s", size_str);
-          UI_Label(buf);
-
-          char time_str[64];
-          FS_FormatTime(selected->modified_time, time_str, sizeof(time_str));
-          snprintf(buf, sizeof(buf), "Modified: %s", time_str);
-          UI_Label(buf);
-        }
-      } else {
-        UI_PushStyleColor(UI_STYLE_TEXT_COLOR, th->text_muted);
-        UI_Label("No file selected");
-        UI_PopStyle();
-      }
-
-      UI_Spacer(32);
-
-      /* Help text */
-      UI_PushStyleColor(UI_STYLE_TEXT_COLOR, th->text_muted);
-      UI_Label("Keyboard shortcuts:");
-      UI_Spacer(4);
-      UI_Label("  F4 - Toggle Split");
-      UI_Label("  j/k - Navigate");
-      UI_Label("  Enter - Open");
-      UI_Label("  Backspace - Up");
-      UI_Label("  Ctrl+H - Home");
-      UI_Label("  F2 - Rename");
-      UI_Label("  Del - Delete");
-      UI_Label("  Tab - Switch Panel"); // Need to implement Tab switching
-      UI_PopStyle();
-
-      UI_EndLayout();
+      /* ===== Command Palette (overlay, rendered last) ===== */
+      CommandPalette_Update(&palette, &ui);
+      CommandPalette_Render(&palette, &ui, win_width, win_height);
 
       /* End UI frame */
       UI_EndFrame(&ui);

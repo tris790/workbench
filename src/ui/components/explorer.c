@@ -296,8 +296,7 @@ static void HandleNormalInput(explorer_state *state, ui_context *ui) {
       if (entry->is_directory) {
         FS_NavigateInto(&state->fs);
       } else {
-        /* TODO: Open file with default application */
-        printf("Open file: %s\n", entry->path);
+        Platform_OpenFile(entry->path);
       }
     }
   }
@@ -357,6 +356,7 @@ static void HandleDialogInput(explorer_state *state, ui_context *ui) {
 
   if (input->key_pressed[KEY_ESCAPE]) {
     Explorer_Cancel(state);
+    UI_EndModal();
     return;
   }
 
@@ -411,6 +411,11 @@ static void HandleDialogInput(explorer_state *state, ui_context *ui) {
 
     default:
       break;
+    }
+    
+    /* Close modal if returning to normal */
+    if (state->mode == EXPLORER_MODE_NORMAL) {
+       UI_EndModal();
     }
   }
 }
@@ -479,6 +484,7 @@ void Explorer_Update(explorer_state *state, ui_context *ui) {
   if (state->mode == EXPLORER_MODE_NORMAL) {
     HandleNormalInput(state, ui);
   } else {
+    UI_BeginModal("ExplorerDialog");
     HandleDialogInput(state, ui);
   }
 }
@@ -600,7 +606,7 @@ static void RenderDialog(explorer_state *state, ui_context *ui, rect bounds) {
   rect dialog = {bounds.x + (bounds.w - dialog_w) / 2,
                  bounds.y + (bounds.h - dialog_h) / 2, dialog_w, dialog_h};
 
-  Render_DrawRectRounded(ctx, dialog, 8.0f, th->panel);
+  UI_DrawPanel(dialog);
 
   /* Title */
   const char *title = "";
@@ -670,24 +676,38 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds) {
 
   /* Setup scroll container */
   state->scroll.view_size = (v2f){(f32)list_area.w, (f32)list_area.h};
+  /* Count visible items first for proper calculations */
+  i32 visible_item_count = Explorer_CountVisible(state);
   state->scroll.content_size = (v2f){
-      (f32)list_area.w, (f32)(state->fs.entry_count * state->item_height)};
+      (f32)list_area.w, (f32)(visible_item_count * state->item_height)};
 
   /* Ensure selection is visible - only when navigation triggered it */
   if (state->scroll_to_selection) {
-    i32 sel_y = state->fs.selected_index * state->item_height;
+    /* Calculate the visible index of the selected entry */
+    i32 visible_sel_index = 0;
+    for (i32 i = 0; i < state->fs.selected_index; i++) {
+      if (Explorer_IsEntryVisible(state, i)) {
+        visible_sel_index++;
+      }
+    }
+    
+    i32 sel_y = visible_sel_index * state->item_height;
     f32 view_top = state->scroll.offset.y;
     f32 view_bottom = view_top + state->scroll.view_size.y - state->item_height;
+    f32 max_scroll = state->scroll.content_size.y - state->scroll.view_size.y;
 
-    if ((f32)sel_y < view_top) {
-      state->scroll.target_offset.y = (f32)sel_y;
-      SmoothValue_SetTarget(&state->scroll.scroll_v,
-                            state->scroll.target_offset.y);
-    } else if ((f32)sel_y > view_bottom) {
-      state->scroll.target_offset.y =
-          (f32)sel_y - state->scroll.view_size.y + state->item_height;
-      SmoothValue_SetTarget(&state->scroll.scroll_v,
-                            state->scroll.target_offset.y);
+    /* Only scroll if content exceeds viewport */
+    if (max_scroll > 0) {
+      if ((f32)sel_y < view_top) {
+        state->scroll.target_offset.y = (f32)sel_y;
+        SmoothValue_SetTarget(&state->scroll.scroll_v,
+                              state->scroll.target_offset.y);
+      } else if ((f32)sel_y > view_bottom) {
+        state->scroll.target_offset.y =
+            (f32)sel_y - state->scroll.view_size.y + state->item_height;
+        SmoothValue_SetTarget(&state->scroll.scroll_v,
+                              state->scroll.target_offset.y);
+      }
     }
     state->scroll_to_selection = false;
   }
@@ -703,12 +723,6 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds) {
 
   /* Set clip rect for list */
   Render_SetClipRect(ctx, list_area);
-
-  /* Count visible items and calculate content size */
-  i32 visible_item_count = Explorer_CountVisible(state);
-
-  /* Update content size based on visible items only */
-  state->scroll.content_size.y = (f32)(visible_item_count * state->item_height);
 
   /* Draw visible items - iterate through all entries but track visible position
    */

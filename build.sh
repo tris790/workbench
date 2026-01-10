@@ -32,6 +32,9 @@ SOURCES="
     src/ui/ui.c
     src/ui/layout.c
     src/ui/components/explorer.c
+    src/ui/components/command_palette.c
+    src/core/fuzzy_match.c
+    src/commands.c
 "
 
 # Include paths for all source directories

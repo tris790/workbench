@@ -198,6 +198,7 @@ u8 *Platform_ReadEntireFile(const char *path, usize *out_size,
 b32 Platform_GetFileInfo(const char *path, file_info *info);
 b32 Platform_FileExists(const char *path);
 b32 Platform_IsDirectory(const char *path);
+void Platform_OpenFile(const char *path);
 
 /* ===== Clipboard API ===== */
 
