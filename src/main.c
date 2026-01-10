@@ -159,8 +159,9 @@ int main(int argc, char **argv) {
             }
           }
         }
-        /* Toggle Dual Panel Mode with F4 */
-        if (event.data.keyboard.key == KEY_F4) {
+        /* Toggle Dual Panel Mode with Ctrl + / */
+        if (event.data.keyboard.key == KEY_SLASH && 
+           (event.data.keyboard.modifiers & MOD_CTRL)) {
           Layout_ToggleMode(&layout);
         }
 

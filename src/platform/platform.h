@@ -114,6 +114,8 @@ typedef enum {
   MOUSE_LEFT = 0,
   MOUSE_MIDDLE,
   MOUSE_RIGHT,
+  MOUSE_X1, /* Back */
+  MOUSE_X2, /* Forward */
   MOUSE_BUTTON_COUNT
 } mouse_button;
 

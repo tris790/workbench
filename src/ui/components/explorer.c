@@ -138,12 +138,49 @@ void Explorer_Init(explorer_state *state, memory_arena *arena) {
 
   /* Navigate to home by default */
   FS_NavigateHome(&state->fs);
+  
+  /* Initialize history */
+  strncpy(state->history[0], state->fs.current_path, FS_MAX_PATH - 1);
+  state->history_index = 0;
+  state->history_count = 1;
 }
 
 /* ===== Navigation ===== */
 
 b32 Explorer_NavigateTo(explorer_state *state, const char *path) {
-  return FS_LoadDirectory(&state->fs, path);
+  if (strcmp(state->fs.current_path, path) == 0)
+    return true;
+
+  if (FS_LoadDirectory(&state->fs, path)) {
+    /* Push to history */
+    if (state->history_index < EXPLORER_MAX_HISTORY - 1) {
+      state->history_index++;
+    } else {
+      /* Shift history if full */
+      for (i32 i = 0; i < EXPLORER_MAX_HISTORY - 1; i++) {
+        strncpy(state->history[i], state->history[i + 1], FS_MAX_PATH);
+      }
+    }
+    
+    strncpy(state->history[state->history_index], path, FS_MAX_PATH - 1);
+    state->history_count = state->history_index + 1;
+    return true;
+  }
+  return false;
+}
+
+void Explorer_GoBack(explorer_state *state) {
+  if (state->history_index > 0) {
+    state->history_index--;
+    FS_LoadDirectory(&state->fs, state->history[state->history_index]);
+  }
+}
+
+void Explorer_GoForward(explorer_state *state) {
+  if (state->history_index < state->history_count - 1) {
+    state->history_index++;
+    FS_LoadDirectory(&state->fs, state->history[state->history_index]);
+  }
 }
 
 void Explorer_Refresh(explorer_state *state) {
@@ -294,21 +331,37 @@ static void HandleNormalInput(explorer_state *state, ui_context *ui) {
     fs_entry *entry = FS_GetSelectedEntry(&state->fs);
     if (entry) {
       if (entry->is_directory) {
-        FS_NavigateInto(&state->fs);
+        char target_path[FS_MAX_PATH];
+        strncpy(target_path, entry->path, FS_MAX_PATH - 1);
+        target_path[FS_MAX_PATH - 1] = '\0';
+        Explorer_NavigateTo(state, target_path);
       } else {
         Platform_OpenFile(entry->path);
       }
     }
   }
 
-  /* Go back */
+  /* Go back (Up directory) */
   if (input->key_pressed[KEY_BACKSPACE]) {
-    FS_NavigateUp(&state->fs);
+    char parent_path[FS_MAX_PATH];
+    FS_JoinPath(parent_path, FS_MAX_PATH, state->fs.current_path, "..");
+    Explorer_NavigateTo(state, parent_path);
   }
 
   /* Go home */
   if (input->key_pressed[KEY_H] && (input->modifiers & MOD_CTRL)) {
-    FS_NavigateHome(&state->fs);
+    Explorer_NavigateTo(state, FS_GetHomePath());
+  }
+
+  /* History Navigation */
+  if ((input->key_pressed[KEY_LEFT] && (input->modifiers & MOD_ALT)) ||
+      input->mouse_pressed[MOUSE_X1]) {
+    Explorer_GoBack(state);
+  }
+
+  if ((input->key_pressed[KEY_RIGHT] && (input->modifiers & MOD_ALT)) ||
+      input->mouse_pressed[MOUSE_X2]) {
+    Explorer_GoForward(state);
   }
 
   /* Toggle hidden files */
@@ -466,8 +519,15 @@ void Explorer_Update(explorer_state *state, ui_context *ui) {
             /* Double-click - navigate into */
             FS_SetSelection(&state->fs, actual_index);
             fs_entry *entry = FS_GetSelectedEntry(&state->fs);
-            if (entry && entry->is_directory) {
-              FS_NavigateInto(&state->fs);
+            if (entry) {
+              if (entry->is_directory) {
+                char target_path[FS_MAX_PATH];
+                strncpy(target_path, entry->path, FS_MAX_PATH - 1);
+                target_path[FS_MAX_PATH - 1] = '\0';
+                Explorer_NavigateTo(state, target_path);
+              } else {
+                Platform_OpenFile(entry->path);
+              }
             }
             state->last_click_time = 0;
           } else {
@@ -656,12 +716,29 @@ static void RenderDialog(explorer_state *state, ui_context *ui, rect bounds) {
   }
 }
 
-void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds) {
+void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
+                     b32 has_focus) {
   render_context *ctx = ui->renderer;
   const theme *th = ui->theme;
 
   /* Background */
   Render_DrawRect(ctx, bounds, th->panel_alt);
+
+  /* Focus Indicator */
+  if (has_focus) {
+    /* Draw a subtle accent border */
+    rect border = bounds;
+    Render_DrawRectRounded(ctx, border, 0, th->accent);
+    
+    /* Inset content slightly */
+    rect inner = {bounds.x + 2, bounds.y + 2, bounds.w - 4, bounds.h - 4};
+    Render_DrawRect(ctx, inner, th->panel_alt);
+    
+    /* Adjust bounds for child content */
+    /* Note: We don't actually change 'bounds' passed to children because
+       we want the scrollbar/etc to still sit flush, but visually the border is on top/under?
+       Actually, let's just draw the border frame. */
+  }
 
   /* Breadcrumb at top */
   rect breadcrumb = {bounds.x, bounds.y, bounds.w, EXPLORER_BREADCRUMB_HEIGHT};

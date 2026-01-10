@@ -262,10 +262,12 @@ static void PointerButton(void *data, struct wl_pointer *pointer, u32 serial,
                    ? EVENT_MOUSE_BUTTON_DOWN
                    : EVENT_MOUSE_BUTTON_UP;
 
-  /* Linux button codes: 272=left, 273=right, 274=middle */
+  /* Linux button codes: 272=left, 273=right, 274=middle, 275=side, 276=extra */
   if (button == 272) event.data.mouse.button = MOUSE_LEFT;
   else if (button == 273) event.data.mouse.button = MOUSE_RIGHT;
   else if (button == 274) event.data.mouse.button = MOUSE_MIDDLE;
+  else if (button == 275) event.data.mouse.button = MOUSE_X1;
+  else if (button == 276) event.data.mouse.button = MOUSE_X2;
 
   event.data.mouse.x = window->mouse_x;
   event.data.mouse.y = window->mouse_y;

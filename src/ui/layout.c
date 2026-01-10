@@ -4,6 +4,8 @@
 
 #include "layout.h"
 
+#include <string.h>
+
 #define SPLITTER_WIDTH 4.0f
 #define ANIMATION_SPEED 12.0f
 
@@ -39,6 +41,16 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
 
   /* Handle splitter interaction in dual mode */
   if (layout->mode == LAYOUT_MODE_DUAL) {
+    /* Focus Switching */
+    if (ui->input.key_pressed[KEY_LEFT] && 
+       (ui->input.modifiers & MOD_CTRL) && (ui->input.modifiers & MOD_SHIFT)) {
+      Layout_SetActivePanel(layout, 0);
+    }
+    if (ui->input.key_pressed[KEY_RIGHT] && 
+       (ui->input.modifiers & MOD_CTRL) && (ui->input.modifiers & MOD_SHIFT)) {
+      Layout_SetActivePanel(layout, 1);
+    }
+    
     f32 available_width = bounds.w;
     f32 split_x = bounds.x + (available_width * layout->split_ratio);
 
@@ -116,7 +128,7 @@ static void DrawSplitter(ui_context *ui, rect bounds, bool hot, bool active) {
 
 void Layout_Render(layout_state *layout, ui_context *ui, rect bounds) {
   if (layout->mode == LAYOUT_MODE_SINGLE) {
-    Explorer_Render(&layout->panels[0].explorer, ui, bounds);
+    Explorer_Render(&layout->panels[0].explorer, ui, bounds, false);
   } else {
     f32 available_width = bounds.w;
     f32 split_x = bounds.x + (available_width * layout->split_ratio);
@@ -129,15 +141,33 @@ void Layout_Render(layout_state *layout, ui_context *ui, rect bounds) {
 
     bool hover = UI_PointInRect(ui->input.mouse_pos, splitter_bounds);
 
-    Explorer_Render(&layout->panels[0].explorer, ui, left_bounds);
+    Explorer_Render(&layout->panels[0].explorer, ui, left_bounds,
+                    layout->active_panel_idx == 0);
     DrawSplitter(ui, splitter_bounds, hover, layout->dragging);
-    Explorer_Render(&layout->panels[1].explorer, ui, right_bounds);
+    Explorer_Render(&layout->panels[1].explorer, ui, right_bounds,
+                    layout->active_panel_idx == 1);
   }
 }
 
 void Layout_SetMode(layout_state *layout, layout_mode mode) {
   if (mode == LAYOUT_MODE_DUAL) {
     layout->target_split_ratio = 0.5f;
+
+    /* Clone state from active panel to inactive panel */
+    u32 src_idx = layout->active_panel_idx;
+    u32 dst_idx = (src_idx + 1) % 2;
+    explorer_state *src = &layout->panels[src_idx].explorer;
+    explorer_state *dst = &layout->panels[dst_idx].explorer;
+
+    /* Navigate to same path */
+    Explorer_NavigateTo(dst, src->fs.current_path);
+    
+    /* Copy history */
+    dst->history_count = src->history_count;
+    dst->history_index = src->history_index;
+    for(i32 i=0; i<src->history_count; i++) {
+        strncpy(dst->history[i], src->history[i], FS_MAX_PATH);
+    }
   }
 
   layout->mode = mode;
