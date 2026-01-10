@@ -153,8 +153,8 @@ Output: `build/wb`
 - [x] Rendering system
 - [X] UI framework
 - [X] File explorer
-- [ ] Panel layout (1 or 2 panels)
-- [ ] Command palette
+- [X] Panel layout (1 or 2 panels)
+- [X] Command palette
 - [ ] Built-in terminal
 - [ ] Preview panel
 - [ ] Context menu

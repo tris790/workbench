@@ -20,7 +20,13 @@ mkdir -p build
 # Source files (new structure)
 SOURCES="
     src/main.c
-    src/platform/platform_linux.c
+    src/platform/linux/linux_platform.c
+    src/platform/linux/linux_window.c
+    src/platform/linux/linux_events.c
+    src/platform/linux/linux_filesystem.c
+    src/platform/linux/linux_clipboard.c
+    src/platform/linux/linux_process.c
+    src/platform/linux/linux_time.c
     src/platform/protocols/xdg-shell-protocol.c
     src/platform/protocols/xdg-decoration-protocol.c
     src/renderer/renderer_software.c
