@@ -735,6 +735,377 @@ static b32 TextInputPopUndo(ui_text_state *state, char *buffer, i32 buf_size) {
   return false;
 }
 
+/* Process text input logic (shared by widgets) */
+b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
+                        ui_input *input) {
+  b32 changed = false;
+  i32 text_len = (i32)strlen(buffer); /* Assumes UTF-8 well-formedness for length */
+
+  /* Handle cursor blink reset on input */
+  if (input->text_input || input->key_pressed[KEY_LEFT] ||
+      input->key_pressed[KEY_RIGHT] || input->key_pressed[KEY_BACKSPACE] ||
+      input->key_pressed[KEY_DELETE] || input->key_pressed[KEY_HOME] ||
+      input->key_pressed[KEY_END]) {
+    state->cursor_blink = 0.0f;
+  }
+
+  b32 ctrl = (input->modifiers & MOD_CTRL) != 0;
+  b32 shift = (input->modifiers & MOD_SHIFT) != 0;
+
+  /* Ctrl+A - Select all */
+  if (ctrl && input->key_pressed[KEY_A]) {
+    state->selection_start = 0;
+    state->selection_end = UTF8Length(buffer); /* CHARS */
+    state->cursor_pos = state->selection_end;
+  }
+
+  /* Ctrl+C - Copy */
+  if (ctrl && input->key_pressed[KEY_C]) {
+    if (state->selection_start >= 0) {
+      i32 start = state->selection_start < state->selection_end
+                      ? state->selection_start
+                      : state->selection_end;
+      i32 end = state->selection_start > state->selection_end
+                    ? state->selection_start
+                    : state->selection_end;
+      i32 start_byte = UTF8ByteOffset(buffer, start);
+      i32 end_byte = UTF8ByteOffset(buffer, end);
+      char temp[UI_MAX_TEXT_INPUT_SIZE];
+      i32 len = end_byte - start_byte;
+      if (len >= UI_MAX_TEXT_INPUT_SIZE) len = UI_MAX_TEXT_INPUT_SIZE - 1;
+      
+      strncpy(temp, buffer + start_byte, (size_t)len);
+      temp[len] = '\0';
+      Platform_SetClipboard(temp);
+    }
+  }
+
+  /* Ctrl+X - Cut */
+  if (ctrl && input->key_pressed[KEY_X]) {
+    if (state->selection_start >= 0) {
+      i32 start = state->selection_start < state->selection_end
+                      ? state->selection_start
+                      : state->selection_end;
+      i32 end = state->selection_start > state->selection_end
+                    ? state->selection_start
+                    : state->selection_end;
+      i32 start_byte = UTF8ByteOffset(buffer, start);
+      i32 end_byte = UTF8ByteOffset(buffer, end);
+
+      /* Copy to clipboard */
+      char temp[UI_MAX_TEXT_INPUT_SIZE];
+      i32 len = end_byte - start_byte;
+      if (len >= UI_MAX_TEXT_INPUT_SIZE) len = UI_MAX_TEXT_INPUT_SIZE - 1;
+      
+      strncpy(temp, buffer + start_byte, (size_t)len);
+      temp[len] = '\0';
+      Platform_SetClipboard(temp);
+
+      /* Delete selection */
+      TextInputPushUndo(state, buffer);
+      
+      i32 total_bytes = (i32)strlen(buffer);
+      memmove(buffer + start_byte, buffer + end_byte, (size_t)(total_bytes - end_byte + 1));
+      
+      state->cursor_pos = start;
+      state->selection_start = -1;
+      changed = true;
+      text_len = (i32)strlen(buffer);
+    }
+  }
+
+  /* Ctrl+V - Paste */
+  if (ctrl && input->key_pressed[KEY_V]) {
+    char clipboard[UI_MAX_TEXT_INPUT_SIZE];
+    if (Platform_GetClipboard(clipboard, sizeof(clipboard))) {
+      /* Delete selection first if any */
+      if (state->selection_start >= 0) {
+        i32 start = state->selection_start < state->selection_end
+                        ? state->selection_start
+                        : state->selection_end;
+        i32 end = state->selection_start > state->selection_end
+                      ? state->selection_start
+                      : state->selection_end;
+        i32 start_byte = UTF8ByteOffset(buffer, start);
+        i32 end_byte = UTF8ByteOffset(buffer, end);
+        TextInputPushUndo(state, buffer);
+        
+        i32 total_bytes = (i32)strlen(buffer);
+        memmove(buffer + start_byte, buffer + end_byte, (size_t)(total_bytes - end_byte + 1));
+        
+        state->cursor_pos = start;
+        state->selection_start = -1;
+        text_len = (i32)strlen(buffer);
+      }
+
+      /* Insert */
+      i32 paste_len = (i32)strlen(clipboard);
+      if (text_len + paste_len < buffer_size - 1) {
+        TextInputPushUndo(state, buffer);
+        i32 cursor_byte = UTF8ByteOffset(buffer, state->cursor_pos);
+        i32 total_bytes = (i32)strlen(buffer);
+        
+        memmove(buffer + cursor_byte + paste_len, buffer + cursor_byte, (size_t)(total_bytes - cursor_byte + 1));
+        memcpy(buffer + cursor_byte, clipboard, (size_t)paste_len);
+        state->cursor_pos += UTF8Length(clipboard); /* Advance char count */
+        changed = true;
+        text_len = (i32)strlen(buffer);
+      }
+    }
+  }
+
+  /* Ctrl+Z - Undo */
+  if (ctrl && input->key_pressed[KEY_Z]) {
+    if (TextInputPopUndo(state, buffer, buffer_size)) {
+      changed = true;
+      text_len = (i32)strlen(buffer);
+    }
+  }
+
+  /* Arrow keys for cursor movement */
+  if (input->key_pressed[KEY_LEFT]) {
+    if (shift && state->selection_start < 0) {
+      state->selection_start = state->cursor_pos;
+    }
+    
+    if (ctrl) {
+        /* Word jump left */
+        if (state->cursor_pos > 0) {
+            i32 cursor = state->cursor_pos - 1;
+            /* Skip whitespace backwards */
+            while (cursor > 0 && buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
+                cursor--;
+            }
+            /* Skip non-whitespace backwards */
+            while (cursor > 0 && buffer[UTF8ByteOffset(buffer, cursor)] != ' ') {
+                cursor--;
+            }
+            /* If we stopped on space (and not at start), move forward one to be at start of word */
+            if (cursor > 0 || buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
+                 if (buffer[UTF8ByteOffset(buffer, cursor)] == ' ') cursor++;
+            }
+            state->cursor_pos = cursor;
+        }
+    } else {
+        if (state->cursor_pos > 0) {
+          state->cursor_pos--;
+        }
+    }
+
+    if (shift) {
+      state->selection_end = state->cursor_pos;
+    } else {
+      state->selection_start = -1;
+    }
+  }
+
+  if (input->key_pressed[KEY_RIGHT]) {
+    if (shift && state->selection_start < 0) {
+      state->selection_start = state->cursor_pos;
+    }
+    
+    if (ctrl) {
+        /* Word jump right */
+        i32 char_count = UTF8Length(buffer);
+        if (state->cursor_pos < char_count) {
+            i32 cursor = state->cursor_pos;
+            /* Skip non-whitespace forward */
+            while (cursor < char_count && buffer[UTF8ByteOffset(buffer, cursor)] != ' ') {
+                cursor++;
+            }
+            /* Skip whitespace forward */
+            while (cursor < char_count && buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
+                cursor++;
+            }
+            state->cursor_pos = cursor;
+        }
+    } else {
+        if (state->cursor_pos < UTF8Length(buffer)) {
+          state->cursor_pos++;
+        }
+    }
+
+    if (shift) {
+      state->selection_end = state->cursor_pos;
+    } else {
+      state->selection_start = -1;
+    }
+  }
+
+  /* Home/End */
+  if (input->key_pressed[KEY_HOME]) {
+    if (shift && state->selection_start < 0) {
+      state->selection_start = state->cursor_pos;
+    }
+    state->cursor_pos = 0;
+    if (shift) {
+      state->selection_end = state->cursor_pos;
+    } else {
+      state->selection_start = -1;
+    }
+  }
+
+  if (input->key_pressed[KEY_END]) {
+    if (shift && state->selection_start < 0) {
+      state->selection_start = state->cursor_pos;
+    }
+    state->cursor_pos = UTF8Length(buffer);
+    if (shift) {
+      state->selection_end = state->cursor_pos;
+    } else {
+      state->selection_start = -1;
+    }
+  }
+
+  /* Backspace */
+  if (input->key_pressed[KEY_BACKSPACE]) {
+    if (state->selection_start >= 0) {
+      /* Delete selection */
+      i32 start = state->selection_start < state->selection_end
+                      ? state->selection_start
+                      : state->selection_end;
+      i32 end = state->selection_start > state->selection_end
+                    ? state->selection_start
+                    : state->selection_end;
+      i32 start_byte = UTF8ByteOffset(buffer, start);
+      i32 end_byte = UTF8ByteOffset(buffer, end);
+      TextInputPushUndo(state, buffer);
+      
+      i32 total_bytes = (i32)strlen(buffer);
+      memmove(buffer + start_byte, buffer + end_byte,
+              (size_t)(total_bytes - end_byte + 1));
+      state->cursor_pos = start;
+      state->selection_start = -1;
+      changed = true;
+      text_len = (i32)strlen(buffer);
+    } else if (state->cursor_pos > 0) {
+      TextInputPushUndo(state, buffer);
+      
+      i32 target_pos = state->cursor_pos - 1;
+      
+      if (ctrl) {
+        /* Word delete backward */
+        i32 cursor = state->cursor_pos - 1;
+        /* Skip whitespace backwards */
+        while (cursor > 0 && buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
+            cursor--;
+        }
+        /* Skip non-whitespace backwards */
+        while (cursor > 0 && buffer[UTF8ByteOffset(buffer, cursor)] != ' ') {
+            cursor--;
+        }
+        /* Adjust to delete from start of word */
+        if (cursor > 0 || buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
+             if (buffer[UTF8ByteOffset(buffer, cursor)] == ' ') cursor++;
+        }
+        target_pos = cursor;
+      }
+      
+      i32 byte_pos = UTF8ByteOffset(buffer, state->cursor_pos);
+      i32 target_byte = UTF8ByteOffset(buffer, target_pos);
+      i32 total_bytes = (i32)strlen(buffer);
+      
+      memmove(buffer + target_byte, buffer + byte_pos,
+              (size_t)(total_bytes - byte_pos + 1));
+      state->cursor_pos = target_pos;
+      changed = true;
+      text_len = (i32)strlen(buffer);
+    }
+  }
+
+  /* Delete */
+  if (input->key_pressed[KEY_DELETE]) {
+    if (state->selection_start >= 0) {
+      /* Same as backspace with selection */
+      i32 start = state->selection_start < state->selection_end
+                      ? state->selection_start
+                      : state->selection_end;
+      i32 end = state->selection_start > state->selection_end
+                    ? state->selection_start
+                    : state->selection_end;
+      i32 start_byte = UTF8ByteOffset(buffer, start);
+      i32 end_byte = UTF8ByteOffset(buffer, end);
+      TextInputPushUndo(state, buffer);
+      
+      i32 total_bytes = (i32)strlen(buffer);
+      memmove(buffer + start_byte, buffer + end_byte,
+              (size_t)(total_bytes - end_byte + 1));
+      state->cursor_pos = start;
+      state->selection_start = -1;
+      changed = true;
+      text_len = (i32)strlen(buffer);
+    } else if (state->cursor_pos < UTF8Length(buffer)) {
+      TextInputPushUndo(state, buffer);
+      
+      i32 target_pos = state->cursor_pos + 1;
+
+      if (ctrl) {
+        /* Word delete forward */
+        i32 char_count = UTF8Length(buffer);
+        i32 cursor = state->cursor_pos;
+        /* Skip non-whitespace forward */
+        while (cursor < char_count && buffer[UTF8ByteOffset(buffer, cursor)] != ' ') {
+            cursor++;
+        }
+        /* Skip whitespace forward */
+        while (cursor < char_count && buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
+            cursor++;
+        }
+        target_pos = cursor;
+      }
+
+      i32 byte_pos = UTF8ByteOffset(buffer, state->cursor_pos);
+      i32 target_byte = UTF8ByteOffset(buffer, target_pos);
+      i32 total_bytes = (i32)strlen(buffer);
+
+      memmove(buffer + byte_pos, buffer + target_byte,
+              (size_t)(total_bytes - target_byte + 1));
+      changed = true;
+      text_len = (i32)strlen(buffer);
+    }
+  }
+
+  /* Text input */
+  if (input->text_input && input->text_input >= 32) {
+    /* Delete selection first if any */
+    if (state->selection_start >= 0) {
+      i32 start = state->selection_start < state->selection_end
+                      ? state->selection_start
+                      : state->selection_end;
+      i32 end = state->selection_start > state->selection_end
+                    ? state->selection_start
+                    : state->selection_end;
+      i32 start_byte = UTF8ByteOffset(buffer, start);
+      i32 end_byte = UTF8ByteOffset(buffer, end);
+      TextInputPushUndo(state, buffer);
+      
+      i32 total_bytes = (i32)strlen(buffer);
+      memmove(buffer + start_byte, buffer + end_byte,
+              (size_t)(total_bytes - end_byte + 1));
+      state->cursor_pos = start;
+      state->selection_start = -1;
+      text_len = (i32)strlen(buffer);
+    }
+
+    /* Insert character */
+    if (text_len < buffer_size - 2) {
+      /* Simple ASCII for now */
+      if (input->text_input < 128) {
+        i32 byte_pos = UTF8ByteOffset(buffer, state->cursor_pos);
+        /* Use fresh length */
+        i32 total_bytes = (i32)strlen(buffer);
+        memmove(buffer + byte_pos + 1, buffer + byte_pos,
+                (size_t)(total_bytes - byte_pos + 1));
+        buffer[byte_pos] = (char)input->text_input;
+        state->cursor_pos++;
+        changed = true;
+      }
+    }
+  }
+
+  return changed;
+}
+
 b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
                  ui_text_state *state) {
   ui_context *ctx = g_ui_ctx;
@@ -782,226 +1153,22 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
   if (ctx->focused == id) {
     state->has_focus = true;
   } else if (state->has_focus) {
-    state->has_focus = false;
-    state->selection_start = -1;
+    /* Check if we just lost focus or if we are claiming it */
+    if (ctx->last_focused != id) {
+      /* We weren't focused last frame, but state says we should be.
+         Claim focus. */
+      ctx->focused = id;
+    } else {
+      /* We were focused and lost it. */
+      state->has_focus = false;
+      state->selection_start = -1;
+    }
   }
 
   /* Handle keyboard input when focused */
   if (ctx->focused == id) {
-    i32 text_len = UTF8Length(buffer);
-    i32 byte_len = (i32)strlen(buffer);
-    b32 ctrl = (ctx->input.modifiers & MOD_CTRL) != 0;
-    b32 shift = (ctx->input.modifiers & MOD_SHIFT) != 0;
-
-    /* Ctrl+A - Select all */
-    if (ctrl && ctx->input.key_pressed[KEY_A]) {
-      state->selection_start = 0;
-      state->selection_end = text_len;
-      state->cursor_pos = text_len;
-    }
-
-    /* Ctrl+C - Copy */
-    if (ctrl && ctx->input.key_pressed[KEY_C]) {
-      if (state->selection_start >= 0) {
-        i32 start = state->selection_start < state->selection_end
-                        ? state->selection_start
-                        : state->selection_end;
-        i32 end = state->selection_start > state->selection_end
-                      ? state->selection_start
-                      : state->selection_end;
-        i32 start_byte = UTF8ByteOffset(buffer, start);
-        i32 end_byte = UTF8ByteOffset(buffer, end);
-        char temp[UI_MAX_TEXT_INPUT_SIZE];
-        strncpy(temp, buffer + start_byte, (size_t)(end_byte - start_byte));
-        temp[end_byte - start_byte] = '\0';
-        Platform_SetClipboard(temp);
-      }
-    }
-
-    /* Ctrl+X - Cut */
-    if (ctrl && ctx->input.key_pressed[KEY_X]) {
-      if (state->selection_start >= 0) {
-        i32 start = state->selection_start < state->selection_end
-                        ? state->selection_start
-                        : state->selection_end;
-        i32 end = state->selection_start > state->selection_end
-                      ? state->selection_start
-                      : state->selection_end;
-        i32 start_byte = UTF8ByteOffset(buffer, start);
-        i32 end_byte = UTF8ByteOffset(buffer, end);
-
-        /* Copy to clipboard */
-        char temp[UI_MAX_TEXT_INPUT_SIZE];
-        strncpy(temp, buffer + start_byte, (size_t)(end_byte - start_byte));
-        temp[end_byte - start_byte] = '\0';
-        Platform_SetClipboard(temp);
-
-        /* Delete selection */
-        TextInputPushUndo(state, buffer);
-        memmove(buffer + start_byte, buffer + end_byte,
-                (size_t)(byte_len - end_byte + 1));
-        state->cursor_pos = start;
-        state->selection_start = -1;
+    if (UI_ProcessTextInput(state, buffer, buffer_size, &ctx->input)) {
         changed = true;
-      }
-    }
-
-    /* Ctrl+V - Paste */
-    if (ctrl && ctx->input.key_pressed[KEY_V]) {
-      /* TODO: Need arena for clipboard */
-      /* For now, skip paste */
-    }
-
-    /* Ctrl+Z - Undo */
-    if (ctrl && ctx->input.key_pressed[KEY_Z]) {
-      if (TextInputPopUndo(state, buffer, buffer_size)) {
-        changed = true;
-      }
-    }
-
-    /* Arrow keys for cursor movement */
-    if (ctx->input.key_pressed[KEY_LEFT]) {
-      if (shift && state->selection_start < 0) {
-        state->selection_start = state->cursor_pos;
-      }
-      if (state->cursor_pos > 0) {
-        state->cursor_pos--;
-      }
-      if (shift) {
-        state->selection_end = state->cursor_pos;
-      } else {
-        state->selection_start = -1;
-      }
-    }
-
-    if (ctx->input.key_pressed[KEY_RIGHT]) {
-      if (shift && state->selection_start < 0) {
-        state->selection_start = state->cursor_pos;
-      }
-      if (state->cursor_pos < text_len) {
-        state->cursor_pos++;
-      }
-      if (shift) {
-        state->selection_end = state->cursor_pos;
-      } else {
-        state->selection_start = -1;
-      }
-    }
-
-    /* Home/End */
-    if (ctx->input.key_pressed[KEY_HOME]) {
-      if (shift && state->selection_start < 0) {
-        state->selection_start = state->cursor_pos;
-      }
-      state->cursor_pos = 0;
-      if (shift) {
-        state->selection_end = state->cursor_pos;
-      } else {
-        state->selection_start = -1;
-      }
-    }
-
-    if (ctx->input.key_pressed[KEY_END]) {
-      if (shift && state->selection_start < 0) {
-        state->selection_start = state->cursor_pos;
-      }
-      state->cursor_pos = text_len;
-      if (shift) {
-        state->selection_end = state->cursor_pos;
-      } else {
-        state->selection_start = -1;
-      }
-    }
-
-    /* Backspace */
-    if (ctx->input.key_pressed[KEY_BACKSPACE]) {
-      if (state->selection_start >= 0) {
-        /* Delete selection */
-        i32 start = state->selection_start < state->selection_end
-                        ? state->selection_start
-                        : state->selection_end;
-        i32 end = state->selection_start > state->selection_end
-                      ? state->selection_start
-                      : state->selection_end;
-        i32 start_byte = UTF8ByteOffset(buffer, start);
-        i32 end_byte = UTF8ByteOffset(buffer, end);
-        TextInputPushUndo(state, buffer);
-        memmove(buffer + start_byte, buffer + end_byte,
-                (size_t)(byte_len - end_byte + 1));
-        state->cursor_pos = start;
-        state->selection_start = -1;
-        changed = true;
-      } else if (state->cursor_pos > 0) {
-        TextInputPushUndo(state, buffer);
-        i32 byte_pos = UTF8ByteOffset(buffer, state->cursor_pos);
-        i32 prev_byte = UTF8ByteOffset(buffer, state->cursor_pos - 1);
-        memmove(buffer + prev_byte, buffer + byte_pos,
-                (size_t)(byte_len - byte_pos + 1));
-        state->cursor_pos--;
-        changed = true;
-      }
-    }
-
-    /* Delete */
-    if (ctx->input.key_pressed[KEY_DELETE]) {
-      if (state->selection_start >= 0) {
-        /* Same as backspace with selection */
-        i32 start = state->selection_start < state->selection_end
-                        ? state->selection_start
-                        : state->selection_end;
-        i32 end = state->selection_start > state->selection_end
-                      ? state->selection_start
-                      : state->selection_end;
-        i32 start_byte = UTF8ByteOffset(buffer, start);
-        i32 end_byte = UTF8ByteOffset(buffer, end);
-        TextInputPushUndo(state, buffer);
-        memmove(buffer + start_byte, buffer + end_byte,
-                (size_t)(byte_len - end_byte + 1));
-        state->cursor_pos = start;
-        state->selection_start = -1;
-        changed = true;
-      } else if (state->cursor_pos < text_len) {
-        TextInputPushUndo(state, buffer);
-        i32 byte_pos = UTF8ByteOffset(buffer, state->cursor_pos);
-        i32 next_byte = UTF8ByteOffset(buffer, state->cursor_pos + 1);
-        memmove(buffer + byte_pos, buffer + next_byte,
-                (size_t)(byte_len - next_byte + 1));
-        changed = true;
-      }
-    }
-
-    /* Text input */
-    if (ctx->input.text_input && ctx->input.text_input >= 32) {
-      /* Delete selection first if any */
-      if (state->selection_start >= 0) {
-        i32 start = state->selection_start < state->selection_end
-                        ? state->selection_start
-                        : state->selection_end;
-        i32 end = state->selection_start > state->selection_end
-                      ? state->selection_start
-                      : state->selection_end;
-        i32 start_byte = UTF8ByteOffset(buffer, start);
-        i32 end_byte = UTF8ByteOffset(buffer, end);
-        TextInputPushUndo(state, buffer);
-        memmove(buffer + start_byte, buffer + end_byte,
-                (size_t)(byte_len - end_byte + 1));
-        state->cursor_pos = start;
-        state->selection_start = -1;
-        byte_len = (i32)strlen(buffer);
-      }
-
-      /* Insert character */
-      if (byte_len < buffer_size - 2) {
-        i32 byte_pos = UTF8ByteOffset(buffer, state->cursor_pos);
-        /* Simple ASCII for now */
-        if (ctx->input.text_input < 128) {
-          memmove(buffer + byte_pos + 1, buffer + byte_pos,
-                  (size_t)(byte_len - byte_pos + 1));
-          buffer[byte_pos] = (char)ctx->input.text_input;
-          state->cursor_pos++;
-          changed = true;
-        }
-      }
     }
 
     /* Update cursor blink */

@@ -271,6 +271,10 @@ void UI_Label(const char *text);
 b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
                  ui_text_state *state);
 
+/* Process text input logic (shared by widgets) */
+b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
+                        ui_input *input);
+
 /* Selectable - returns true when clicked */
 b32 UI_Selectable(const char *label, b32 selected);
 

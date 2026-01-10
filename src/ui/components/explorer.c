@@ -218,6 +218,7 @@ void Explorer_StartRename(explorer_state *state) {
     strncpy(state->input_buffer, entry->name, sizeof(state->input_buffer) - 1);
     memset(&state->input_state, 0, sizeof(state->input_state));
     state->input_state.cursor_pos = (i32)strlen(state->input_buffer);
+    state->input_state.has_focus = true;
   }
 }
 
@@ -225,12 +226,14 @@ void Explorer_StartCreateFile(explorer_state *state) {
   state->mode = EXPLORER_MODE_CREATE_FILE;
   state->input_buffer[0] = '\0';
   memset(&state->input_state, 0, sizeof(state->input_state));
+  state->input_state.has_focus = true;
 }
 
 void Explorer_StartCreateDir(explorer_state *state) {
   state->mode = EXPLORER_MODE_CREATE_DIR;
   state->input_buffer[0] = '\0';
   memset(&state->input_state, 0, sizeof(state->input_state));
+  state->input_state.has_focus = true;
 }
 
 void Explorer_ConfirmDelete(explorer_state *state) {

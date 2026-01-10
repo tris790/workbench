@@ -125,7 +125,7 @@ const struct wl_data_device_listener data_device_listener = {
 
 /* ===== Clipboard API ===== */
 
-char *Platform_GetClipboard(memory_arena *arena) {
+char *Platform_GetClipboard(char *buffer, usize buffer_size) {
   if (!g_platform.selection_offer) {
     return NULL;
   }
@@ -147,12 +147,10 @@ char *Platform_GetClipboard(memory_arena *arena) {
   wl_display_roundtrip(g_platform.display);
 
   /* Read from pipe */
-  usize capacity = 1024;
-  char *buffer = malloc(capacity);
   usize len = 0;
-
-  while (true) {
-    ssize_t r = read(fds[0], buffer + len, capacity - len - 1);
+  
+  while (len < buffer_size - 1) {
+    ssize_t r = read(fds[0], buffer + len, buffer_size - len - 1);
     if (r < 0) {
         break;
     }
@@ -160,20 +158,11 @@ char *Platform_GetClipboard(memory_arena *arena) {
         break; /* EOF */
     }
     len += r;
-    if (len >= capacity - 1) {
-      capacity *= 2;
-      buffer = realloc(buffer, capacity);
-    }
   }
   buffer[len] = '\0';
   close(fds[0]);
 
-  /* Copy to arena */
-  char *result = ArenaPushArray(arena, char, len + 1);
-  memcpy(result, buffer, len + 1);
-  free(buffer);
-
-  return result;
+  return buffer;
 }
 
 b32 Platform_SetClipboard(const char *text) {

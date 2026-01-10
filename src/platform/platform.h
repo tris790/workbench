@@ -204,7 +204,7 @@ void Platform_OpenFile(const char *path);
 
 /* ===== Clipboard API ===== */
 
-char *Platform_GetClipboard(memory_arena *arena);
+char *Platform_GetClipboard(char *buffer, usize buffer_size);
 b32 Platform_SetClipboard(const char *text);
 
 /* ===== Process API ===== */

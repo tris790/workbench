@@ -122,6 +122,17 @@ void Platform_Shutdown(void) {
   if (!g_platform.initialized)
     return;
 
+  if (g_platform.clipboard_content)
+    free(g_platform.clipboard_content);
+  if (g_platform.clipboard_source)
+    wl_data_source_destroy(g_platform.clipboard_source);
+  if (g_platform.selection_offer)
+    wl_data_offer_destroy(g_platform.selection_offer);
+  if (g_platform.data_device)
+    wl_data_device_destroy(g_platform.data_device);
+  if (g_platform.data_device_manager)
+    wl_data_device_manager_destroy(g_platform.data_device_manager);
+
   if (g_platform.keyboard)
     wl_keyboard_destroy(g_platform.keyboard);
   if (g_platform.pointer)
@@ -141,16 +152,7 @@ void Platform_Shutdown(void) {
   if (g_platform.display)
     wl_display_disconnect(g_platform.display);
 
-  if (g_platform.clipboard_content)
-    free(g_platform.clipboard_content);
-  if (g_platform.clipboard_source)
-    wl_data_source_destroy(g_platform.clipboard_source);
-  if (g_platform.selection_offer)
-    wl_data_offer_destroy(g_platform.selection_offer);
-  if (g_platform.data_device)
-    wl_data_device_destroy(g_platform.data_device);
-  if (g_platform.data_device_manager)
-    wl_data_device_manager_destroy(g_platform.data_device_manager);
+  memset(&g_platform, 0, sizeof(g_platform));
 
   memset(&g_platform, 0, sizeof(g_platform));
 }
