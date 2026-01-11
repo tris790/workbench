@@ -155,7 +155,7 @@ Output: `build/wb`
 - [X] File explorer
 - [X] Panel layout (1 or 2 panels)
 - [X] Command palette
-- [ ] Built-in terminal
+- [X] Built-in terminal
 - [ ] Preview panel
 - [ ] Context menu
 - [ ] Settings

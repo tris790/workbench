@@ -46,6 +46,7 @@ SOURCES="
     src/ui/components/file_item.c
     src/ui/components/command_palette.c
     src/ui/components/terminal_panel.c
+    src/ui/components/quick_filter.c
     src/core/fuzzy_match.c
     src/commands.c
     src/terminal/pty_linux.c

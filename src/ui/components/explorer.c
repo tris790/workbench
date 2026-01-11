@@ -9,8 +9,10 @@
 #include "core/text.h"
 #include "dialog.h"
 #include "file_item.h"
+#include "fuzzy_match.h"
 #include "icons.h"
 #include "input.h"
+#include "quick_filter.h"
 #include "theme.h"
 
 #include <stdio.h>
@@ -39,6 +41,19 @@ static b32 Explorer_IsEntryVisible(explorer_state *state, i32 index) {
   /* Hidden files are those starting with '.' */
   if (!state->show_hidden && entry->name[0] == '.') {
     return false;
+  }
+
+  /* Apply quick filter if active */
+  if (QuickFilter_IsActive(&state->filter)) {
+    const char *query = QuickFilter_GetQuery(&state->filter);
+
+    /* Use only the part after the last slash for matching filenames */
+    const char *last_slash = strrchr(query, '/');
+    const char *match_query = last_slash ? last_slash + 1 : query;
+
+    if (match_query[0] != '\0' && !FuzzyMatch(match_query, entry->name)) {
+      return false;
+    }
   }
 
   return true;
@@ -141,6 +156,9 @@ void Explorer_Init(explorer_state *state, memory_arena *arena) {
   /* Selection animation */
   state->selection_anim.speed = 600.0f;
 
+  /* Initialize quick filter */
+  QuickFilter_Init(&state->filter);
+
   /* Navigate to home by default */
   FS_NavigateHome(&state->fs);
 
@@ -157,6 +175,9 @@ b32 Explorer_NavigateTo(explorer_state *state, const char *path) {
     return true;
 
   if (FS_LoadDirectory(&state->fs, path)) {
+    /* Clear quick filter on navigation */
+    QuickFilter_Clear(&state->filter);
+
     /* Push to history */
     if (state->history_index < EXPLORER_MAX_HISTORY - 1) {
       state->history_index++;
@@ -317,18 +338,33 @@ void Explorer_Cancel(explorer_state *state) {
 
 static void HandleNormalInput(explorer_state *state, ui_context *ui) {
   ui_input *input = &ui->input;
+  b32 filter_active = QuickFilter_IsActive(&state->filter);
 
-  /* Vim-style navigation */
-  if (Input_KeyRepeat(KEY_J) ||
-      (Input_KeyRepeat(KEY_DOWN) && !(input->modifiers & MOD_CTRL))) {
+  /* Vim-style navigation - disabled when filter is active (j/k are printable)
+   */
+  if (!filter_active && Input_KeyRepeat(KEY_J)) {
     Explorer_MoveVisibleSelection(state, 1);
     SmoothValue_SetTarget(&state->selection_anim,
                           (f32)state->fs.selected_index);
     state->scroll_to_selection = true;
   }
 
-  if (Input_KeyRepeat(KEY_K) ||
-      (Input_KeyRepeat(KEY_UP) && !(input->modifiers & MOD_CTRL))) {
+  if (!filter_active && Input_KeyRepeat(KEY_K)) {
+    Explorer_MoveVisibleSelection(state, -1);
+    SmoothValue_SetTarget(&state->selection_anim,
+                          (f32)state->fs.selected_index);
+    state->scroll_to_selection = true;
+  }
+
+  /* Arrow key navigation - always works */
+  if (Input_KeyRepeat(KEY_DOWN) && !(input->modifiers & MOD_CTRL)) {
+    Explorer_MoveVisibleSelection(state, 1);
+    SmoothValue_SetTarget(&state->selection_anim,
+                          (f32)state->fs.selected_index);
+    state->scroll_to_selection = true;
+  }
+
+  if (Input_KeyRepeat(KEY_UP) && !(input->modifiers & MOD_CTRL)) {
     Explorer_MoveVisibleSelection(state, -1);
     SmoothValue_SetTarget(&state->selection_anim,
                           (f32)state->fs.selected_index);
@@ -349,18 +385,18 @@ static void HandleNormalInput(explorer_state *state, ui_context *ui) {
   }
 
   /* Home/End */
-  if (input->key_pressed[KEY_HOME]) {
+  if (Input_KeyPressed(KEY_HOME)) {
     FS_SetSelection(&state->fs, Explorer_FindFirstVisible(state));
     state->scroll_to_selection = true;
   }
 
-  if (input->key_pressed[KEY_END]) {
+  if (Input_KeyPressed(KEY_END)) {
     FS_SetSelection(&state->fs, Explorer_FindLastVisible(state));
     state->scroll_to_selection = true;
   }
 
   /* Enter directory or open file */
-  if (input->key_pressed[KEY_RETURN]) {
+  if (Input_KeyPressed(KEY_RETURN)) {
     fs_entry *entry = FS_GetSelectedEntry(&state->fs);
     if (entry) {
       if (entry->is_directory) {
@@ -374,45 +410,38 @@ static void HandleNormalInput(explorer_state *state, ui_context *ui) {
     }
   }
 
-  /* Go back (Up directory) */
-  if (input->key_pressed[KEY_BACKSPACE]) {
-    char parent_path[FS_MAX_PATH];
-    FS_JoinPath(parent_path, FS_MAX_PATH, state->fs.current_path, "..");
-    Explorer_NavigateTo(state, parent_path);
-  }
-
   /* Go home */
-  if (input->key_pressed[KEY_H] && (input->modifiers & MOD_CTRL)) {
+  if (Input_KeyPressed(KEY_H) && (input->modifiers & MOD_CTRL)) {
     Explorer_NavigateTo(state, FS_GetHomePath());
   }
 
   /* History Navigation */
-  if ((input->key_pressed[KEY_LEFT] && (input->modifiers & MOD_ALT)) ||
+  if ((Input_KeyPressed(KEY_LEFT) && (input->modifiers & MOD_ALT)) ||
       input->mouse_pressed[MOUSE_X1]) {
     Explorer_GoBack(state);
   }
 
-  if ((input->key_pressed[KEY_RIGHT] && (input->modifiers & MOD_ALT)) ||
+  if ((Input_KeyPressed(KEY_RIGHT) && (input->modifiers & MOD_ALT)) ||
       input->mouse_pressed[MOUSE_X2]) {
     Explorer_GoForward(state);
   }
 
   /* Toggle hidden files */
-  if (input->key_pressed[KEY_PERIOD] && (input->modifiers & MOD_CTRL)) {
+  if (Input_KeyPressed(KEY_PERIOD) && (input->modifiers & MOD_CTRL)) {
     Explorer_ToggleHidden(state);
   }
 
   /* File operations */
-  if (input->key_pressed[KEY_R] && (input->modifiers & MOD_CTRL)) {
+  if (Input_KeyPressed(KEY_R) && (input->modifiers & MOD_CTRL)) {
     Explorer_Refresh(state);
   }
 
-  if (input->key_pressed[KEY_F2] ||
-      (input->key_pressed[KEY_R] && !(input->modifiers & MOD_CTRL))) {
+  if (Input_KeyPressed(KEY_F2) ||
+      (Input_KeyPressed(KEY_R) && !(input->modifiers & MOD_CTRL))) {
     Explorer_StartRename(state);
   }
 
-  if (input->key_pressed[KEY_N] && (input->modifiers & MOD_CTRL)) {
+  if (Input_KeyPressed(KEY_N) && (input->modifiers & MOD_CTRL)) {
     if (input->modifiers & MOD_SHIFT) {
       Explorer_StartCreateDir(state);
     } else {
@@ -420,19 +449,19 @@ static void HandleNormalInput(explorer_state *state, ui_context *ui) {
     }
   }
 
-  if (input->key_pressed[KEY_DELETE]) {
+  if (Input_KeyPressed(KEY_DELETE)) {
     Explorer_ConfirmDelete(state, ui);
   }
 
-  if (input->key_pressed[KEY_C] && (input->modifiers & MOD_CTRL)) {
+  if (Input_KeyPressed(KEY_C) && (input->modifiers & MOD_CTRL)) {
     Explorer_Copy(state);
   }
 
-  if (input->key_pressed[KEY_X] && (input->modifiers & MOD_CTRL)) {
+  if (Input_KeyPressed(KEY_X) && (input->modifiers & MOD_CTRL)) {
     Explorer_Cut(state);
   }
 
-  if (input->key_pressed[KEY_V] && (input->modifiers & MOD_CTRL)) {
+  if (Input_KeyPressed(KEY_V) && (input->modifiers & MOD_CTRL)) {
     Explorer_Paste(state);
   }
 }
@@ -584,6 +613,110 @@ void Explorer_Update(explorer_state *state, ui_context *ui) {
   }
 
   if (state->mode == EXPLORER_MODE_NORMAL) {
+    /* Update quick filter first - it may consume input */
+    b32 filter_was_active = state->filter_was_active;
+    QuickFilter_Update(&state->filter, ui);
+    b32 filter_is_active = QuickFilter_IsActive(&state->filter);
+
+    state->filter_was_active = filter_is_active;
+
+    if (!filter_was_active && filter_is_active) {
+      /* Filter just started - save current path */
+      strncpy(state->search_start_path, state->fs.current_path,
+              FS_MAX_PATH - 1);
+      state->search_start_path[FS_MAX_PATH - 1] = '\0';
+    } else if (filter_is_active) {
+      /* Filter is active - handle folder traversal */
+      const char *query = QuickFilter_GetQuery(&state->filter);
+      if (query) {
+        /* Extract path part from query (everything up to last slash) */
+        char path_part[FS_MAX_PATH] = {0};
+        const char *last_slash = strrchr(query, '/');
+
+        if (last_slash) {
+          size_t len = (size_t)(last_slash - query) + 1;
+          if (len < sizeof(path_part)) {
+            memcpy(path_part, query, len);
+            path_part[len] = '\0';
+          }
+        }
+
+        /* Construct target path: search_start_path + path_part */
+        char target_path[FS_MAX_PATH] = {0};
+
+        /* Always start from the search start location */
+        if (path_part[0] != '\0') {
+          FS_JoinPath(target_path, FS_MAX_PATH, state->search_start_path,
+                      path_part);
+        } else {
+          strncpy(target_path, state->search_start_path, FS_MAX_PATH - 1);
+          target_path[FS_MAX_PATH - 1] = '\0';
+        }
+
+        /* Strip trailing slash from target_path for comparison and loading
+           (unless it is just root "/") */
+        size_t target_len = strlen(target_path);
+        if (target_len > 1 && target_path[target_len - 1] == '/') {
+          target_path[target_len - 1] = '\0';
+        }
+
+        /* If target path is different from current, navigate */
+        if (target_path[0] != '\0' &&
+            strcmp(state->fs.current_path, target_path) != 0) {
+          /* Use FS_LoadDirectory directly to avoid history push and filter
+           * clear */
+          if (FS_LoadDirectory(&state->fs, target_path)) {
+            /* Stay here */
+          }
+        }
+      }
+    } else if (filter_was_active && !filter_is_active) {
+      /* Filter just ended */
+      if (state->search_start_path[0] != '\0' &&
+          strcmp(state->fs.current_path, state->search_start_path) != 0) {
+        FS_LoadDirectory(&state->fs, state->search_start_path);
+      }
+    }
+
+    /* If filter state or content changed, reset selection */
+    const char *current_filter = QuickFilter_GetQuery(&state->filter);
+    if (filter_was_active != filter_is_active ||
+        strcmp(state->last_filter_buffer, current_filter) != 0) {
+
+      /* Update last buffer */
+      strncpy(state->last_filter_buffer, current_filter,
+              sizeof(state->last_filter_buffer) - 1);
+      state->last_filter_buffer[sizeof(state->last_filter_buffer) - 1] = '\0';
+
+      /* Find first and second visible items to apply selection preference:
+         - If > 1 result (e.g. ".." and "match"), select 2nd (the match)
+         - Else select 1st (e.g. "..")
+      */
+      i32 first_idx = -1;
+      i32 second_idx = -1;
+      i32 found = 0;
+
+      for (u32 i = 0; i < state->fs.entry_count; i++) {
+        if (Explorer_IsEntryVisible(state, (i32)i)) {
+          if (found == 0)
+            first_idx = (i32)i;
+          if (found == 1) {
+            second_idx = (i32)i;
+            break; /* Found enough to decide */
+          }
+          found++;
+        }
+      }
+
+      /* Use second if found, otherwise first */
+      i32 target = (second_idx != -1) ? second_idx : first_idx;
+
+      if (target >= 0) {
+        FS_SetSelection(&state->fs, target);
+        state->scroll_to_selection = true;
+      }
+    }
+
     HandleNormalInput(state, ui);
   } else {
     UI_BeginModal("ExplorerDialog");
@@ -781,6 +914,9 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
     bar_color.a = 100;
     Render_DrawRectRounded(ctx, scrollbar, 3.0f, bar_color);
   }
+
+  /* Draw quick filter overlay (positioned at bottom of list area) */
+  QuickFilter_Render(&state->filter, ui, list_area);
 
   /* Draw dialog overlay if in a mode */
   if (state->mode != EXPLORER_MODE_NORMAL) {

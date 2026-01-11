@@ -18,7 +18,8 @@ typedef enum {
   INPUT_TARGET_EXPLORER,        /* File explorer panel */
   INPUT_TARGET_TERMINAL,        /* Terminal panel */
   INPUT_TARGET_COMMAND_PALETTE, /* Command palette (modal) */
-  INPUT_TARGET_DIALOG, /* Modal dialogs (rename, create, delete, etc.) */
+  INPUT_TARGET_DIALOG,       /* Modal dialogs (rename, create, delete, etc.) */
+  INPUT_TARGET_QUICK_FILTER, /* Quick filter in explorer */
   INPUT_TARGET_COUNT
 } input_target;
 

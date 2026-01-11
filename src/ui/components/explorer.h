@@ -9,6 +9,7 @@
 #define EXPLORER_H
 
 #include "fs.h"
+#include "quick_filter.h"
 #include "text.h"
 #include "ui.h"
 
@@ -64,6 +65,14 @@ typedef struct {
 
   /* Wrapped text for dialogs (arena-allocated) */
   wrapped_text dialog_text;
+
+  /* Quick filter state */
+  quick_filter_state filter;
+
+  /* Search Traversal State */
+  char search_start_path[FS_MAX_PATH];
+  b32 filter_was_active;
+  char last_filter_buffer[QUICK_FILTER_MAX_INPUT];
 } explorer_state;
 
 /* ===== Explorer API ===== */
