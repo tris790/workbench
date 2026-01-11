@@ -76,10 +76,11 @@ void TerminalPanel_Init(terminal_panel_state *state) {
   state->cursor_blink.current = 1.0f;
   state->cursor_blink.target = 1.0f;
   state->cursor_blink.speed = 4.0f;
-  
+
   /* Initialize suggestion engine */
-  state->shell_mode = SHELL_FISH;  /* Default to fish shell on Linux per user request */
-  state->suggestions = Suggestion_Create(NULL);  /* Default history path */
+  state->shell_mode =
+      SHELL_FISH; /* Default to fish shell on Linux per user request */
+  state->suggestions = Suggestion_Create(NULL); /* Default history path */
 }
 
 void TerminalPanel_Destroy(terminal_panel_state *state) {
@@ -90,7 +91,7 @@ void TerminalPanel_Destroy(terminal_panel_state *state) {
     Terminal_Destroy(state->terminal);
     state->terminal = NULL;
   }
-  
+
   if (state->suggestions) {
     Suggestion_Destroy(state->suggestions);
     state->suggestions = NULL;
@@ -111,11 +112,12 @@ void TerminalPanel_Toggle(terminal_panel_state *state, const char *cwd) {
 
     /* Create terminal if needed, or respawn if CWD changed significantly */
     if (!state->terminal) {
-      state->terminal = Terminal_Create(TERMINAL_DEFAULT_COLS, TERMINAL_DEFAULT_ROWS);
+      state->terminal =
+          Terminal_Create(TERMINAL_DEFAULT_COLS, TERMINAL_DEFAULT_ROWS);
       if (state->terminal) {
         const char *shell = NULL;
         if (state->shell_mode == SHELL_FISH) {
-            shell = "fish";
+          shell = "fish";
         }
         Terminal_Spawn(state->terminal, shell, cwd);
         if (cwd) {
@@ -131,7 +133,8 @@ void TerminalPanel_Toggle(terminal_panel_state *state, const char *cwd) {
   }
 }
 
-void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt, b32 is_active) {
+void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
+                          b32 is_active) {
   (void)ui; /* Used to be for ui->input, now using centralized Input_* API */
   if (!state)
     return;
@@ -140,7 +143,8 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt, b
   SmoothValue_Update(&state->anim, dt);
 
   /* Sync has_focus with global input focus AND panel activity */
-  state->has_focus = Input_HasFocus(INPUT_TARGET_TERMINAL) && state->visible && is_active;
+  state->has_focus =
+      Input_HasFocus(INPUT_TARGET_TERMINAL) && state->visible && is_active;
 
   /* Update cursor blink */
   if (state->visible && state->has_focus) {
@@ -156,8 +160,9 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt, b
   }
 
   /* Handle click-to-focus */
-  if (state->visible && state->anim.current > 0.5f && state->last_bounds.w > 0) {
-    if (Input_MousePressed(MOUSE_LEFT) && 
+  if (state->visible && state->anim.current > 0.5f &&
+      state->last_bounds.w > 0) {
+    if (Input_MousePressed(MOUSE_LEFT) &&
         UI_PointInRect(Input_GetMousePos(), state->last_bounds)) {
       Input_SetFocus(INPUT_TARGET_TERMINAL);
       state->has_focus = true;
@@ -175,12 +180,13 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt, b
   }
 
   /* Handle keyboard input when focused */
-  if (state->has_focus && state->terminal && Terminal_IsAlive(state->terminal) &&
+  if (state->has_focus && state->terminal &&
+      Terminal_IsAlive(state->terminal) &&
       Input_HasFocus(INPUT_TARGET_TERMINAL)) {
 
     u32 mods = Input_GetModifiers();
     b32 at_eol = Terminal_IsCursorAtEOL(state->terminal);
-    
+
     /* ===== Suggestion Acceptance ===== */
     /* Ctrl+F or Right Arrow (at EOL): Accept full suggestion */
     if ((Input_KeyPressed(KEY_RIGHT) && at_eol) ||
@@ -195,36 +201,76 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt, b
       }
     }
     /* Alt+F or Alt+Right: Accept first word of suggestion */
-    else if ((Input_KeyPressed(KEY_RIGHT) || Input_KeyPressed(KEY_F)) && 
+    else if ((Input_KeyPressed(KEY_RIGHT) || Input_KeyPressed(KEY_F)) &&
              (mods & MOD_ALT)) {
       char first_word[256];
-      Suggestion_GetFirstWord(&state->current_suggestion, first_word, sizeof(first_word));
+      Suggestion_GetFirstWord(&state->current_suggestion, first_word,
+                              sizeof(first_word));
       if (first_word[0] != '\0') {
         Terminal_Write(state->terminal, first_word, (u32)strlen(first_word));
         state->current_suggestion.valid = false;
       }
     }
+    /* ===== Word Navigation & Deletion (Ctrl/Alt modifiers) ===== */
+    /* Ctrl+Backspace: Delete word backward (send Ctrl+W) */
+    else if (Input_KeyRepeat(KEY_BACKSPACE) && (mods & MOD_CTRL)) {
+      Terminal_Write(state->terminal, "\x17",
+                     1); /* Ctrl+W = backward-kill-word */
+    }
+    /* Alt+Backspace: Delete word backward (send ESC + DEL) */
+    else if (Input_KeyRepeat(KEY_BACKSPACE) && (mods & MOD_ALT)) {
+      Terminal_Write(state->terminal, "\x1b\x7f", 2);
+    }
+    /* Ctrl+Delete: Delete word forward */
+    else if (Input_KeyRepeat(KEY_DELETE) && (mods & MOD_CTRL)) {
+      Terminal_Write(state->terminal, "\x1b[3;5~", 6);
+    }
+    /* Ctrl+Left: Move word backward */
+    else if (Input_KeyRepeat(KEY_LEFT) && (mods & MOD_CTRL)) {
+      Terminal_Write(state->terminal, "\x1b[1;5D", 6);
+    }
+    /* Ctrl+Right: Move word forward */
+    else if (Input_KeyRepeat(KEY_RIGHT) && (mods & MOD_CTRL)) {
+      Terminal_Write(state->terminal, "\x1b[1;5C", 6);
+    }
+    /* Alt+Left: Move word backward (alternate) */
+    else if (Input_KeyRepeat(KEY_LEFT) && (mods & MOD_ALT)) {
+      Terminal_Write(state->terminal, "\x1b[1;3D", 6);
+    }
+    /* Alt+Right: Move word forward (alternate) */
+    else if (Input_KeyRepeat(KEY_RIGHT) && (mods & MOD_ALT)) {
+      Terminal_Write(state->terminal, "\x1b[1;3C", 6);
+    }
+    /* Ctrl+Home: Move to beginning of line/input */
+    else if (Input_KeyRepeat(KEY_HOME) && (mods & MOD_CTRL)) {
+      Terminal_Write(state->terminal, "\x1b[1;5H", 6);
+    }
+    /* Ctrl+End: Move to end of line/input */
+    else if (Input_KeyRepeat(KEY_END) && (mods & MOD_CTRL)) {
+      Terminal_Write(state->terminal, "\x1b[1;5F", 6);
+    }
     /* ===== Standard Key Handling ===== */
-    else if (Input_KeyPressed(KEY_UP)) {
+    else if (Input_KeyRepeat(KEY_UP)) {
       Terminal_Write(state->terminal, "\x1b[A", 3);
-    }
-    else if (Input_KeyPressed(KEY_DOWN)) {
+    } else if (Input_KeyRepeat(KEY_DOWN)) {
       Terminal_Write(state->terminal, "\x1b[B", 3);
-    }
-    else if (Input_KeyPressed(KEY_RIGHT)) {
+    } else if (Input_KeyRepeat(KEY_RIGHT)) {
       Terminal_Write(state->terminal, "\x1b[C", 3);
-    }
-    else if (Input_KeyPressed(KEY_LEFT)) {
+    } else if (Input_KeyRepeat(KEY_LEFT)) {
       Terminal_Write(state->terminal, "\x1b[D", 3);
     }
-    
-    if (Input_KeyPressed(KEY_HOME)) {
-      Terminal_Write(state->terminal, "\x1b[H", 3);
+
+    if (Input_KeyRepeat(KEY_HOME)) {
+      if (!(mods & MOD_CTRL)) { /* Already handled Ctrl+Home above */
+        Terminal_Write(state->terminal, "\x1b[H", 3);
+      }
     }
-    if (Input_KeyPressed(KEY_END)) {
-      Terminal_Write(state->terminal, "\x1b[F", 3);
+    if (Input_KeyRepeat(KEY_END)) {
+      if (!(mods & MOD_CTRL)) { /* Already handled Ctrl+End above */
+        Terminal_Write(state->terminal, "\x1b[F", 3);
+      }
     }
-    if (Input_KeyPressed(KEY_PAGE_UP)) {
+    if (Input_KeyRepeat(KEY_PAGE_UP)) {
       if (mods & MOD_SHIFT) {
         /* Shift+PageUp = scroll terminal history */
         Terminal_Scroll(state->terminal, 10);
@@ -232,24 +278,31 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt, b
         Terminal_Write(state->terminal, "\x1b[5~", 4);
       }
     }
-    if (Input_KeyPressed(KEY_PAGE_DOWN)) {
+    if (Input_KeyRepeat(KEY_PAGE_DOWN)) {
       if (mods & MOD_SHIFT) {
         Terminal_Scroll(state->terminal, -10);
       } else {
         Terminal_Write(state->terminal, "\x1b[6~", 4);
       }
     }
-    if (Input_KeyPressed(KEY_DELETE)) {
-      Terminal_Write(state->terminal, "\x1b[3~", 4);
+    if (Input_KeyRepeat(KEY_DELETE)) {
+      if (!(mods & MOD_CTRL)) { /* Already handled Ctrl+Delete above */
+        Terminal_Write(state->terminal, "\x1b[3~", 4);
+      }
     }
-    if (Input_KeyPressed(KEY_BACKSPACE)) {
-      Terminal_Write(state->terminal, "\x7f", 1);
+    if (Input_KeyRepeat(KEY_BACKSPACE)) {
+      if (!(mods & (MOD_CTRL |
+                    MOD_ALT))) { /* Already handled Ctrl/Alt+Backspace above */
+        Terminal_Write(state->terminal, "\x7f", 1);
+      }
     }
-    /* Handle tab completion override only if emulated mode AND suggestion is active */
+    /* Handle tab completion override only if emulated mode AND suggestion is
+     * active */
     if (Input_KeyPressed(KEY_TAB)) {
       b32 accepted = false;
-      
-      if (state->shell_mode == SHELL_EMULATED && state->current_suggestion.valid && at_eol) {
+
+      if (state->shell_mode == SHELL_EMULATED &&
+          state->current_suggestion.valid && at_eol) {
         const char *suffix = Suggestion_GetSuffix(&state->current_suggestion);
         if (suffix && suffix[0] != '\0') {
           Terminal_Write(state->terminal, suffix, (u32)strlen(suffix));
@@ -257,7 +310,7 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt, b
           accepted = true;
         }
       }
-      
+
       if (!accepted) {
         Terminal_Write(state->terminal, "\t", 1);
       }
@@ -278,7 +331,8 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt, b
     /* Ctrl+key combinations (except Ctrl+F which is handled above) */
     if (mods & MOD_CTRL) {
       for (int k = KEY_A; k <= KEY_Z; k++) {
-        if (k == KEY_F) continue;  /* Already handled for suggestion */
+        if (k == KEY_F)
+          continue; /* Already handled for suggestion */
         if (Input_KeyPressed((key_code)k)) {
           char ctrl_char = (char)((k - KEY_A) + 1); /* Ctrl+A = 0x01, etc. */
           Terminal_Write(state->terminal, &ctrl_char, 1);
@@ -304,30 +358,33 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt, b
     Input_ConsumeKeys();
     Input_ConsumeText();
   }
-  
+
   /* ===== Update Suggestions ===== */
   if (state->terminal && state->suggestions && state->visible) {
     const char *current_input = Terminal_GetCurrentLine(state->terminal);
-    
+
     /* Update CWD for path suggestions */
     if (state->terminal && state->terminal->cwd[0] != '\0') {
-       Suggestion_SetCWD(state->suggestions, state->terminal->cwd);
+      Suggestion_SetCWD(state->suggestions, state->terminal->cwd);
     } else if (state->last_cwd[0] != '\0') {
       Suggestion_SetCWD(state->suggestions, state->last_cwd);
     }
-    
+
     /* Update suggestion if input changed or is non-empty */
-      /* Only update suggestion if input changed or is non-empty */
+    /* Only update suggestion if input changed or is non-empty */
     if (current_input) {
-      if (current_input[0] != '\0' && strcmp(current_input, state->last_input) != 0) {
-        strncpy(state->last_input, current_input, sizeof(state->last_input) - 1);
+      if (current_input[0] != '\0' &&
+          strcmp(current_input, state->last_input) != 0) {
+        strncpy(state->last_input, current_input,
+                sizeof(state->last_input) - 1);
         state->last_input[sizeof(state->last_input) - 1] = '\0';
-        
+
         /* Get new suggestion only if in EMULATED mode */
         if (state->shell_mode == SHELL_EMULATED) {
-            state->current_suggestion = Suggestion_Get(state->suggestions, current_input);
+          state->current_suggestion =
+              Suggestion_Get(state->suggestions, current_input);
         } else {
-            state->current_suggestion.valid = false;
+          state->current_suggestion.valid = false;
         }
       } else if (current_input[0] == '\0') {
         /* Clear suggestion when input is empty */
@@ -393,7 +450,7 @@ void TerminalPanel_Render(terminal_panel_state *state, ui_context *ui,
     /* No terminal yet */
     color text_color = {128, 128, 128, 255};
     v2i pos = {content.x, content.y};
-     /* Use ui->font directly as we haven't defined mono_font yet */
+    /* Use ui->font directly as we haven't defined mono_font yet */
     Render_DrawText(r, pos, "Terminal not started", ui->font, text_color);
     return;
   }
@@ -405,9 +462,11 @@ void TerminalPanel_Render(terminal_panel_state *state, ui_context *ui,
 
   if (mono_font) {
     cell_width = Font_MeasureWidth(mono_font, "M");
-    if (cell_width <= 0) cell_width = 8;
+    if (cell_width <= 0)
+      cell_width = 8;
     cell_height = Font_GetLineHeight(mono_font);
-    if (cell_height <= 0) cell_height = 16;
+    if (cell_height <= 0)
+      cell_height = 16;
   }
 
   /* Calculate visible dimensions */
@@ -429,7 +488,8 @@ void TerminalPanel_Render(terminal_panel_state *state, ui_context *ui,
   for (u32 y = 0; y < rows && y < visible_rows; y++) {
     for (u32 x = 0; x < cols && x < visible_cols; x++) {
       const terminal_cell *cell = Terminal_GetCell(state->terminal, x, y);
-      if (!cell) continue;
+      if (!cell)
+        continue;
 
       i32 px = content.x + (i32)x * cell_width;
       i32 py = content.y + (i32)y * cell_height;
@@ -485,15 +545,15 @@ void TerminalPanel_Render(terminal_panel_state *state, ui_context *ui,
       /* Get cursor position */
       u32 cursor_x = Terminal_GetCursorCol(state->terminal);
       u32 cursor_y = state->terminal->cursor_y;
-      
+
       /* Only show suggestion at end of line */
       if (Terminal_IsCursorAtEOL(state->terminal)) {
         i32 ghost_x = content.x + (i32)cursor_x * cell_width;
         i32 ghost_y = content.y + (i32)cursor_y * cell_height;
-        
+
         /* Gray color for ghost text */
         color ghost_color = {100, 100, 100, 220};
-        
+
         v2i ghost_pos = {ghost_x, ghost_y};
         Render_DrawText(r, ghost_pos, suffix, mono_font, ghost_color);
       }
@@ -530,48 +590,52 @@ void TerminalPanel_Render(terminal_panel_state *state, ui_context *ui,
     /* Calculate thumb */
     u32 total_lines = state->terminal->scrollback_count + state->terminal->rows;
     u32 viewport_lines = state->terminal->rows;
-    
+
     /* Avoid div by zero */
     if (total_lines > 0) {
-        f32 view_ratio = (f32)viewport_lines / (f32)total_lines;
-        i32 thumb_height = (i32)((f32)sb_track.h * view_ratio);
-        if (thumb_height < 20) thumb_height = 20;
-        
-        /* Scroll offset 0 = bottom, offset max = top */
-        /* Invert logic for visual scrollbar (top=0) */
-        /* When scroll_offset = 0 (bottom), thumb should be at bottom of track */
-        /* When scroll_offset = max (top), thumb should be at top of track */
-        
-        i32 scrollable_height = sb_track.h - thumb_height;
-        f32 scroll_ratio = (f32)state->terminal->scroll_offset / (f32)state->terminal->scrollback_count;
-        
-        /* Clamp ratio */
-        if (scroll_ratio > 1.0f) scroll_ratio = 1.0f;
-        if (scroll_ratio < 0.0f) scroll_ratio = 0.0f;
-        
-        /* Calculate y position. 
-           Ratio 1.0 (top of history) -> y = 0
-           Ratio 0.0 (bottom of history) -> y = max_y
-        */
-        i32 thumb_y = sb_track.y + (i32)((1.0f - scroll_ratio) * (f32)scrollable_height);
-        
-        rect sb_thumb = {
-            .x = sb_track.x + 2,
-            .y = thumb_y,
-            .w = sb_width - 4,
-            .h = thumb_height,
-        };
-        
-        color thumb_color = {80, 80, 80, 255};
-        if (state->has_focus) {
-            thumb_color = (color){100, 100, 100, 255};
-        }
-        
-        Render_DrawRect(r, sb_thumb, thumb_color);
+      f32 view_ratio = (f32)viewport_lines / (f32)total_lines;
+      i32 thumb_height = (i32)((f32)sb_track.h * view_ratio);
+      if (thumb_height < 20)
+        thumb_height = 20;
+
+      /* Scroll offset 0 = bottom, offset max = top */
+      /* Invert logic for visual scrollbar (top=0) */
+      /* When scroll_offset = 0 (bottom), thumb should be at bottom of track */
+      /* When scroll_offset = max (top), thumb should be at top of track */
+
+      i32 scrollable_height = sb_track.h - thumb_height;
+      f32 scroll_ratio = (f32)state->terminal->scroll_offset /
+                         (f32)state->terminal->scrollback_count;
+
+      /* Clamp ratio */
+      if (scroll_ratio > 1.0f)
+        scroll_ratio = 1.0f;
+      if (scroll_ratio < 0.0f)
+        scroll_ratio = 0.0f;
+
+      /* Calculate y position.
+         Ratio 1.0 (top of history) -> y = 0
+         Ratio 0.0 (bottom of history) -> y = max_y
+      */
+      i32 thumb_y =
+          sb_track.y + (i32)((1.0f - scroll_ratio) * (f32)scrollable_height);
+
+      rect sb_thumb = {
+          .x = sb_track.x + 2,
+          .y = thumb_y,
+          .w = sb_width - 4,
+          .h = thumb_height,
+      };
+
+      color thumb_color = {80, 80, 80, 255};
+      if (state->has_focus) {
+        thumb_color = (color){100, 100, 100, 255};
+      }
+
+      Render_DrawRect(r, sb_thumb, thumb_color);
     }
   }
 }
-
 
 i32 TerminalPanel_GetHeight(terminal_panel_state *state, i32 available_height) {
   if (!state)

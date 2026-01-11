@@ -36,6 +36,7 @@ SOURCES="
     src/core/animation.c
     src/core/fs.c
     src/core/input.c
+    src/core/key_repeat.c
     src/core/text.c
     src/ui/ui.c
     src/ui/layout.c

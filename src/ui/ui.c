@@ -5,6 +5,7 @@
  */
 
 #include "ui.h"
+#include "input.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -402,12 +403,13 @@ void UI_BeginFrame(ui_context *ctx, ui_input *input, f32 dt) {
   /* Store last frame's focus */
   ctx->last_focused = ctx->focused;
 
-/* Reset focus tracking for this frame */
+  /* Reset focus tracking for this frame */
   ctx->focus_count = 0;
 
   /* Update modal state */
   ctx->active_modal = ctx->next_modal;
-  ctx->next_modal = UI_ID_NONE; /* Reset for this frame, modals must call BeginModal to keep active */
+  ctx->next_modal = UI_ID_NONE; /* Reset for this frame, modals must call
+                                   BeginModal to keep active */
   ctx->current_modal = UI_ID_NONE;
 }
 
@@ -417,9 +419,10 @@ void UI_EndFrame(ui_context *ctx) {
     UI_EndLayout();
   }
 
-  /* Handle arrow key navigation - BLOCK if modal is active and we are not processing it?
-     Actually, focus navigation might need to be restricted to modal only.
-     For now, we let it be, assuming modal elements are the only ones getting focus.
+  /* Handle arrow key navigation - BLOCK if modal is active and we are not
+     processing it? Actually, focus navigation might need to be restricted to
+     modal only. For now, we let it be, assuming modal elements are the only
+     ones getting focus.
   */
 
   if (ctx->input.key_pressed[KEY_DOWN]) {
@@ -476,10 +479,11 @@ b32 UI_IsActive(ui_id id) { return g_ui_ctx->active == id; }
 static void RegisterFocusable(ui_id id) {
   ui_context *ctx = g_ui_ctx;
   /* If modal is active, only register elements if we are in that modal */
-  if (ctx->active_modal != UI_ID_NONE && ctx->current_modal != ctx->active_modal) {
+  if (ctx->active_modal != UI_ID_NONE &&
+      ctx->current_modal != ctx->active_modal) {
     return;
   }
-  
+
   if (ctx->focus_count < 256) {
     ctx->focus_order[ctx->focus_count++] = id;
   }
@@ -739,7 +743,8 @@ static b32 TextInputPopUndo(ui_text_state *state, char *buffer, i32 buf_size) {
 b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
                         ui_input *input) {
   b32 changed = false;
-  i32 text_len = (i32)strlen(buffer); /* Assumes UTF-8 well-formedness for length */
+  i32 text_len =
+      (i32)strlen(buffer); /* Assumes UTF-8 well-formedness for length */
 
   /* Handle cursor blink reset on input */
   if (input->text_input || input->key_pressed[KEY_LEFT] ||
@@ -772,8 +777,9 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
       i32 end_byte = UTF8ByteOffset(buffer, end);
       char temp[UI_MAX_TEXT_INPUT_SIZE];
       i32 len = end_byte - start_byte;
-      if (len >= UI_MAX_TEXT_INPUT_SIZE) len = UI_MAX_TEXT_INPUT_SIZE - 1;
-      
+      if (len >= UI_MAX_TEXT_INPUT_SIZE)
+        len = UI_MAX_TEXT_INPUT_SIZE - 1;
+
       strncpy(temp, buffer + start_byte, (size_t)len);
       temp[len] = '\0';
       Platform_SetClipboard(temp);
@@ -795,18 +801,20 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
       /* Copy to clipboard */
       char temp[UI_MAX_TEXT_INPUT_SIZE];
       i32 len = end_byte - start_byte;
-      if (len >= UI_MAX_TEXT_INPUT_SIZE) len = UI_MAX_TEXT_INPUT_SIZE - 1;
-      
+      if (len >= UI_MAX_TEXT_INPUT_SIZE)
+        len = UI_MAX_TEXT_INPUT_SIZE - 1;
+
       strncpy(temp, buffer + start_byte, (size_t)len);
       temp[len] = '\0';
       Platform_SetClipboard(temp);
 
       /* Delete selection */
       TextInputPushUndo(state, buffer);
-      
+
       i32 total_bytes = (i32)strlen(buffer);
-      memmove(buffer + start_byte, buffer + end_byte, (size_t)(total_bytes - end_byte + 1));
-      
+      memmove(buffer + start_byte, buffer + end_byte,
+              (size_t)(total_bytes - end_byte + 1));
+
       state->cursor_pos = start;
       state->selection_start = -1;
       changed = true;
@@ -829,10 +837,11 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
         i32 start_byte = UTF8ByteOffset(buffer, start);
         i32 end_byte = UTF8ByteOffset(buffer, end);
         TextInputPushUndo(state, buffer);
-        
+
         i32 total_bytes = (i32)strlen(buffer);
-        memmove(buffer + start_byte, buffer + end_byte, (size_t)(total_bytes - end_byte + 1));
-        
+        memmove(buffer + start_byte, buffer + end_byte,
+                (size_t)(total_bytes - end_byte + 1));
+
         state->cursor_pos = start;
         state->selection_start = -1;
         text_len = (i32)strlen(buffer);
@@ -844,8 +853,9 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
         TextInputPushUndo(state, buffer);
         i32 cursor_byte = UTF8ByteOffset(buffer, state->cursor_pos);
         i32 total_bytes = (i32)strlen(buffer);
-        
-        memmove(buffer + cursor_byte + paste_len, buffer + cursor_byte, (size_t)(total_bytes - cursor_byte + 1));
+
+        memmove(buffer + cursor_byte + paste_len, buffer + cursor_byte,
+                (size_t)(total_bytes - cursor_byte + 1));
         memcpy(buffer + cursor_byte, clipboard, (size_t)paste_len);
         state->cursor_pos += UTF8Length(clipboard); /* Advance char count */
         changed = true;
@@ -867,29 +877,31 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
     if (shift && state->selection_start < 0) {
       state->selection_start = state->cursor_pos;
     }
-    
+
     if (ctrl) {
-        /* Word jump left */
-        if (state->cursor_pos > 0) {
-            i32 cursor = state->cursor_pos - 1;
-            /* Skip whitespace backwards */
-            while (cursor > 0 && buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
-                cursor--;
-            }
-            /* Skip non-whitespace backwards */
-            while (cursor > 0 && buffer[UTF8ByteOffset(buffer, cursor)] != ' ') {
-                cursor--;
-            }
-            /* If we stopped on space (and not at start), move forward one to be at start of word */
-            if (cursor > 0 || buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
-                 if (buffer[UTF8ByteOffset(buffer, cursor)] == ' ') cursor++;
-            }
-            state->cursor_pos = cursor;
+      /* Word jump left */
+      if (state->cursor_pos > 0) {
+        i32 cursor = state->cursor_pos - 1;
+        /* Skip whitespace backwards */
+        while (cursor > 0 && buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
+          cursor--;
         }
+        /* Skip non-whitespace backwards */
+        while (cursor > 0 && buffer[UTF8ByteOffset(buffer, cursor)] != ' ') {
+          cursor--;
+        }
+        /* If we stopped on space (and not at start), move forward one to be at
+         * start of word */
+        if (cursor > 0 || buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
+          if (buffer[UTF8ByteOffset(buffer, cursor)] == ' ')
+            cursor++;
+        }
+        state->cursor_pos = cursor;
+      }
     } else {
-        if (state->cursor_pos > 0) {
-          state->cursor_pos--;
-        }
+      if (state->cursor_pos > 0) {
+        state->cursor_pos--;
+      }
     }
 
     if (shift) {
@@ -903,26 +915,28 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
     if (shift && state->selection_start < 0) {
       state->selection_start = state->cursor_pos;
     }
-    
+
     if (ctrl) {
-        /* Word jump right */
-        i32 char_count = UTF8Length(buffer);
-        if (state->cursor_pos < char_count) {
-            i32 cursor = state->cursor_pos;
-            /* Skip non-whitespace forward */
-            while (cursor < char_count && buffer[UTF8ByteOffset(buffer, cursor)] != ' ') {
-                cursor++;
-            }
-            /* Skip whitespace forward */
-            while (cursor < char_count && buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
-                cursor++;
-            }
-            state->cursor_pos = cursor;
+      /* Word jump right */
+      i32 char_count = UTF8Length(buffer);
+      if (state->cursor_pos < char_count) {
+        i32 cursor = state->cursor_pos;
+        /* Skip non-whitespace forward */
+        while (cursor < char_count &&
+               buffer[UTF8ByteOffset(buffer, cursor)] != ' ') {
+          cursor++;
         }
+        /* Skip whitespace forward */
+        while (cursor < char_count &&
+               buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
+          cursor++;
+        }
+        state->cursor_pos = cursor;
+      }
     } else {
-        if (state->cursor_pos < UTF8Length(buffer)) {
-          state->cursor_pos++;
-        }
+      if (state->cursor_pos < UTF8Length(buffer)) {
+        state->cursor_pos++;
+      }
     }
 
     if (shift) {
@@ -957,8 +971,8 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
     }
   }
 
-  /* Backspace */
-  if (input->key_pressed[KEY_BACKSPACE]) {
+  /* Backspace - check both local key_pressed and global key repeat */
+  if (input->key_pressed[KEY_BACKSPACE] || Input_KeyRepeat(KEY_BACKSPACE)) {
     if (state->selection_start >= 0) {
       /* Delete selection */
       i32 start = state->selection_start < state->selection_end
@@ -970,7 +984,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
       i32 start_byte = UTF8ByteOffset(buffer, start);
       i32 end_byte = UTF8ByteOffset(buffer, end);
       TextInputPushUndo(state, buffer);
-      
+
       i32 total_bytes = (i32)strlen(buffer);
       memmove(buffer + start_byte, buffer + end_byte,
               (size_t)(total_bytes - end_byte + 1));
@@ -980,31 +994,32 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
       text_len = (i32)strlen(buffer);
     } else if (state->cursor_pos > 0) {
       TextInputPushUndo(state, buffer);
-      
+
       i32 target_pos = state->cursor_pos - 1;
-      
+
       if (ctrl) {
         /* Word delete backward */
         i32 cursor = state->cursor_pos - 1;
         /* Skip whitespace backwards */
         while (cursor > 0 && buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
-            cursor--;
+          cursor--;
         }
         /* Skip non-whitespace backwards */
         while (cursor > 0 && buffer[UTF8ByteOffset(buffer, cursor)] != ' ') {
-            cursor--;
+          cursor--;
         }
         /* Adjust to delete from start of word */
         if (cursor > 0 || buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
-             if (buffer[UTF8ByteOffset(buffer, cursor)] == ' ') cursor++;
+          if (buffer[UTF8ByteOffset(buffer, cursor)] == ' ')
+            cursor++;
         }
         target_pos = cursor;
       }
-      
+
       i32 byte_pos = UTF8ByteOffset(buffer, state->cursor_pos);
       i32 target_byte = UTF8ByteOffset(buffer, target_pos);
       i32 total_bytes = (i32)strlen(buffer);
-      
+
       memmove(buffer + target_byte, buffer + byte_pos,
               (size_t)(total_bytes - byte_pos + 1));
       state->cursor_pos = target_pos;
@@ -1013,8 +1028,8 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
     }
   }
 
-  /* Delete */
-  if (input->key_pressed[KEY_DELETE]) {
+  /* Delete - check both local key_pressed and global key repeat */
+  if (input->key_pressed[KEY_DELETE] || Input_KeyRepeat(KEY_DELETE)) {
     if (state->selection_start >= 0) {
       /* Same as backspace with selection */
       i32 start = state->selection_start < state->selection_end
@@ -1026,7 +1041,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
       i32 start_byte = UTF8ByteOffset(buffer, start);
       i32 end_byte = UTF8ByteOffset(buffer, end);
       TextInputPushUndo(state, buffer);
-      
+
       i32 total_bytes = (i32)strlen(buffer);
       memmove(buffer + start_byte, buffer + end_byte,
               (size_t)(total_bytes - end_byte + 1));
@@ -1036,7 +1051,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
       text_len = (i32)strlen(buffer);
     } else if (state->cursor_pos < UTF8Length(buffer)) {
       TextInputPushUndo(state, buffer);
-      
+
       i32 target_pos = state->cursor_pos + 1;
 
       if (ctrl) {
@@ -1044,12 +1059,14 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
         i32 char_count = UTF8Length(buffer);
         i32 cursor = state->cursor_pos;
         /* Skip non-whitespace forward */
-        while (cursor < char_count && buffer[UTF8ByteOffset(buffer, cursor)] != ' ') {
-            cursor++;
+        while (cursor < char_count &&
+               buffer[UTF8ByteOffset(buffer, cursor)] != ' ') {
+          cursor++;
         }
         /* Skip whitespace forward */
-        while (cursor < char_count && buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
-            cursor++;
+        while (cursor < char_count &&
+               buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
+          cursor++;
         }
         target_pos = cursor;
       }
@@ -1078,7 +1095,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
       i32 start_byte = UTF8ByteOffset(buffer, start);
       i32 end_byte = UTF8ByteOffset(buffer, end);
       TextInputPushUndo(state, buffer);
-      
+
       i32 total_bytes = (i32)strlen(buffer);
       memmove(buffer + start_byte, buffer + end_byte,
               (size_t)(total_bytes - end_byte + 1));
@@ -1168,7 +1185,7 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
   /* Handle keyboard input when focused */
   if (ctx->focused == id) {
     if (UI_ProcessTextInput(state, buffer, buffer_size, &ctx->input)) {
-        changed = true;
+      changed = true;
     }
 
     /* Update cursor blink */
@@ -1259,7 +1276,7 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
 void UI_BeginModal(const char *name) {
   ui_context *ctx = g_ui_ctx;
   ui_id id = UI_GenID(name);
-  
+
   ctx->current_modal = id;
   ctx->next_modal = id; /* Keep alive for next frame */
 }
@@ -1274,10 +1291,10 @@ void UI_EndModal(void) {
 void UI_DrawPanel(rect bounds) {
   ui_context *ctx = g_ui_ctx;
   const theme *th = ctx->theme;
-  
+
   /* Background */
   Render_DrawRectRounded(ctx->renderer, bounds, th->radius_md, th->panel);
-  
+
   /* Border */
   rect border = {bounds.x - 1, bounds.y - 1, bounds.w + 2, bounds.h + 2};
   Render_DrawRectRounded(ctx->renderer, border, th->radius_md + 1, th->border);

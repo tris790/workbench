@@ -319,16 +319,16 @@ static void HandleNormalInput(explorer_state *state, ui_context *ui) {
   ui_input *input = &ui->input;
 
   /* Vim-style navigation */
-  if (input->key_pressed[KEY_J] ||
-      (input->key_pressed[KEY_DOWN] && !(input->modifiers & MOD_CTRL))) {
+  if (Input_KeyRepeat(KEY_J) ||
+      (Input_KeyRepeat(KEY_DOWN) && !(input->modifiers & MOD_CTRL))) {
     Explorer_MoveVisibleSelection(state, 1);
     SmoothValue_SetTarget(&state->selection_anim,
                           (f32)state->fs.selected_index);
     state->scroll_to_selection = true;
   }
 
-  if (input->key_pressed[KEY_K] ||
-      (input->key_pressed[KEY_UP] && !(input->modifiers & MOD_CTRL))) {
+  if (Input_KeyRepeat(KEY_K) ||
+      (Input_KeyRepeat(KEY_UP) && !(input->modifiers & MOD_CTRL))) {
     Explorer_MoveVisibleSelection(state, -1);
     SmoothValue_SetTarget(&state->selection_anim,
                           (f32)state->fs.selected_index);
@@ -336,13 +336,13 @@ static void HandleNormalInput(explorer_state *state, ui_context *ui) {
   }
 
   /* Page navigation */
-  if (input->key_pressed[KEY_PAGE_DOWN]) {
+  if (Input_KeyRepeat(KEY_PAGE_DOWN)) {
     i32 visible = (i32)(state->scroll.view_size.y / state->item_height);
     Explorer_MoveVisibleSelection(state, visible);
     state->scroll_to_selection = true;
   }
 
-  if (input->key_pressed[KEY_PAGE_UP]) {
+  if (Input_KeyRepeat(KEY_PAGE_UP)) {
     i32 visible = (i32)(state->scroll.view_size.y / state->item_height);
     Explorer_MoveVisibleSelection(state, -visible);
     state->scroll_to_selection = true;

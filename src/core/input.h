@@ -8,49 +8,49 @@
 #ifndef INPUT_H
 #define INPUT_H
 
-#include "types.h"
 #include "platform.h"
+#include "types.h"
 
 /* ===== Input Targets ===== */
 
 typedef enum {
-    INPUT_TARGET_NONE = 0,
-    INPUT_TARGET_EXPLORER,         /* File explorer panel */
-    INPUT_TARGET_TERMINAL,         /* Terminal panel */
-    INPUT_TARGET_COMMAND_PALETTE,  /* Command palette (modal) */
-    INPUT_TARGET_DIALOG,           /* Modal dialogs (rename, create, delete, etc.) */
-    INPUT_TARGET_COUNT
+  INPUT_TARGET_NONE = 0,
+  INPUT_TARGET_EXPLORER,        /* File explorer panel */
+  INPUT_TARGET_TERMINAL,        /* Terminal panel */
+  INPUT_TARGET_COMMAND_PALETTE, /* Command palette (modal) */
+  INPUT_TARGET_DIALOG, /* Modal dialogs (rename, create, delete, etc.) */
+  INPUT_TARGET_COUNT
 } input_target;
 
 /* ===== Input State ===== */
 
 typedef struct {
-    /* Current focused target (receives keyboard input) */
-    input_target focus;
-    
-    /* Focus stack for modal push/pop (max 4 deep should be plenty) */
-    input_target focus_stack[4];
-    i32 focus_stack_depth;
-    
-    /* Input consumption flags - set by handlers to prevent double-processing */
-    b32 key_consumed;
-    b32 text_consumed;
-    b32 mouse_consumed;
-    b32 scroll_consumed;
-    
-    /* Raw input from platform */
-    struct {
-        v2i mouse_pos;
-        b32 mouse_down[MOUSE_BUTTON_COUNT];
-        b32 mouse_pressed[MOUSE_BUTTON_COUNT];
-        b32 mouse_released[MOUSE_BUTTON_COUNT];
-        f32 scroll_delta;
-        b32 key_down[KEY_COUNT];
-        b32 key_pressed[KEY_COUNT];
-        b32 key_released[KEY_COUNT];
-        u32 modifiers;
-        u32 text_input;
-    } raw;
+  /* Current focused target (receives keyboard input) */
+  input_target focus;
+
+  /* Focus stack for modal push/pop (max 4 deep should be plenty) */
+  input_target focus_stack[4];
+  i32 focus_stack_depth;
+
+  /* Input consumption flags - set by handlers to prevent double-processing */
+  b32 key_consumed;
+  b32 text_consumed;
+  b32 mouse_consumed;
+  b32 scroll_consumed;
+
+  /* Raw input from platform */
+  struct {
+    v2i mouse_pos;
+    b32 mouse_down[MOUSE_BUTTON_COUNT];
+    b32 mouse_pressed[MOUSE_BUTTON_COUNT];
+    b32 mouse_released[MOUSE_BUTTON_COUNT];
+    f32 scroll_delta;
+    b32 key_down[KEY_COUNT];
+    b32 key_pressed[KEY_COUNT];
+    b32 key_released[KEY_COUNT];
+    u32 modifiers;
+    u32 text_input;
+  } raw;
 } input_state;
 
 /* ===== Global Input State ===== */
@@ -59,7 +59,7 @@ typedef struct {
 void Input_Init(void);
 
 /* Get the global input state (for direct access if needed) */
-input_state* Input_GetState(void);
+input_state *Input_GetState(void);
 
 /* ===== Focus Management ===== */
 
@@ -80,11 +80,12 @@ b32 Input_HasFocus(input_target target);
 
 /* ===== Frame Lifecycle ===== */
 
-/* Note: ui_input is defined in ui.h - we need to include it or forward declare. 
+/* Note: ui_input is defined in ui.h - we need to include it or forward declare.
    To avoid circular dependencies, the implementation file includes ui.h */
 
 /* Begin input frame - call after collecting platform events */
-void Input_BeginFrame(void *raw_input); /* Pass ui_input*, but use void* to avoid circular include */
+void Input_BeginFrame(void *raw_input); /* Pass ui_input*, but use void* to
+                                           avoid circular include */
 
 /* End input frame - cleanup */
 void Input_EndFrame(void);
@@ -114,8 +115,14 @@ b32 Input_KeyPressedRaw(key_code key);
 /* Check if key is held down */
 b32 Input_KeyDown(key_code key);
 
-/* Get text input codepoint (0 if consumed or none) */
+/* Check if key should fire (initial press OR repeat) - for repeating actions */
+b32 Input_KeyRepeat(key_code key);
+
+/* Get text input character for this frame */
 u32 Input_GetTextInput(void);
+
+/* Set repeated text input (for key repeat module) */
+void Input_SetRepeatedTextInput(u32 text);
 
 /* Get current modifiers */
 u32 Input_GetModifiers(void);

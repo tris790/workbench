@@ -11,6 +11,7 @@
 #include "components/explorer.h"
 #include "font.h"
 #include "input.h"
+#include "key_repeat.h"
 #include "layout.h" /* Now using layout system */
 #include "platform.h"
 #include "renderer.h"
@@ -65,12 +66,15 @@ int main(int argc, char **argv) {
   Render_Init(&renderer, backend);
 
   /* Load default font */
-  font *main_font = Font_LoadFromFile("assets/fonts/JetBrainsMono-Regular.ttf", 16);
-  font *mono_font = Font_LoadFromFile("assets/fonts/JetBrainsMono-Regular.ttf", 14);
+  font *main_font =
+      Font_LoadFromFile("assets/fonts/JetBrainsMono-Regular.ttf", 16);
+  font *mono_font =
+      Font_LoadFromFile("assets/fonts/JetBrainsMono-Regular.ttf", 14);
   renderer.default_font = main_font;
 
   if (!main_font) {
-    fprintf(stderr, "Warning: Could not load ui font assets/fonts/JetBrainsMono-Regular.ttf\n");
+    fprintf(stderr, "Warning: Could not load ui font "
+                    "assets/fonts/JetBrainsMono-Regular.ttf\n");
   }
 
   /* Get theme */
@@ -100,7 +104,8 @@ int main(int argc, char **argv) {
   /* Initialize Command Palette */
   command_palette_state palette;
   panel *initial_panel = Layout_GetActivePanel(&layout);
-  CommandPalette_Init(&palette, initial_panel ? &initial_panel->explorer.fs : NULL);
+  CommandPalette_Init(&palette,
+                      initial_panel ? &initial_panel->explorer.fs : NULL);
 
   /* Initialize Commands Module */
   Commands_Init(&layout);
@@ -108,6 +113,7 @@ int main(int argc, char **argv) {
 
   /* Initialize Input System */
   Input_Init();
+  KeyRepeat_Init();
 
   u64 last_time = Platform_GetTimeMs();
 
@@ -143,7 +149,7 @@ int main(int argc, char **argv) {
         bool consumed = false;
 
         /* Command palette keybindings */
-        if (event.data.keyboard.key == KEY_P && 
+        if (event.data.keyboard.key == KEY_P &&
             (event.data.keyboard.modifiers & MOD_CTRL)) {
           if (event.data.keyboard.modifiers & MOD_SHIFT) {
             CommandPalette_Open(&palette, PALETTE_MODE_COMMAND);
@@ -152,11 +158,12 @@ int main(int argc, char **argv) {
           }
           consumed = true;
         }
-        
+
         if (event.data.keyboard.key == KEY_ESCAPE) {
           /* Let CommandPalette_Update handle ESC if palette is open */
           if (!CommandPalette_IsOpen(&palette)) {
-            /* Only handle ESC at main level if explorer has focus and not in dialog */
+            /* Only handle ESC at main level if explorer has focus and not in
+             * dialog */
             input_target focus = Input_GetFocus();
             if (focus == INPUT_TARGET_EXPLORER) {
               panel *p = Layout_GetActivePanel(&layout);
@@ -172,15 +179,16 @@ int main(int argc, char **argv) {
           consumed = true;
         }
         /* Toggle Dual Panel Mode with Ctrl + / */
-        if (event.data.keyboard.key == KEY_SLASH && 
-           (event.data.keyboard.modifiers & MOD_CTRL)) {
+        if (event.data.keyboard.key == KEY_SLASH &&
+            (event.data.keyboard.modifiers & MOD_CTRL)) {
           Layout_ToggleMode(&layout);
           consumed = true;
         }
 
         /* Toggle Terminal with ` (backtick) */
         if (event.data.keyboard.key == KEY_GRAVE &&
-            !(event.data.keyboard.modifiers & (MOD_CTRL | MOD_ALT | MOD_SHIFT))) {
+            !(event.data.keyboard.modifiers &
+              (MOD_CTRL | MOD_ALT | MOD_SHIFT))) {
           Layout_ToggleTerminal(&layout);
           consumed = true;
         }
@@ -202,6 +210,12 @@ int main(int argc, char **argv) {
         if (event.data.keyboard.key < KEY_COUNT) {
           if (!input.key_down[event.data.keyboard.key]) {
             input.key_pressed[event.data.keyboard.key] = true;
+            /* Store character for key repeat */
+            if (event.data.keyboard.character >= 32 &&
+                event.data.keyboard.character < 128) {
+              KeyRepeat_SetCharacter(event.data.keyboard.key,
+                                     event.data.keyboard.character);
+            }
           }
           input.key_down[event.data.keyboard.key] = true;
         }
@@ -282,6 +296,20 @@ int main(int argc, char **argv) {
 
       /* Begin input frame with collected input */
       Input_BeginFrame(&input);
+
+      /* Update key repeat system with current time */
+      u64 frame_time = Platform_GetTimeMs();
+      KeyRepeat_Update(input.key_down, input.key_pressed, frame_time);
+
+      /* Add repeated text input if any */
+      u32 repeated_text = KeyRepeat_GetTextInput();
+      if (repeated_text > 0) {
+        /* Update global input state for Input_GetTextInput() */
+        Input_SetRepeatedTextInput(repeated_text);
+        /* Update local input structs for UI components */
+        input.text_input = repeated_text;
+        ui.input.text_input = repeated_text;
+      }
 
       /* Calculate layout bounds early for update */
       rect layout_bounds = {0, 0, win_width, win_height};
