@@ -10,6 +10,7 @@
 
 #include "explorer.h"
 #include "renderer.h"
+#include "terminal_panel.h"
 #include "types.h"
 #include "ui.h"
 
@@ -20,6 +21,7 @@ typedef enum {
 
 typedef struct {
   explorer_state explorer;
+  terminal_panel_state terminal;
   bool active;
 } panel;
 
@@ -52,5 +54,8 @@ void Layout_SetMode(layout_state *layout, layout_mode mode);
 void Layout_ToggleMode(layout_state *layout);
 void Layout_SetActivePanel(layout_state *layout, u32 index);
 panel *Layout_GetActivePanel(layout_state *layout);
+
+/* Toggle terminal for active panel */
+void Layout_ToggleTerminal(layout_state *layout);
 
 #endif /* LAYOUT_H */

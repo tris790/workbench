@@ -6,6 +6,7 @@
 
 #include "explorer.h"
 #include "icons.h"
+#include "input.h"
 #include "theme.h"
 
 #include <stdio.h>
@@ -215,6 +216,7 @@ void Explorer_StartRename(explorer_state *state) {
   fs_entry *entry = FS_GetSelectedEntry(&state->fs);
   if (entry && strcmp(entry->name, "..") != 0) {
     state->mode = EXPLORER_MODE_RENAME;
+    Input_PushFocus(INPUT_TARGET_DIALOG);
     strncpy(state->input_buffer, entry->name, sizeof(state->input_buffer) - 1);
     memset(&state->input_state, 0, sizeof(state->input_state));
     state->input_state.cursor_pos = (i32)strlen(state->input_buffer);
@@ -224,6 +226,7 @@ void Explorer_StartRename(explorer_state *state) {
 
 void Explorer_StartCreateFile(explorer_state *state) {
   state->mode = EXPLORER_MODE_CREATE_FILE;
+  Input_PushFocus(INPUT_TARGET_DIALOG);
   state->input_buffer[0] = '\0';
   memset(&state->input_state, 0, sizeof(state->input_state));
   state->input_state.has_focus = true;
@@ -231,6 +234,7 @@ void Explorer_StartCreateFile(explorer_state *state) {
 
 void Explorer_StartCreateDir(explorer_state *state) {
   state->mode = EXPLORER_MODE_CREATE_DIR;
+  Input_PushFocus(INPUT_TARGET_DIALOG);
   state->input_buffer[0] = '\0';
   memset(&state->input_state, 0, sizeof(state->input_state));
   state->input_state.has_focus = true;
@@ -240,6 +244,7 @@ void Explorer_ConfirmDelete(explorer_state *state) {
   fs_entry *entry = FS_GetSelectedEntry(&state->fs);
   if (entry && strcmp(entry->name, "..") != 0) {
     state->mode = EXPLORER_MODE_CONFIRM_DELETE;
+    Input_PushFocus(INPUT_TARGET_DIALOG);
   }
 }
 
@@ -280,6 +285,9 @@ void Explorer_Paste(explorer_state *state) {
 }
 
 void Explorer_Cancel(explorer_state *state) {
+  if (state->mode != EXPLORER_MODE_NORMAL) {
+    Input_PopFocus();
+  }
   state->mode = EXPLORER_MODE_NORMAL;
 }
 
@@ -407,6 +415,65 @@ static void HandleNormalInput(explorer_state *state, ui_context *ui) {
   }
 }
 
+static void Explorer_OnConfirm(explorer_state *state) {
+  switch (state->mode) {
+  case EXPLORER_MODE_RENAME: {
+    fs_entry *entry = FS_GetSelectedEntry(&state->fs);
+    if (entry && state->input_buffer[0] != '\0') {
+      char new_path[FS_MAX_PATH];
+      FS_JoinPath(new_path, FS_MAX_PATH, state->fs.current_path,
+                  state->input_buffer);
+      if (FS_Rename(entry->path, new_path)) {
+        Explorer_Refresh(state);
+      }
+    }
+    state->mode = EXPLORER_MODE_NORMAL;
+  } break;
+
+  case EXPLORER_MODE_CREATE_FILE: {
+    if (state->input_buffer[0] != '\0') {
+      char new_path[FS_MAX_PATH];
+      FS_JoinPath(new_path, FS_MAX_PATH, state->fs.current_path,
+                  state->input_buffer);
+      if (FS_CreateFile(new_path)) {
+        Explorer_Refresh(state);
+      }
+    }
+    state->mode = EXPLORER_MODE_NORMAL;
+  } break;
+
+  case EXPLORER_MODE_CREATE_DIR: {
+    if (state->input_buffer[0] != '\0') {
+      char new_path[FS_MAX_PATH];
+      FS_JoinPath(new_path, FS_MAX_PATH, state->fs.current_path,
+                  state->input_buffer);
+      if (FS_CreateDirectory(new_path)) {
+        Explorer_Refresh(state);
+      }
+    }
+    state->mode = EXPLORER_MODE_NORMAL;
+  } break;
+
+  case EXPLORER_MODE_CONFIRM_DELETE: {
+    fs_entry *entry = FS_GetSelectedEntry(&state->fs);
+    if (entry) {
+      if (FS_Delete(entry->path)) {
+        Explorer_Refresh(state);
+      }
+    }
+    state->mode = EXPLORER_MODE_NORMAL;
+  } break;
+
+  default:
+    break;
+  }
+
+  if (state->mode == EXPLORER_MODE_NORMAL) {
+    Input_PopFocus();
+    UI_EndModal();
+  }
+}
+
 static void HandleDialogInput(explorer_state *state, ui_context *ui) {
   ui_input *input = &ui->input;
 
@@ -417,62 +484,7 @@ static void HandleDialogInput(explorer_state *state, ui_context *ui) {
   }
 
   if (input->key_pressed[KEY_RETURN]) {
-    switch (state->mode) {
-    case EXPLORER_MODE_RENAME: {
-      fs_entry *entry = FS_GetSelectedEntry(&state->fs);
-      if (entry && state->input_buffer[0] != '\0') {
-        char new_path[FS_MAX_PATH];
-        FS_JoinPath(new_path, FS_MAX_PATH, state->fs.current_path,
-                    state->input_buffer);
-        if (FS_Rename(entry->path, new_path)) {
-          Explorer_Refresh(state);
-        }
-      }
-      state->mode = EXPLORER_MODE_NORMAL;
-    } break;
-
-    case EXPLORER_MODE_CREATE_FILE: {
-      if (state->input_buffer[0] != '\0') {
-        char new_path[FS_MAX_PATH];
-        FS_JoinPath(new_path, FS_MAX_PATH, state->fs.current_path,
-                    state->input_buffer);
-        if (FS_CreateFile(new_path)) {
-          Explorer_Refresh(state);
-        }
-      }
-      state->mode = EXPLORER_MODE_NORMAL;
-    } break;
-
-    case EXPLORER_MODE_CREATE_DIR: {
-      if (state->input_buffer[0] != '\0') {
-        char new_path[FS_MAX_PATH];
-        FS_JoinPath(new_path, FS_MAX_PATH, state->fs.current_path,
-                    state->input_buffer);
-        if (FS_CreateDirectory(new_path)) {
-          Explorer_Refresh(state);
-        }
-      }
-      state->mode = EXPLORER_MODE_NORMAL;
-    } break;
-
-    case EXPLORER_MODE_CONFIRM_DELETE: {
-      fs_entry *entry = FS_GetSelectedEntry(&state->fs);
-      if (entry) {
-        if (FS_Delete(entry->path)) {
-          Explorer_Refresh(state);
-        }
-      }
-      state->mode = EXPLORER_MODE_NORMAL;
-    } break;
-
-    default:
-      break;
-    }
-    
-    /* Close modal if returning to normal */
-    if (state->mode == EXPLORER_MODE_NORMAL) {
-       UI_EndModal();
-    }
+    Explorer_OnConfirm(state);
   }
 }
 
@@ -659,20 +671,26 @@ static void RenderDialog(explorer_state *state, ui_context *ui, rect bounds) {
   render_context *ctx = ui->renderer;
   const theme *th = ui->theme;
 
-  /* Dim background */
-  color dim = {0, 0, 0, 128};
+  /* Dim background - deep and premium */
+  color dim = Color_WithAlpha(th->background, 200);
   Render_DrawRect(ctx, bounds, dim);
 
-  /* Dialog box */
-  i32 dialog_w = 300;
-  i32 dialog_h = 100;
+  /* Dialog box - larger and centered */
+  i32 dialog_w = 420;
+  i32 dialog_h = (state->mode == EXPLORER_MODE_CONFIRM_DELETE) ? 180 : 200;
   rect dialog = {bounds.x + (bounds.w - dialog_w) / 2,
                  bounds.y + (bounds.h - dialog_h) / 2, dialog_w, dialog_h};
 
+  /* Outer shadow/border */
+  rect shadow = {dialog.x - 1, dialog.y - 1, dialog.w + 2, dialog.h + 2};
+  Render_DrawRectRounded(ctx, shadow, th->radius_md + 1, th->border);
   UI_DrawPanel(dialog);
 
-  /* Title */
+  /* Header */
   const char *title = "";
+  color title_color = th->text;
+  b32 is_danger = false;
+
   switch (state->mode) {
   case EXPLORER_MODE_RENAME:
     title = "Rename";
@@ -685,38 +703,107 @@ static void RenderDialog(explorer_state *state, ui_context *ui, rect bounds) {
     break;
   case EXPLORER_MODE_CONFIRM_DELETE:
     title = "Delete?";
+    title_color = th->error;
+    is_danger = true;
     break;
   default:
     break;
   }
 
-  v2i title_pos = {dialog.x + 16, dialog.y + 12};
-  Render_DrawText(ctx, title_pos, title, ui->font, th->text);
+  /* Draw Header with separator */
+  i32 header_h = 44;
+  rect header_rect = {dialog.x, dialog.y, dialog.w, header_h};
+  v2i title_pos = {header_rect.x + th->spacing_lg,
+                   header_rect.y + (header_h - Font_GetLineHeight(ui->font)) / 2};
+  Render_DrawText(ctx, title_pos, title, ui->font, title_color);
 
-  /* Input or confirmation */
+  rect sep = {dialog.x, dialog.y + header_h, dialog.w, 1};
+  Render_DrawRect(ctx, sep, Color_WithAlpha(th->border, 100));
+
+  /* Content Area */
+  i32 content_y = dialog.y + header_h + th->spacing_lg;
+  i32 content_w = dialog.w - (th->spacing_lg * 2);
+
   if (state->mode == EXPLORER_MODE_CONFIRM_DELETE) {
     fs_entry *entry = FS_GetSelectedEntry(&state->fs);
     if (entry) {
-      char msg[256];
-      char name_truncated[64];
-      strncpy(name_truncated, entry->name, sizeof(name_truncated) - 1);
-      name_truncated[sizeof(name_truncated) - 1] = '\0';
-      snprintf(msg, sizeof(msg), "Delete \"%s\"?", name_truncated);
-      v2i msg_pos = {dialog.x + 16, dialog.y + 40};
+      /* Warning Icon and Message */
+      i32 icon_size = 20;
+      rect icon_rect = {dialog.x + th->spacing_lg, content_y, icon_size, icon_size};
+      /* Use a simple rectangle for warning icon if no specific one exists, but let's try to draw one */
+      Render_DrawRectRounded(ctx, icon_rect, 4.0f, th->error);
+      
+      i32 text_x = icon_rect.x + icon_size + th->spacing_md;
+      v2i msg_pos = {text_x, content_y + (icon_size - Font_GetLineHeight(ui->font)) / 2};
+      
+      char msg[300];
+      i32 max_text_w = dialog.w - (text_x - dialog.x) - th->spacing_lg;
+      
+      /* Truncate filename if needed */
+      char truncated_name[FS_MAX_NAME];
+      snprintf(truncated_name, sizeof(truncated_name), "%s", entry->name);
+      if (Font_MeasureWidth(ui->font, truncated_name) > max_text_w - 100) {
+          /* Simple truncation */
+          i32 len = (i32)strlen(truncated_name);
+          while (len > 5 && Font_MeasureWidth(ui->font, truncated_name) > max_text_w - 120) {
+              truncated_name[--len] = '\0';
+          }
+          strcat(truncated_name, "...");
+      }
+
+      snprintf(msg, sizeof(msg), "Are you sure you want to delete \"%s\"?", truncated_name);
       Render_DrawText(ctx, msg_pos, msg, ui->font, th->text);
 
-      v2i hint_pos = {dialog.x + 16, dialog.y + 70};
-      Render_DrawText(ctx, hint_pos, "Enter to confirm, Esc to cancel",
-                      ui->font, th->text_muted);
+      v2i hint_pos = {text_x, msg_pos.y + 24};
+      Render_DrawText(ctx, hint_pos, "This action cannot be undone.", ui->font, th->text_muted);
     }
   } else {
-    /* Text input */
-    rect input_rect = {dialog.x + 16, dialog.y + 40, dialog.w - 32, 32};
+    /* Text input area */
+    rect input_rect = {dialog.x + th->spacing_lg, content_y, content_w, 36};
+    UI_PushStyleInt(UI_STYLE_PADDING, 8);
     UI_BeginLayout(UI_LAYOUT_VERTICAL, input_rect);
-    UI_TextInput(state->input_buffer, sizeof(state->input_buffer), "Name...",
+    UI_TextInput(state->input_buffer, sizeof(state->input_buffer), "Enter name...",
                  &state->input_state);
     UI_EndLayout();
+    UI_PopStyle();
   }
+
+  /* Footer Buttons */
+  i32 footer_h = 50;
+  rect footer_rect = {dialog.x, dialog.y + dialog.h - footer_h, dialog.w, footer_h};
+  
+  /* Layout buttons from right to left */
+  i32 btn_w = 90;
+  i32 btn_h = 30;
+  i32 btn_y = footer_rect.y + (footer_h - btn_h) / 2;
+  
+  /* Cancel Button */
+  rect cancel_rect = {footer_rect.x + footer_rect.w - (btn_w * 2) - (th->spacing_lg * 2), btn_y, btn_w, btn_h};
+  UI_BeginLayout(UI_LAYOUT_HORIZONTAL, cancel_rect);
+  UI_PushStyleColor(UI_STYLE_BG_COLOR, Color_WithAlpha(th->panel_alt, 150));
+  if (UI_Button("Cancel")) {
+      Explorer_Cancel(state);
+      UI_EndModal();
+  }
+  UI_PopStyle();
+  UI_EndLayout();
+
+  /* Confirm Button */
+  rect confirm_rect = {footer_rect.x + footer_rect.w - btn_w - th->spacing_lg, btn_y, btn_w, btn_h};
+  UI_BeginLayout(UI_LAYOUT_HORIZONTAL, confirm_rect);
+  if (is_danger) {
+      UI_PushStyleColor(UI_STYLE_BG_COLOR, th->error);
+      UI_PushStyleColor(UI_STYLE_HOVER_COLOR, Color_Lighten(th->error, 0.1f));
+  } else {
+      UI_PushStyleColor(UI_STYLE_BG_COLOR, th->accent);
+  }
+  
+  if (UI_Button(is_danger ? "Delete" : "Confirm")) {
+      Explorer_OnConfirm(state);
+  }
+  UI_PopStyle();
+  if (is_danger) UI_PopStyle();
+  UI_EndLayout();
 }
 
 void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,

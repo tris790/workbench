@@ -7,6 +7,7 @@
 
 #include "command_palette.h"
 #include "fuzzy_match.h"
+#include "input.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -150,6 +151,9 @@ void CommandPalette_Open(command_palette_state *state, palette_mode mode) {
   /* Start fade-in animation */
   state->fade_anim.target = 1.0f;
 
+  /* Push focus to command palette */
+  Input_PushFocus(INPUT_TARGET_COMMAND_PALETTE);
+
   /* Reset scroll position (preserve speed) */
   state->scroll.offset = (v2f){0, 0};
   state->scroll.target_offset = (v2f){0, 0};
@@ -167,6 +171,7 @@ void CommandPalette_Open(command_palette_state *state, palette_mode mode) {
 void CommandPalette_Close(command_palette_state *state) {
   state->mode = PALETTE_MODE_CLOSED;
   state->fade_anim.target = 0.0f;
+  Input_PopFocus();
 }
 
 b32 CommandPalette_IsOpen(command_palette_state *state) {

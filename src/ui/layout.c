@@ -3,6 +3,7 @@
  */
 
 #include "layout.h"
+#include "input.h"
 
 #include <string.h>
 
@@ -22,6 +23,10 @@ void Layout_Init(layout_state *layout, memory_arena *arena) {
   /* Initialize panels */
   Explorer_Init(&layout->panels[0].explorer, arena);
   Explorer_Init(&layout->panels[1].explorer, arena);
+
+  /* Initialize terminal panels (one per split as requested) */
+  TerminalPanel_Init(&layout->panels[0].terminal);
+  TerminalPanel_Init(&layout->panels[1].terminal);
 
   layout->panels[0].active = true;
   layout->panels[1].active = false;
@@ -104,14 +109,39 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
 
       if (UI_PointInRect(ui->input.mouse_pos, left_bounds)) {
         Layout_SetActivePanel(layout, 0);
+        /* Set focus to explorer if click wasn't in terminal area */
+        if (!TerminalPanel_IsVisible(&layout->panels[0].terminal) ||
+            !UI_PointInRect(ui->input.mouse_pos, layout->panels[0].terminal.last_bounds)) {
+          Input_SetFocus(INPUT_TARGET_EXPLORER);
+        }
       } else if (UI_PointInRect(ui->input.mouse_pos, right_bounds)) {
         Layout_SetActivePanel(layout, 1);
+        if (!TerminalPanel_IsVisible(&layout->panels[1].terminal) ||
+            !UI_PointInRect(ui->input.mouse_pos, layout->panels[1].terminal.last_bounds)) {
+          Input_SetFocus(INPUT_TARGET_EXPLORER);
+        }
+      }
+    }
+  } else {
+    /* Single panel mode: handle click-to-focus for explorer */
+    if (ui->input.mouse_pressed[MOUSE_LEFT]) {
+      if (!TerminalPanel_IsVisible(&layout->panels[0].terminal) ||
+          !UI_PointInRect(ui->input.mouse_pos, layout->panels[0].terminal.last_bounds)) {
+        Input_SetFocus(INPUT_TARGET_EXPLORER);
       }
     }
   }
 
-  /* Update the active panel's explorer */
-  Explorer_Update(&layout->panels[layout->active_panel_idx].explorer, ui);
+  /* Update terminal panels FIRST (they have input priority when focused) */
+  for (int i = 0; i < 2; i++) {
+    TerminalPanel_Update(&layout->panels[i].terminal, ui, ui->dt, (u32)i == layout->active_panel_idx);
+  }
+
+  /* Update explorer only if it has focus (keys not consumed by terminal) */
+  input_target focus = Input_GetFocus();
+  if (focus == INPUT_TARGET_EXPLORER || focus == INPUT_TARGET_DIALOG) {
+    Explorer_Update(&layout->panels[layout->active_panel_idx].explorer, ui);
+  }
 }
 
 static void DrawSplitter(ui_context *ui, rect bounds, bool hot, bool active) {
@@ -126,9 +156,33 @@ static void DrawSplitter(ui_context *ui, rect bounds, bool hot, bool active) {
   Render_DrawRect(ui->renderer, bounds, c);
 }
 
+/* Helper to render a single panel with its terminal */
+static void RenderPanelWithTerminal(layout_state *layout, ui_context *ui,
+                                     rect bounds, u32 panel_idx) {
+  panel *p = &layout->panels[panel_idx];
+  b32 has_focus = (layout->active_panel_idx == panel_idx);
+
+  /* Calculate terminal height if visible */
+  i32 terminal_height = TerminalPanel_GetHeight(&p->terminal, bounds.h);
+
+  /* Adjust explorer bounds to account for terminal */
+  rect explorer_bounds = bounds;
+  if (terminal_height > 0) {
+    explorer_bounds.h = bounds.h - terminal_height;
+  }
+
+  /* Render explorer */
+  Explorer_Render(&p->explorer, ui, explorer_bounds, has_focus && !TerminalPanel_HasFocus(&p->terminal));
+
+  /* Render terminal if visible */
+  if (terminal_height > 0) {
+    TerminalPanel_Render(&p->terminal, ui, bounds);
+  }
+}
+
 void Layout_Render(layout_state *layout, ui_context *ui, rect bounds) {
   if (layout->mode == LAYOUT_MODE_SINGLE) {
-    Explorer_Render(&layout->panels[0].explorer, ui, bounds, false);
+    RenderPanelWithTerminal(layout, ui, bounds, 0);
   } else {
     f32 available_width = bounds.w;
     f32 split_x = bounds.x + (available_width * layout->split_ratio);
@@ -141,11 +195,9 @@ void Layout_Render(layout_state *layout, ui_context *ui, rect bounds) {
 
     bool hover = UI_PointInRect(ui->input.mouse_pos, splitter_bounds);
 
-    Explorer_Render(&layout->panels[0].explorer, ui, left_bounds,
-                    layout->active_panel_idx == 0);
+    RenderPanelWithTerminal(layout, ui, left_bounds, 0);
     DrawSplitter(ui, splitter_bounds, hover, layout->dragging);
-    Explorer_Render(&layout->panels[1].explorer, ui, right_bounds,
-                    layout->active_panel_idx == 1);
+    RenderPanelWithTerminal(layout, ui, right_bounds, 1);
   }
 }
 
@@ -168,6 +220,9 @@ void Layout_SetMode(layout_state *layout, layout_mode mode) {
     for(i32 i=0; i<src->history_count; i++) {
         strncpy(dst->history[i], src->history[i], FS_MAX_PATH);
     }
+
+    /* Focus the new split */
+    Layout_SetActivePanel(layout, dst_idx);
   }
 
   layout->mode = mode;
@@ -196,4 +251,15 @@ void Layout_SetActivePanel(layout_state *layout, u32 index) {
 
 panel *Layout_GetActivePanel(layout_state *layout) {
   return &layout->panels[layout->active_panel_idx];
+}
+
+void Layout_ToggleTerminal(layout_state *layout) {
+  panel *p = Layout_GetActivePanel(layout);
+  if (!p) return;
+
+  /* Get CWD from explorer */
+  const char *cwd = p->explorer.fs.current_path;
+
+  /* Toggle terminal for this panel */
+  TerminalPanel_Toggle(&p->terminal, cwd);
 }

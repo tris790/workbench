@@ -10,6 +10,7 @@
 #include "components/command_palette.h"
 #include "components/explorer.h"
 #include "font.h"
+#include "input.h"
 #include "layout.h" /* Now using layout system */
 #include "platform.h"
 #include "renderer.h"
@@ -64,12 +65,12 @@ int main(int argc, char **argv) {
   Render_Init(&renderer, backend);
 
   /* Load default font */
-  font *main_font = Font_Load("sans", 16);
-  font *mono_font = Font_Load("monospace", 14);
+  font *main_font = Font_LoadFromFile("assets/fonts/JetBrainsMono-Regular.ttf", 16);
+  font *mono_font = Font_LoadFromFile("assets/fonts/JetBrainsMono-Regular.ttf", 14);
   renderer.default_font = main_font;
 
   if (!main_font) {
-    fprintf(stderr, "Warning: Could not load system font\n");
+    fprintf(stderr, "Warning: Could not load ui font assets/fonts/JetBrainsMono-Regular.ttf\n");
   }
 
   /* Get theme */
@@ -105,6 +106,9 @@ int main(int argc, char **argv) {
   Commands_Init(&layout);
   Commands_Register(&palette);
 
+  /* Initialize Input System */
+  Input_Init();
+
   u64 last_time = Platform_GetTimeMs();
 
   /* Main loop */
@@ -135,7 +139,9 @@ int main(int argc, char **argv) {
         printf("Quit event received\n");
         break;
 
-      case EVENT_KEY_DOWN:
+      case EVENT_KEY_DOWN: {
+        bool consumed = false;
+
         /* Command palette keybindings */
         if (event.data.keyboard.key == KEY_P && 
             (event.data.keyboard.modifiers & MOD_CTRL)) {
@@ -144,25 +150,53 @@ int main(int argc, char **argv) {
           } else {
             CommandPalette_Open(&palette, PALETTE_MODE_FILE);
           }
+          consumed = true;
         }
-        
         
         if (event.data.keyboard.key == KEY_ESCAPE) {
           /* Let CommandPalette_Update handle ESC if palette is open */
           if (!CommandPalette_IsOpen(&palette)) {
-            panel *p = Layout_GetActivePanel(&layout);
-            if (p && p->explorer.mode != EXPLORER_MODE_NORMAL) {
-              Explorer_Cancel(&p->explorer);
-            } else {
-              printf("Escape pressed, exiting...\n");
-              goto cleanup;
+            /* Only handle ESC at main level if explorer has focus and not in dialog */
+            input_target focus = Input_GetFocus();
+            if (focus == INPUT_TARGET_EXPLORER) {
+              panel *p = Layout_GetActivePanel(&layout);
+              if (p && p->explorer.mode != EXPLORER_MODE_NORMAL) {
+                Explorer_Cancel(&p->explorer);
+              } else {
+                printf("Escape pressed, exiting...\n");
+                goto cleanup;
+              }
             }
+            /* Terminal and Dialog handle their own ESC */
           }
+          consumed = true;
         }
         /* Toggle Dual Panel Mode with Ctrl + / */
         if (event.data.keyboard.key == KEY_SLASH && 
            (event.data.keyboard.modifiers & MOD_CTRL)) {
           Layout_ToggleMode(&layout);
+          consumed = true;
+        }
+
+        /* Toggle Terminal with ` (backtick) */
+        if (event.data.keyboard.key == KEY_GRAVE &&
+            !(event.data.keyboard.modifiers & (MOD_CTRL | MOD_ALT | MOD_SHIFT))) {
+          Layout_ToggleTerminal(&layout);
+          consumed = true;
+        }
+
+        /* Focus Split 1 (Alt + 1) */
+        if (event.data.keyboard.key == KEY_1 &&
+            (event.data.keyboard.modifiers & MOD_ALT)) {
+          Layout_SetActivePanel(&layout, 0);
+          consumed = true;
+        }
+
+        /* Focus Split 2 (Alt + 2) */
+        if (event.data.keyboard.key == KEY_2 &&
+            (event.data.keyboard.modifiers & MOD_ALT)) {
+          Layout_SetActivePanel(&layout, 1);
+          consumed = true;
         }
 
         if (event.data.keyboard.key < KEY_COUNT) {
@@ -172,11 +206,12 @@ int main(int argc, char **argv) {
           input.key_down[event.data.keyboard.key] = true;
         }
         input.modifiers = event.data.keyboard.modifiers;
-        if (event.data.keyboard.character >= 32 &&
+        if (!consumed && event.data.keyboard.character >= 32 &&
             event.data.keyboard.character < 128) {
           input.text_input = event.data.keyboard.character;
         }
         break;
+      }
 
       case EVENT_KEY_UP:
         if (event.data.keyboard.key < KEY_COUNT) {
@@ -245,6 +280,9 @@ int main(int argc, char **argv) {
       /* Begin UI frame */
       UI_BeginFrame(&ui, &input, dt);
 
+      /* Begin input frame with collected input */
+      Input_BeginFrame(&input);
+
       /* Calculate layout bounds early for update */
       rect layout_bounds = {0, 0, win_width, win_height};
 
@@ -260,6 +298,9 @@ int main(int argc, char **argv) {
       /* ===== Command Palette (overlay, rendered last) ===== */
       CommandPalette_Update(&palette, &ui);
       CommandPalette_Render(&palette, &ui, win_width, win_height);
+
+      /* End input frame */
+      Input_EndFrame();
 
       /* End UI frame */
       UI_EndFrame(&ui);

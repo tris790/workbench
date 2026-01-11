@@ -35,23 +35,30 @@ SOURCES="
     src/core/theme.c
     src/core/animation.c
     src/core/fs.c
+    src/core/input.c
     src/ui/ui.c
     src/ui/layout.c
     src/ui/components/explorer.c
     src/ui/components/command_palette.c
+    src/ui/components/terminal_panel.c
     src/core/fuzzy_match.c
     src/commands.c
+    src/terminal/pty_linux.c
+    src/terminal/terminal.c
+    src/terminal/ansi_parser.c
+    src/terminal/command_history.c
+    src/terminal/suggestion.c
 "
 
 # Include paths for all source directories
-INCLUDES="-Isrc -Isrc/core -Isrc/platform -Isrc/platform/protocols -Isrc/renderer -Isrc/ui -Isrc/ui/components"
+INCLUDES="-Isrc -Isrc/core -Isrc/platform -Isrc/platform/protocols -Isrc/renderer -Isrc/ui -Isrc/ui/components -Isrc/terminal"
 
 # Compiler and flags
 CC="gcc"
-CFLAGS="-std=c99 -Wall -Wextra -Werror -Wpedantic"
+CFLAGS="-std=c99 -D_GNU_SOURCE -Wall -Wextra -Werror -Wpedantic"
 CFLAGS="$CFLAGS $INCLUDES"
 CFLAGS="$CFLAGS $(pkg-config --cflags freetype2 fontconfig)"
-LDFLAGS="-lwayland-client -lrt -lm $(pkg-config --libs freetype2 fontconfig)"
+LDFLAGS="-lwayland-client -lrt -lm -lutil -lpthread $(pkg-config --libs freetype2 fontconfig)"
 
 # Mode-specific flags
 if [ "$BUILD_MODE" = "release" ]; then
