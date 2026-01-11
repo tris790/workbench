@@ -9,6 +9,7 @@
 #define EXPLORER_H
 
 #include "fs.h"
+#include "fs_watcher.h"
 #include "quick_filter.h"
 #include "text.h"
 #include "ui.h"
@@ -17,6 +18,10 @@
 
 #define EXPLORER_MAX_HISTORY 32
 #define EXPLORER_DIALOG_WIDTH 420
+
+/* Forward declaration */
+struct context_menu_state_s;
+
 typedef enum {
   EXPLORER_MODE_NORMAL,
   EXPLORER_MODE_RENAME,
@@ -25,7 +30,7 @@ typedef enum {
   EXPLORER_MODE_CONFIRM_DELETE,
 } explorer_mode;
 
-typedef struct {
+typedef struct explorer_state_s {
   /* File system state */
   fs_state fs;
 
@@ -73,12 +78,24 @@ typedef struct {
   char search_start_path[FS_MAX_PATH];
   b32 filter_was_active;
   char last_filter_buffer[QUICK_FILTER_MAX_INPUT];
+
+  /* Context menu (managed by layout/main.c) */
+  struct context_menu_state_s *context_menu;
+
+  /* File system watcher for external changes */
+  fs_watcher watcher;
 } explorer_state;
 
 /* ===== Explorer API ===== */
 
 /* Initialize explorer state */
 void Explorer_Init(explorer_state *state, memory_arena *arena);
+
+/* Shutdown and cleanup explorer resources */
+void Explorer_Shutdown(explorer_state *state);
+
+/* Poll file watcher for external changes (call for ALL panels each frame) */
+void Explorer_PollWatcher(explorer_state *state);
 
 /* Update explorer (call each frame, handles input) */
 void Explorer_Update(explorer_state *state, ui_context *ui);

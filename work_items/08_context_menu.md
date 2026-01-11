@@ -4,10 +4,12 @@
 Implement a non-bloated, customizable context menu system.
 
 ## Requirements
-- Right-click or keyboard shortcut to open
+- Right-click to open
 - Clean, minimal design
 - Customizable via settings
 - Keyboard navigation within menu
+- Clicking outside to close
+- Add actions to command palette also
 
 ## Deliverables
 
@@ -55,7 +57,6 @@ typedef struct {
 ### 5. Default Menu Items
 
 **File Context:**
-- Open
 - Open With...
 - Copy
 - Cut
@@ -65,13 +66,17 @@ typedef struct {
 - Properties
 
 **Directory Context:**
-- Open
-- Open in New Panel
-- Open in Terminal
+- New File
+- New Directory
 - Copy
 - Cut
 - Delete
 - Copy Path
+
+**Empty Space Context:**
+- New File
+- New Directory
+- Open App here
 
 ### 6. Customization
 - Add/remove items via settings
@@ -84,9 +89,6 @@ typedef struct {
 - All default actions work
 - Clean, non-bloated appearance
 - Custom items can be added
-
-## Dependencies
-- 07_preview_panel.md
 
 ## Next Work Item
 09_settings.md

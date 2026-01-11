@@ -8,6 +8,7 @@
 #include "animation.h"
 #include "commands.h"
 #include "components/command_palette.h"
+#include "components/context_menu.h"
 #include "components/explorer.h"
 #include "font.h"
 #include "input.h"
@@ -110,6 +111,15 @@ int main(int argc, char **argv) {
   /* Initialize Commands Module */
   Commands_Init(&layout);
   Commands_Register(&palette);
+
+  /* Initialize Context Menu */
+  context_menu_state context_menu;
+  ContextMenu_Init(&context_menu);
+
+  /* Store context menu reference in layout for explorer access */
+  layout.context_menu = &context_menu;
+  layout.panels[0].explorer.context_menu = &context_menu;
+  layout.panels[1].explorer.context_menu = &context_menu;
 
   /* Initialize Input System */
   Input_Init();
@@ -322,6 +332,10 @@ int main(int argc, char **argv) {
 
       /* ===== Layout System (Full Window) ===== */
       Layout_Render(&layout, &ui, layout_bounds);
+
+      /* ===== Context Menu (overlay) ===== */
+      ContextMenu_Update(&context_menu, &ui);
+      ContextMenu_Render(&context_menu, &ui, win_width, win_height);
 
       /* ===== Command Palette (overlay, rendered last) ===== */
       CommandPalette_Update(&palette, &ui);

@@ -6,6 +6,7 @@
 
 #include "explorer.h"
 #include "breadcrumb.h"
+#include "context_menu.h"
 #include "core/text.h"
 #include "dialog.h"
 #include "file_item.h"
@@ -159,13 +160,23 @@ void Explorer_Init(explorer_state *state, memory_arena *arena) {
   /* Initialize quick filter */
   QuickFilter_Init(&state->filter);
 
+  /* Initialize file system watcher */
+  FSWatcher_Init(&state->watcher);
+
   /* Navigate to home by default */
   FS_NavigateHome(&state->fs);
+
+  /* Start watching the initial directory */
+  FSWatcher_WatchDirectory(&state->watcher, state->fs.current_path);
 
   /* Initialize history */
   strncpy(state->history[0], state->fs.current_path, FS_MAX_PATH - 1);
   state->history_index = 0;
   state->history_count = 1;
+}
+
+void Explorer_Shutdown(explorer_state *state) {
+  FSWatcher_Shutdown(&state->watcher);
 }
 
 /* ===== Navigation ===== */
@@ -177,6 +188,9 @@ b32 Explorer_NavigateTo(explorer_state *state, const char *path) {
   if (FS_LoadDirectory(&state->fs, path)) {
     /* Clear quick filter on navigation */
     QuickFilter_Clear(&state->filter);
+
+    /* Update file watcher to watch new directory */
+    FSWatcher_WatchDirectory(&state->watcher, path);
 
     /* Push to history */
     if (state->history_index < EXPLORER_MAX_HISTORY - 1) {
@@ -544,6 +558,13 @@ static void HandleDialogInput(explorer_state *state, ui_context *ui) {
   }
 }
 
+void Explorer_PollWatcher(explorer_state *state) {
+  /* Poll file watcher for external changes */
+  if (FSWatcher_Poll(&state->watcher)) {
+    Explorer_Refresh(state);
+  }
+}
+
 void Explorer_Update(explorer_state *state, ui_context *ui) {
   ui_input *input = &ui->input;
 
@@ -572,8 +593,14 @@ void Explorer_Update(explorer_state *state, ui_context *ui) {
                               state->scroll.target_offset.y);
       }
 
-      /* Handle mouse click to select items */
-      if (input->mouse_pressed[MOUSE_LEFT]) {
+      /* Handle mouse click to select items - but not if context menu is open */
+      b32 context_menu_open =
+          state->context_menu && ContextMenu_IsVisible(state->context_menu);
+      b32 mouse_over_menu =
+          context_menu_open &&
+          ContextMenu_IsMouseOver(state->context_menu, input->mouse_pos);
+
+      if (input->mouse_pressed[MOUSE_LEFT] && !mouse_over_menu) {
         i32 click_y = input->mouse_pos.y - state->list_bounds.y +
                       (i32)state->scroll.offset.y;
         i32 clicked_visible_index = click_y / state->item_height;
@@ -607,6 +634,35 @@ void Explorer_Update(explorer_state *state, ui_context *ui) {
             state->last_click_time = now;
             state->last_click_index = actual_index;
           }
+        }
+      }
+
+      /* Handle right-click for context menu */
+      if (input->mouse_pressed[MOUSE_RIGHT] && state->context_menu) {
+        i32 click_y = input->mouse_pos.y - state->list_bounds.y +
+                      (i32)state->scroll.offset.y;
+        i32 clicked_visible_index = click_y / state->item_height;
+
+        /* Convert visible index to actual entry index */
+        i32 actual_index =
+            Explorer_VisibleToActualIndex(state, clicked_visible_index);
+
+        if (actual_index >= 0) {
+          /* Select the item */
+          FS_SetSelection(&state->fs, actual_index);
+
+          /* Determine context type and show menu */
+          fs_entry *entry = FS_GetSelectedEntry(&state->fs);
+          if (entry) {
+            context_type type =
+                entry->is_directory ? CONTEXT_DIRECTORY : CONTEXT_FILE;
+            ContextMenu_Show(state->context_menu, input->mouse_pos, type,
+                             entry->path, state, ui);
+          }
+        } else {
+          /* Right-click on empty space */
+          ContextMenu_Show(state->context_menu, input->mouse_pos, CONTEXT_EMPTY,
+                           state->fs.current_path, state, ui);
         }
       }
     }

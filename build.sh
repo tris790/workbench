@@ -38,6 +38,7 @@ SOURCES="
     src/core/input.c
     src/core/key_repeat.c
     src/core/text.c
+    src/platform/linux/linux_fs_watcher.c
     src/ui/ui.c
     src/ui/layout.c
     src/ui/components/explorer.c
@@ -47,6 +48,7 @@ SOURCES="
     src/ui/components/command_palette.c
     src/ui/components/terminal_panel.c
     src/ui/components/quick_filter.c
+    src/ui/components/context_menu.c
     src/core/fuzzy_match.c
     src/commands.c
     src/terminal/pty_linux.c

@@ -19,6 +19,9 @@ typedef enum {
   LAYOUT_MODE_DUAL,
 } layout_mode;
 
+/* Forward declaration */
+struct context_menu_state_s;
+
 typedef struct {
   explorer_state explorer;
   terminal_panel_state terminal;
@@ -36,6 +39,9 @@ typedef struct {
   bool dragging;          /* Is the splitter being dragged? */
   f32 drag_start_x;       /* Mouse X when drag started */
   f32 drag_start_ratio;   /* Split ratio when drag started */
+
+  /* Context menu reference (managed by main.c) */
+  struct context_menu_state_s *context_menu;
 } layout_state;
 
 #define MIN_PANEL_WIDTH 100.0f

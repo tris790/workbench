@@ -5,6 +5,7 @@
 #include "layout.h"
 #include "input.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #define SPLITTER_WIDTH 4.0f
@@ -19,6 +20,8 @@ void Layout_Init(layout_state *layout, memory_arena *arena) {
   layout->split_ratio = 0.5f;
   layout->target_split_ratio = 0.5f;
   layout->dragging = false;
+  layout->context_menu =
+      NULL; /* Will be set by main.c after ContextMenu_Init */
 
   /* Initialize panels */
   Explorer_Init(&layout->panels[0].explorer, arena);
@@ -47,15 +50,15 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
   /* Handle splitter interaction in dual mode */
   if (layout->mode == LAYOUT_MODE_DUAL) {
     /* Focus Switching */
-    if (ui->input.key_pressed[KEY_LEFT] && 
-       (ui->input.modifiers & MOD_CTRL) && (ui->input.modifiers & MOD_SHIFT)) {
+    if (ui->input.key_pressed[KEY_LEFT] && (ui->input.modifiers & MOD_CTRL) &&
+        (ui->input.modifiers & MOD_SHIFT)) {
       Layout_SetActivePanel(layout, 0);
     }
-    if (ui->input.key_pressed[KEY_RIGHT] && 
-       (ui->input.modifiers & MOD_CTRL) && (ui->input.modifiers & MOD_SHIFT)) {
+    if (ui->input.key_pressed[KEY_RIGHT] && (ui->input.modifiers & MOD_CTRL) &&
+        (ui->input.modifiers & MOD_SHIFT)) {
       Layout_SetActivePanel(layout, 1);
     }
-    
+
     f32 available_width = bounds.w;
     f32 split_x = bounds.x + (available_width * layout->split_ratio);
 
@@ -101,7 +104,8 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
     }
 
     /* Handle panel activation (click to focus, but not on splitter) */
-    if (!layout->dragging && ui->input.mouse_pressed[MOUSE_LEFT]) {
+    if (!layout->dragging && (ui->input.mouse_pressed[MOUSE_LEFT] ||
+                              ui->input.mouse_pressed[MOUSE_RIGHT])) {
       rect left_bounds = {bounds.x, bounds.y, split_x - bounds.x, bounds.h};
       rect right_bounds = {split_x + SPLITTER_WIDTH, bounds.y,
                            bounds.w - (split_x - bounds.x) - SPLITTER_WIDTH,
@@ -111,35 +115,46 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
         Layout_SetActivePanel(layout, 0);
         /* Set focus to explorer if click wasn't in terminal area */
         if (!TerminalPanel_IsVisible(&layout->panels[0].terminal) ||
-            !UI_PointInRect(ui->input.mouse_pos, layout->panels[0].terminal.last_bounds)) {
+            !UI_PointInRect(ui->input.mouse_pos,
+                            layout->panels[0].terminal.last_bounds)) {
           Input_SetFocus(INPUT_TARGET_EXPLORER);
         }
       } else if (UI_PointInRect(ui->input.mouse_pos, right_bounds)) {
         Layout_SetActivePanel(layout, 1);
         if (!TerminalPanel_IsVisible(&layout->panels[1].terminal) ||
-            !UI_PointInRect(ui->input.mouse_pos, layout->panels[1].terminal.last_bounds)) {
+            !UI_PointInRect(ui->input.mouse_pos,
+                            layout->panels[1].terminal.last_bounds)) {
           Input_SetFocus(INPUT_TARGET_EXPLORER);
         }
       }
     }
   } else {
     /* Single panel mode: handle click-to-focus for explorer */
-    if (ui->input.mouse_pressed[MOUSE_LEFT]) {
+    if (ui->input.mouse_pressed[MOUSE_LEFT] ||
+        ui->input.mouse_pressed[MOUSE_RIGHT]) {
       if (!TerminalPanel_IsVisible(&layout->panels[0].terminal) ||
-          !UI_PointInRect(ui->input.mouse_pos, layout->panels[0].terminal.last_bounds)) {
+          !UI_PointInRect(ui->input.mouse_pos,
+                          layout->panels[0].terminal.last_bounds)) {
         Input_SetFocus(INPUT_TARGET_EXPLORER);
       }
     }
   }
 
+  /* Poll file watchers for ALL panels (even inactive ones) */
+  for (int i = 0; i < 2; i++) {
+    Explorer_PollWatcher(&layout->panels[i].explorer);
+  }
+
   /* Update terminal panels FIRST (they have input priority when focused) */
   for (int i = 0; i < 2; i++) {
-    TerminalPanel_Update(&layout->panels[i].terminal, ui, ui->dt, (u32)i == layout->active_panel_idx);
+    TerminalPanel_Update(&layout->panels[i].terminal, ui, ui->dt,
+                         (u32)i == layout->active_panel_idx);
   }
 
   /* Update explorer only if it has focus (keys not consumed by terminal) */
   input_target focus = Input_GetFocus();
-  if (focus == INPUT_TARGET_EXPLORER || focus == INPUT_TARGET_DIALOG) {
+  if (focus == INPUT_TARGET_EXPLORER || focus == INPUT_TARGET_DIALOG ||
+      focus == INPUT_TARGET_CONTEXT_MENU) {
     Explorer_Update(&layout->panels[layout->active_panel_idx].explorer, ui);
   }
 }
@@ -158,7 +173,7 @@ static void DrawSplitter(ui_context *ui, rect bounds, bool hot, bool active) {
 
 /* Helper to render a single panel with its terminal */
 static void RenderPanelWithTerminal(layout_state *layout, ui_context *ui,
-                                     rect bounds, u32 panel_idx) {
+                                    rect bounds, u32 panel_idx) {
   panel *p = &layout->panels[panel_idx];
   b32 has_focus = (layout->active_panel_idx == panel_idx);
 
@@ -172,7 +187,8 @@ static void RenderPanelWithTerminal(layout_state *layout, ui_context *ui,
   }
 
   /* Render explorer */
-  Explorer_Render(&p->explorer, ui, explorer_bounds, has_focus && !TerminalPanel_HasFocus(&p->terminal));
+  Explorer_Render(&p->explorer, ui, explorer_bounds,
+                  has_focus && !TerminalPanel_HasFocus(&p->terminal));
 
   /* Render terminal if visible */
   if (terminal_height > 0) {
@@ -213,12 +229,16 @@ void Layout_SetMode(layout_state *layout, layout_mode mode) {
 
     /* Navigate to same path */
     Explorer_NavigateTo(dst, src->fs.current_path);
-    
+
+    /* Force watcher to watch the correct path (in case NavigateTo returned
+     * early) */
+    FSWatcher_WatchDirectory(&dst->watcher, src->fs.current_path);
+
     /* Copy history */
     dst->history_count = src->history_count;
     dst->history_index = src->history_index;
-    for(i32 i=0; i<src->history_count; i++) {
-        strncpy(dst->history[i], src->history[i], FS_MAX_PATH);
+    for (i32 i = 0; i < src->history_count; i++) {
+      strncpy(dst->history[i], src->history[i], FS_MAX_PATH);
     }
 
     /* Focus the new split */
@@ -255,7 +275,8 @@ panel *Layout_GetActivePanel(layout_state *layout) {
 
 void Layout_ToggleTerminal(layout_state *layout) {
   panel *p = Layout_GetActivePanel(layout);
-  if (!p) return;
+  if (!p)
+    return;
 
   /* Get CWD from explorer */
   const char *cwd = p->explorer.fs.current_path;
