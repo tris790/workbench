@@ -5,6 +5,10 @@
  */
 
 #include "explorer.h"
+#include "breadcrumb.h"
+#include "core/text.h"
+#include "dialog.h"
+#include "file_item.h"
 #include "icons.h"
 #include "input.h"
 #include "theme.h"
@@ -139,7 +143,7 @@ void Explorer_Init(explorer_state *state, memory_arena *arena) {
 
   /* Navigate to home by default */
   FS_NavigateHome(&state->fs);
-  
+
   /* Initialize history */
   strncpy(state->history[0], state->fs.current_path, FS_MAX_PATH - 1);
   state->history_index = 0;
@@ -162,7 +166,7 @@ b32 Explorer_NavigateTo(explorer_state *state, const char *path) {
         strncpy(state->history[i], state->history[i + 1], FS_MAX_PATH);
       }
     }
-    
+
     strncpy(state->history[state->history_index], path, FS_MAX_PATH - 1);
     state->history_count = state->history_index + 1;
     return true;
@@ -240,11 +244,24 @@ void Explorer_StartCreateDir(explorer_state *state) {
   state->input_state.has_focus = true;
 }
 
-void Explorer_ConfirmDelete(explorer_state *state) {
+void Explorer_ConfirmDelete(explorer_state *state, ui_context *ui) {
   fs_entry *entry = FS_GetSelectedEntry(&state->fs);
   if (entry && strcmp(entry->name, "..") != 0) {
     state->mode = EXPLORER_MODE_CONFIRM_DELETE;
     Input_PushFocus(INPUT_TARGET_DIALOG);
+
+    /* Pre-wrap text using arena */
+    const theme *th = ui->theme;
+
+    i32 icon_size = 20;
+    i32 text_x = th->spacing_lg + icon_size + th->spacing_md;
+    i32 max_text_w = EXPLORER_DIALOG_WIDTH - text_x - th->spacing_lg;
+
+    char msg[512];
+    snprintf(msg, sizeof(msg), "Are you sure you want to delete \"%s\"?",
+             entry->name);
+
+    state->dialog_text = Text_Wrap(state->fs.arena, msg, ui->font, max_text_w);
   }
 }
 
@@ -288,6 +305,11 @@ void Explorer_Cancel(explorer_state *state) {
   if (state->mode != EXPLORER_MODE_NORMAL) {
     Input_PopFocus();
   }
+
+  /* Arena-allocated dialog_text is automatically reclaimed */
+  state->dialog_text.lines = NULL;
+  state->dialog_text.count = 0;
+
   state->mode = EXPLORER_MODE_NORMAL;
 }
 
@@ -399,7 +421,7 @@ static void HandleNormalInput(explorer_state *state, ui_context *ui) {
   }
 
   if (input->key_pressed[KEY_DELETE]) {
-    Explorer_ConfirmDelete(state);
+    Explorer_ConfirmDelete(state, ui);
   }
 
   if (input->key_pressed[KEY_C] && (input->modifiers & MOD_CTRL)) {
@@ -461,6 +483,11 @@ static void Explorer_OnConfirm(explorer_state *state) {
         Explorer_Refresh(state);
       }
     }
+
+    /* Arena-allocated dialog_text is automatically reclaimed */
+    state->dialog_text.lines = NULL;
+    state->dialog_text.count = 0;
+
     state->mode = EXPLORER_MODE_NORMAL;
   } break;
 
@@ -566,244 +593,55 @@ void Explorer_Update(explorer_state *state, ui_context *ui) {
 
 /* ===== Rendering ===== */
 
-static void RenderBreadcrumb(explorer_state *state, ui_context *ui,
-                             rect bounds) {
-  render_context *ctx = ui->renderer;
-  const theme *th = ui->theme;
-
-  /* Draw background */
-  Render_DrawRect(ctx, bounds, th->panel);
-
-  /* Draw path */
-  i32 padding = 8;
-  v2i pos = {bounds.x + padding, bounds.y + (bounds.h - 16) / 2};
-
-  /* Truncate path if too long */
-  const char *path = state->fs.current_path;
-  i32 max_width = bounds.w - padding * 2;
-  i32 path_width = Font_MeasureWidth(ui->font, path);
-
-  if (path_width > max_width) {
-    /* Show "..." prefix */
-    char display[FS_MAX_PATH];
-    const char *start = path + strlen(path);
-
-    while (start > path) {
-      start--;
-      if (*start == '/') {
-        char temp[FS_MAX_PATH];
-        snprintf(temp, sizeof(temp), "...%s", start);
-        if (Font_MeasureWidth(ui->font, temp) <= max_width) {
-          snprintf(display, sizeof(display), "...%s", start);
-          Render_DrawText(ctx, pos, display, ui->font, th->text);
-          goto done_breadcrumb;
-        }
-      }
-    }
-    /* Fallback - just show what fits */
-    Render_DrawText(ctx, pos, "...", ui->font, th->text);
-  } else {
-    Render_DrawText(ctx, pos, path, ui->font, th->text);
-  }
-
-done_breadcrumb:;
-
-  /* Bottom border */
-  {
-    rect border = {bounds.x, bounds.y + bounds.h - 1, bounds.w, 1};
-    Render_DrawRect(ctx, border, th->border);
-  }
-}
-
-static void RenderFileItem(explorer_state *state, ui_context *ui,
-                           fs_entry *entry, i32 index, rect bounds,
-                           b32 is_selected, b32 is_hovered) {
-  render_context *ctx = ui->renderer;
-  const theme *th = ui->theme;
-
-  /* Background */
-  if (is_selected) {
-    Render_DrawRectRounded(ctx, bounds, 4.0f, th->accent);
-  } else if (is_hovered) {
-    Render_DrawRectRounded(ctx, bounds, 4.0f, th->panel);
-  }
-
-  i32 x = bounds.x + EXPLORER_ICON_PADDING;
-  i32 y = bounds.y;
-
-  /* Icon */
-  color icon_color =
-      is_selected ? th->background : Icon_GetTypeColor(entry->icon, th);
-  rect icon_bounds = {x, y + (bounds.h - EXPLORER_ICON_SIZE) / 2,
-                      EXPLORER_ICON_SIZE, EXPLORER_ICON_SIZE};
-  Icon_Draw(ctx, icon_bounds, entry->icon, icon_color);
-
-  x += EXPLORER_ICON_SIZE + EXPLORER_ICON_PADDING;
-
-  /* Filename */
-  color text_color = is_selected ? th->background : th->text;
-  v2i text_pos = {x, y + (bounds.h - Font_GetLineHeight(ui->font)) / 2};
-
-  /* Check if file is hidden */
-  b32 is_hidden = entry->name[0] == '.' && strcmp(entry->name, "..") != 0;
-  if (is_hidden && !is_selected) {
-    text_color = th->text_muted;
-  }
-
-  Render_DrawText(ctx, text_pos, entry->name, ui->font, text_color);
-
-  /* Size column */
-  if (state->show_size_column && !entry->is_directory) {
-    char size_str[32];
-    FS_FormatSize(entry->size, size_str, sizeof(size_str));
-
-    i32 size_width = Font_MeasureWidth(ui->font, size_str);
-    v2i size_pos = {bounds.x + bounds.w - size_width - 8,
-                    y + (bounds.h - Font_GetLineHeight(ui->font)) / 2};
-    Render_DrawText(ctx, size_pos, size_str, ui->font,
-                    is_selected ? th->background : th->text_muted);
-  }
-
-  (void)index;
-}
-
 static void RenderDialog(explorer_state *state, ui_context *ui, rect bounds) {
-  render_context *ctx = ui->renderer;
-  const theme *th = ui->theme;
-
-  /* Dim background - deep and premium */
-  color dim = Color_WithAlpha(th->background, 200);
-  Render_DrawRect(ctx, bounds, dim);
-
-  /* Dialog box - larger and centered */
-  i32 dialog_w = 420;
-  i32 dialog_h = (state->mode == EXPLORER_MODE_CONFIRM_DELETE) ? 180 : 200;
-  rect dialog = {bounds.x + (bounds.w - dialog_w) / 2,
-                 bounds.y + (bounds.h - dialog_h) / 2, dialog_w, dialog_h};
-
-  /* Outer shadow/border */
-  rect shadow = {dialog.x - 1, dialog.y - 1, dialog.w + 2, dialog.h + 2};
-  Render_DrawRectRounded(ctx, shadow, th->radius_md + 1, th->border);
-  UI_DrawPanel(dialog);
-
-  /* Header */
-  const char *title = "";
-  color title_color = th->text;
-  b32 is_danger = false;
+  /* Build dialog configuration based on current mode */
+  dialog_config config = {0};
 
   switch (state->mode) {
   case EXPLORER_MODE_RENAME:
-    title = "Rename";
+    config.type = DIALOG_TYPE_INPUT;
+    config.title = "Rename";
+    config.input_buffer = state->input_buffer;
+    config.input_buffer_size = sizeof(state->input_buffer);
+    config.input_state = &state->input_state;
+    config.placeholder = "Enter new name...";
     break;
   case EXPLORER_MODE_CREATE_FILE:
-    title = "New File";
+    config.type = DIALOG_TYPE_INPUT;
+    config.title = "New File";
+    config.input_buffer = state->input_buffer;
+    config.input_buffer_size = sizeof(state->input_buffer);
+    config.input_state = &state->input_state;
+    config.placeholder = "Enter filename...";
     break;
   case EXPLORER_MODE_CREATE_DIR:
-    title = "New Folder";
+    config.type = DIALOG_TYPE_INPUT;
+    config.title = "New Folder";
+    config.input_buffer = state->input_buffer;
+    config.input_buffer_size = sizeof(state->input_buffer);
+    config.input_state = &state->input_state;
+    config.placeholder = "Enter folder name...";
     break;
   case EXPLORER_MODE_CONFIRM_DELETE:
-    title = "Delete?";
-    title_color = th->error;
-    is_danger = true;
+    config.type = DIALOG_TYPE_CONFIRM;
+    config.title = "Delete?";
+    config.is_danger = true;
+    config.message = state->dialog_text;
+    config.hint = "This action cannot be undone.";
+    config.confirm_label = "Delete";
     break;
   default:
-    break;
+    return;
   }
 
-  /* Draw Header with separator */
-  i32 header_h = 44;
-  rect header_rect = {dialog.x, dialog.y, dialog.w, header_h};
-  v2i title_pos = {header_rect.x + th->spacing_lg,
-                   header_rect.y + (header_h - Font_GetLineHeight(ui->font)) / 2};
-  Render_DrawText(ctx, title_pos, title, ui->font, title_color);
+  dialog_result result = Dialog_Render(ui, bounds, &config);
 
-  rect sep = {dialog.x, dialog.y + header_h, dialog.w, 1};
-  Render_DrawRect(ctx, sep, Color_WithAlpha(th->border, 100));
-
-  /* Content Area */
-  i32 content_y = dialog.y + header_h + th->spacing_lg;
-  i32 content_w = dialog.w - (th->spacing_lg * 2);
-
-  if (state->mode == EXPLORER_MODE_CONFIRM_DELETE) {
-    fs_entry *entry = FS_GetSelectedEntry(&state->fs);
-    if (entry) {
-      /* Warning Icon and Message */
-      i32 icon_size = 20;
-      rect icon_rect = {dialog.x + th->spacing_lg, content_y, icon_size, icon_size};
-      /* Use a simple rectangle for warning icon if no specific one exists, but let's try to draw one */
-      Render_DrawRectRounded(ctx, icon_rect, 4.0f, th->error);
-      
-      i32 text_x = icon_rect.x + icon_size + th->spacing_md;
-      v2i msg_pos = {text_x, content_y + (icon_size - Font_GetLineHeight(ui->font)) / 2};
-      
-      char msg[300];
-      i32 max_text_w = dialog.w - (text_x - dialog.x) - th->spacing_lg;
-      
-      /* Truncate filename if needed */
-      char truncated_name[FS_MAX_NAME];
-      snprintf(truncated_name, sizeof(truncated_name), "%s", entry->name);
-      if (Font_MeasureWidth(ui->font, truncated_name) > max_text_w - 100) {
-          /* Simple truncation */
-          i32 len = (i32)strlen(truncated_name);
-          while (len > 5 && Font_MeasureWidth(ui->font, truncated_name) > max_text_w - 120) {
-              truncated_name[--len] = '\0';
-          }
-          strcat(truncated_name, "...");
-      }
-
-      snprintf(msg, sizeof(msg), "Are you sure you want to delete \"%s\"?", truncated_name);
-      Render_DrawText(ctx, msg_pos, msg, ui->font, th->text);
-
-      v2i hint_pos = {text_x, msg_pos.y + 24};
-      Render_DrawText(ctx, hint_pos, "This action cannot be undone.", ui->font, th->text_muted);
-    }
-  } else {
-    /* Text input area */
-    rect input_rect = {dialog.x + th->spacing_lg, content_y, content_w, 36};
-    UI_PushStyleInt(UI_STYLE_PADDING, 8);
-    UI_BeginLayout(UI_LAYOUT_VERTICAL, input_rect);
-    UI_TextInput(state->input_buffer, sizeof(state->input_buffer), "Enter name...",
-                 &state->input_state);
-    UI_EndLayout();
-    UI_PopStyle();
+  if (result == DIALOG_RESULT_CONFIRM) {
+    Explorer_OnConfirm(state);
+  } else if (result == DIALOG_RESULT_CANCEL) {
+    Explorer_Cancel(state);
+    UI_EndModal();
   }
-
-  /* Footer Buttons */
-  i32 footer_h = 50;
-  rect footer_rect = {dialog.x, dialog.y + dialog.h - footer_h, dialog.w, footer_h};
-  
-  /* Layout buttons from right to left */
-  i32 btn_w = 90;
-  i32 btn_h = 30;
-  i32 btn_y = footer_rect.y + (footer_h - btn_h) / 2;
-  
-  /* Cancel Button */
-  rect cancel_rect = {footer_rect.x + footer_rect.w - (btn_w * 2) - (th->spacing_lg * 2), btn_y, btn_w, btn_h};
-  UI_BeginLayout(UI_LAYOUT_HORIZONTAL, cancel_rect);
-  UI_PushStyleColor(UI_STYLE_BG_COLOR, Color_WithAlpha(th->panel_alt, 150));
-  if (UI_Button("Cancel")) {
-      Explorer_Cancel(state);
-      UI_EndModal();
-  }
-  UI_PopStyle();
-  UI_EndLayout();
-
-  /* Confirm Button */
-  rect confirm_rect = {footer_rect.x + footer_rect.w - btn_w - th->spacing_lg, btn_y, btn_w, btn_h};
-  UI_BeginLayout(UI_LAYOUT_HORIZONTAL, confirm_rect);
-  if (is_danger) {
-      UI_PushStyleColor(UI_STYLE_BG_COLOR, th->error);
-      UI_PushStyleColor(UI_STYLE_HOVER_COLOR, Color_Lighten(th->error, 0.1f));
-  } else {
-      UI_PushStyleColor(UI_STYLE_BG_COLOR, th->accent);
-  }
-  
-  if (UI_Button(is_danger ? "Delete" : "Confirm")) {
-      Explorer_OnConfirm(state);
-  }
-  UI_PopStyle();
-  if (is_danger) UI_PopStyle();
-  UI_EndLayout();
 }
 
 void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
@@ -819,20 +657,20 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
     /* Draw a subtle accent border */
     rect border = bounds;
     Render_DrawRectRounded(ctx, border, 0, th->accent);
-    
+
     /* Inset content slightly */
     rect inner = {bounds.x + 2, bounds.y + 2, bounds.w - 4, bounds.h - 4};
     Render_DrawRect(ctx, inner, th->panel_alt);
-    
+
     /* Adjust bounds for child content */
     /* Note: We don't actually change 'bounds' passed to children because
-       we want the scrollbar/etc to still sit flush, but visually the border is on top/under?
-       Actually, let's just draw the border frame. */
+       we want the scrollbar/etc to still sit flush, but visually the border is
+       on top/under? Actually, let's just draw the border frame. */
   }
 
   /* Breadcrumb at top */
   rect breadcrumb = {bounds.x, bounds.y, bounds.w, EXPLORER_BREADCRUMB_HEIGHT};
-  RenderBreadcrumb(state, ui, breadcrumb);
+  Breadcrumb_Render(ui, breadcrumb, state->fs.current_path);
 
   /* File list area */
   rect list_area = {bounds.x, bounds.y + EXPLORER_BREADCRUMB_HEIGHT, bounds.w,
@@ -845,8 +683,8 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
   state->scroll.view_size = (v2f){(f32)list_area.w, (f32)list_area.h};
   /* Count visible items first for proper calculations */
   i32 visible_item_count = Explorer_CountVisible(state);
-  state->scroll.content_size = (v2f){
-      (f32)list_area.w, (f32)(visible_item_count * state->item_height)};
+  state->scroll.content_size =
+      (v2f){(f32)list_area.w, (f32)(visible_item_count * state->item_height)};
 
   /* Ensure selection is visible - only when navigation triggered it */
   if (state->scroll_to_selection) {
@@ -857,7 +695,7 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
         visible_sel_index++;
       }
     }
-    
+
     i32 sel_y = visible_sel_index * state->item_height;
     f32 view_top = state->scroll.offset.y;
     f32 view_bottom = view_top + state->scroll.view_size.y - state->item_height;
@@ -915,8 +753,11 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
 
       b32 is_selected = ((i32)i == state->fs.selected_index);
       b32 is_hovered = UI_PointInRect(ui->input.mouse_pos, item_bounds);
-      RenderFileItem(state, ui, entry, (i32)i, item_bounds, is_selected,
-                     is_hovered);
+      file_item_config item_config = {.icon_size = EXPLORER_ICON_SIZE,
+                                      .icon_padding = EXPLORER_ICON_PADDING,
+                                      .show_size = state->show_size_column};
+      FileItem_Render(ui, entry, item_bounds, is_selected, is_hovered,
+                      &item_config);
     }
 
     visible_index++;

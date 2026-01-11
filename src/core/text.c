@@ -1,0 +1,139 @@
+/*
+ * text.c - Text processing utilities implementation
+ *
+ * C99, handmade hero style.
+ */
+
+#include "text.h"
+
+#include <string.h>
+
+/* Internal: Find line break point for text wrapping.
+ * Returns the index where this line should end (exclusive).
+ */
+static i32 FindLineBreak(const char *text, i32 len, font *f, i32 max_width) {
+  if (len == 0)
+    return 0;
+
+  i32 last_space = -1;
+  i32 current_width = 0;
+
+  for (i32 i = 0; i < len; i++) {
+    char c = text[i];
+    char temp[2] = {c, '\0'};
+    i32 char_w = Font_MeasureWidth(f, temp);
+
+    if (current_width + char_w > max_width) {
+      /* Exceeded width - break at last space or force break here */
+      if (last_space > 0) {
+        return last_space;
+      }
+      /* No space found - force break (at least 1 char) */
+      return i > 0 ? i : 1;
+    }
+
+    current_width += char_w;
+
+    if (c == ' ') {
+      last_space = i;
+    }
+  }
+
+  /* Entire remaining text fits */
+  return len;
+}
+
+/* Internal: Count lines needed for wrapping (pass 1) */
+static i32 CountWrappedLines(const char *text, font *f, i32 max_width) {
+  if (!text || !f || max_width <= 0)
+    return 0;
+
+  i32 len = (i32)strlen(text);
+  if (len == 0)
+    return 0;
+
+  i32 line_count = 0;
+  i32 pos = 0;
+
+  while (pos < len) {
+    i32 remaining = len - pos;
+    i32 line_len = FindLineBreak(text + pos, remaining, f, max_width);
+
+    if (line_len == 0)
+      break; /* Safety: prevent infinite loop */
+
+    line_count++;
+    pos += line_len;
+
+    /* Skip space at break point */
+    if (pos < len && text[pos] == ' ') {
+      pos++;
+    }
+  }
+
+  return line_count > 0 ? line_count : 1;
+}
+
+wrapped_text Text_Wrap(memory_arena *arena, const char *text, font *f,
+                       i32 max_width) {
+  wrapped_text result = {0};
+
+  if (!arena || !text || !f || max_width <= 0) {
+    return result;
+  }
+
+  i32 len = (i32)strlen(text);
+  if (len == 0) {
+    return result;
+  }
+
+  /* Pass 1: Count lines needed */
+  i32 line_count = CountWrappedLines(text, f, max_width);
+  if (line_count == 0) {
+    return result;
+  }
+
+  /* Pass 2: Allocate and fill lines */
+  char **lines = ArenaPushArray(arena, char *, line_count);
+  if (!lines) {
+    return result;
+  }
+
+  i32 pos = 0;
+  i32 line_idx = 0;
+
+  while (pos < len && line_idx < line_count) {
+    i32 remaining = len - pos;
+    i32 line_len = FindLineBreak(text + pos, remaining, f, max_width);
+
+    if (line_len == 0)
+      break;
+
+    /* Allocate line string from arena (+1 for null terminator) */
+    char *line = ArenaPushArray(arena, char, line_len + 1);
+    if (!line) {
+      return result; /* Arena exhausted */
+    }
+
+    memcpy(line, text + pos, line_len);
+    line[line_len] = '\0';
+
+    lines[line_idx++] = line;
+    pos += line_len;
+
+    /* Skip space at break point */
+    if (pos < len && text[pos] == ' ') {
+      pos++;
+    }
+  }
+
+  result.lines = lines;
+  result.count = line_idx;
+  return result;
+}
+
+i32 Text_GetWrappedHeight(i32 line_count, font *f) {
+  if (!f || line_count <= 0)
+    return 0;
+  return line_count * Font_GetLineHeight(f);
+}

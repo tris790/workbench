@@ -9,11 +9,13 @@
 #define EXPLORER_H
 
 #include "fs.h"
+#include "text.h"
 #include "ui.h"
 
 /* ===== Explorer State ===== */
 
 #define EXPLORER_MAX_HISTORY 32
+#define EXPLORER_DIALOG_WIDTH 420
 typedef enum {
   EXPLORER_MODE_NORMAL,
   EXPLORER_MODE_RENAME,
@@ -25,7 +27,7 @@ typedef enum {
 typedef struct {
   /* File system state */
   fs_state fs;
-  
+
   /* Navigation History */
   char history[EXPLORER_MAX_HISTORY][FS_MAX_PATH];
   i32 history_index; /* Current position in history */
@@ -59,6 +61,9 @@ typedef struct {
 
   /* Flag to trigger auto-scroll to selection (set on keyboard nav) */
   b32 scroll_to_selection;
+
+  /* Wrapped text for dialogs (arena-allocated) */
+  wrapped_text dialog_text;
 } explorer_state;
 
 /* ===== Explorer API ===== */
@@ -93,7 +98,7 @@ void Explorer_ToggleHidden(explorer_state *state);
 void Explorer_StartRename(explorer_state *state);
 void Explorer_StartCreateFile(explorer_state *state);
 void Explorer_StartCreateDir(explorer_state *state);
-void Explorer_ConfirmDelete(explorer_state *state);
+void Explorer_ConfirmDelete(explorer_state *state, ui_context *ui);
 void Explorer_Copy(explorer_state *state);
 void Explorer_Cut(explorer_state *state);
 void Explorer_Paste(explorer_state *state);

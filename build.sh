@@ -36,9 +36,13 @@ SOURCES="
     src/core/animation.c
     src/core/fs.c
     src/core/input.c
+    src/core/text.c
     src/ui/ui.c
     src/ui/layout.c
     src/ui/components/explorer.c
+    src/ui/components/dialog.c
+    src/ui/components/breadcrumb.c
+    src/ui/components/file_item.c
     src/ui/components/command_palette.c
     src/ui/components/terminal_panel.c
     src/core/fuzzy_match.c
