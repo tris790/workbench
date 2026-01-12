@@ -78,8 +78,12 @@ void TerminalPanel_Init(terminal_panel_state *state) {
   state->cursor_blink.speed = 4.0f;
 
   /* Initialize suggestion engine */
+#ifdef _WIN32
+  state->shell_mode = SHELL_SYSTEM;
+#else
   state->shell_mode =
       SHELL_FISH; /* Default to fish shell on Linux per user request */
+#endif
   state->suggestions = Suggestion_Create(NULL); /* Default history path */
 }
 

@@ -23,9 +23,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Get framebuffer from platform (defined in platform_linux.c) */
-extern void *Platform_GetFramebuffer(platform_window *window);
-
 int main(int argc, char **argv) {
   (void)argc;
   (void)argv;
@@ -34,12 +31,6 @@ int main(int argc, char **argv) {
 
   if (!Platform_Init()) {
     fprintf(stderr, "Failed to initialize platform\n");
-    return 1;
-  }
-
-  if (!Font_SystemInit()) {
-    fprintf(stderr, "Failed to initialize font system\n");
-    Platform_Shutdown();
     return 1;
   }
 
@@ -54,12 +45,17 @@ int main(int argc, char **argv) {
   platform_window *window = Platform_CreateWindow(&config);
   if (!window) {
     fprintf(stderr, "Failed to create window\n");
-    Font_SystemShutdown();
     Platform_Shutdown();
     return 1;
   }
 
-  printf("Window created (%dx%d)\n", config.width, config.height);
+  /* Initialize font system AFTER window creation (GDI needs display context) */
+  if (!Font_SystemInit()) {
+    fprintf(stderr, "Failed to initialize font system\n");
+    Platform_DestroyWindow(window);
+    Platform_Shutdown();
+    return 1;
+  }
 
   /* Initialize renderer */
   renderer_backend *backend = Render_CreateSoftwareBackend();
@@ -86,9 +82,9 @@ int main(int argc, char **argv) {
   UI_Init(&ui, &renderer, th, main_font);
 
   /* Initialize memory arena for file system */
-  void *arena_memory = malloc(Megabytes(16));
+  void *arena_memory = malloc(Megabytes(64));
   memory_arena arena;
-  ArenaInit(&arena, arena_memory, Megabytes(16));
+  ArenaInit(&arena, arena_memory, Megabytes(64));
 
   /* Initialize Layout (which inits explorers) */
   layout_state layout;
@@ -123,6 +119,7 @@ int main(int argc, char **argv) {
 
   /* Initialize Input System */
   Input_Init();
+
   KeyRepeat_Init();
 
   u64 last_time = Platform_GetTimeMs();
@@ -130,6 +127,7 @@ int main(int argc, char **argv) {
   /* Main loop */
   i32 win_width = config.width;
   i32 win_height = config.height;
+  i32 frame_count = 0;
 
   while (!Platform_WindowShouldClose(window)) {
     platform_event event;
@@ -142,9 +140,6 @@ int main(int argc, char **argv) {
     memset(input.key_released, 0, sizeof(input.key_released));
     memset(input.mouse_pressed, 0, sizeof(input.mouse_pressed));
     memset(input.mouse_released, 0, sizeof(input.mouse_released));
-    input.scroll_delta = 0;
-    input.text_input = 0;
-
     input.scroll_delta = 0;
     input.text_input = 0;
 
@@ -349,6 +344,8 @@ int main(int argc, char **argv) {
       /* Commit the frame to display */
       Platform_PresentFrame(window);
     }
+
+    frame_count++;
 
     /* Small sleep to avoid busy-looping when no events */
     Platform_SleepMs(16); /* ~60fps target */

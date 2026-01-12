@@ -15,8 +15,12 @@
 
 /* Opaque watcher handle - one per explorer panel */
 typedef struct fs_watcher {
-  i32 fd;          /* inotify file descriptor (Linux) */
-  i32 wd;          /* Current watch descriptor */
+#ifdef _WIN32
+  void *handle; /* HANDLE for FindFirstChangeNotification */
+#else
+  i32 fd; /* inotify file descriptor (Linux) */
+  i32 wd; /* Current watch descriptor */
+#endif
   char path[512];  /* Currently watched path */
   b32 has_changes; /* Flag set when changes detected */
 } fs_watcher;

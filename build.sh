@@ -51,7 +51,7 @@ SOURCES="
     src/ui/components/context_menu.c
     src/core/fuzzy_match.c
     src/commands.c
-    src/terminal/pty_linux.c
+    src/platform/linux/linux_pty.c
     src/terminal/terminal.c
     src/terminal/ansi_parser.c
     src/terminal/command_history.c

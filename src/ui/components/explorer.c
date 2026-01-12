@@ -51,9 +51,9 @@ static b32 Explorer_IsEntryVisible(explorer_state *state, i32 index) {
   if (QuickFilter_IsActive(&state->filter)) {
     const char *query = QuickFilter_GetQuery(&state->filter);
 
-    /* Use only the part after the last slash for matching filenames */
-    const char *last_slash = strrchr(query, '/');
-    const char *match_query = last_slash ? last_slash + 1 : query;
+    /* Use only the part after the last separator for matching filenames */
+    const char *last_sep = FS_FindLastSeparator(query);
+    const char *match_query = last_sep ? last_sep + 1 : query;
 
     if (match_query[0] != '\0' && !FuzzyMatch(match_query, entry->name)) {
       return false;
@@ -186,7 +186,7 @@ void Explorer_Shutdown(explorer_state *state) {
 
 b32 Explorer_NavigateTo(explorer_state *state, const char *path,
                         b32 keep_filter) {
-  if (strcmp(state->fs.current_path, path) == 0)
+  if (FS_PathsEqual(state->fs.current_path, path))
     return true;
 
   if (FS_LoadDirectory(&state->fs, path)) {
@@ -199,8 +199,8 @@ b32 Explorer_NavigateTo(explorer_state *state, const char *path,
       if (strncmp(path, state->search_start_path, start_len) == 0) {
         const char *rel_path = path + start_len;
 
-        /* Skip leading slash of relative path if present */
-        if (rel_path[0] == '/') {
+        /* Skip leading separator of relative path if present */
+        if (FS_IsPathSeparator(rel_path[0])) {
           rel_path++;
         }
 
@@ -722,12 +722,12 @@ void Explorer_Update(explorer_state *state, ui_context *ui) {
       /* Filter is active - handle folder traversal */
       const char *query = QuickFilter_GetQuery(&state->filter);
       if (query) {
-        /* Extract path part from query (everything up to last slash) */
+        /* Extract path part from query (everything up to last separator) */
         char path_part[FS_MAX_PATH] = {0};
-        const char *last_slash = strrchr(query, '/');
+        const char *last_sep = FS_FindLastSeparator(query);
 
-        if (last_slash) {
-          size_t len = (size_t)(last_slash - query) + 1;
+        if (last_sep) {
+          size_t len = (size_t)(last_sep - query) + 1;
           if (len < sizeof(path_part)) {
             memcpy(path_part, query, len);
             path_part[len] = '\0';
@@ -755,7 +755,7 @@ void Explorer_Update(explorer_state *state, ui_context *ui) {
 
         /* If target path is different from current, navigate */
         if (target_path[0] != '\0' &&
-            strcmp(state->fs.current_path, target_path) != 0) {
+            !FS_PathsEqual(state->fs.current_path, target_path)) {
           /* Use FS_LoadDirectory directly to avoid history push and filter
            * clear */
           if (FS_LoadDirectory(&state->fs, target_path)) {

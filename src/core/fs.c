@@ -25,17 +25,67 @@ const char *FS_GetExtension(const char *filename) {
   return dot;
 }
 
+b32 FS_IsPathSeparator(char c) { return c == '/' || c == '\\'; }
+
+const char *FS_FindLastSeparator(const char *path) {
+  const char *last_slash = strrchr(path, '/');
+  const char *last_backslash = strrchr(path, '\\');
+  if (!last_slash)
+    return last_backslash;
+  if (!last_backslash)
+    return last_slash;
+  return (last_slash > last_backslash) ? last_slash : last_backslash;
+}
+
+void FS_NormalizePath(char *path) {
+  if (!path)
+    return;
+  for (char *p = path; *p; p++) {
+    if (*p == '\\')
+      *p = '/';
+  }
+  /* Remove trailing slash unless it's the root */
+  usize len = strlen(path);
+  if (len > 1 && path[len - 1] == '/') {
+    path[len - 1] = '\0';
+  }
+}
+
+b32 FS_PathsEqual(const char *p1, const char *p2) {
+  if (!p1 || !p2)
+    return p1 == p2;
+
+  /* Normalize temporary copies for comparison */
+  char n1[FS_MAX_PATH];
+  char n2[FS_MAX_PATH];
+  strncpy(n1, p1, FS_MAX_PATH - 1);
+  n1[FS_MAX_PATH - 1] = '\0';
+  strncpy(n2, p2, FS_MAX_PATH - 1);
+  n2[FS_MAX_PATH - 1] = '\0';
+
+  FS_NormalizePath(n1);
+  FS_NormalizePath(n2);
+
+#ifdef _WIN32
+  return strcasecmp(n1, n2) == 0;
+#else
+  return strcmp(n1, n2) == 0;
+#endif
+}
+
 const char *FS_GetFilename(const char *path) {
-  const char *slash = strrchr(path, '/');
-  return slash ? slash + 1 : path;
+  const char *sep = FS_FindLastSeparator(path);
+  return sep ? sep + 1 : path;
 }
 
 void FS_JoinPath(char *dest, usize dest_size, const char *dir,
                  const char *filename) {
   usize dir_len = strlen(dir);
-  if (dir_len > 0 && dir[dir_len - 1] == '/') {
+  if (dir_len > 0 && FS_IsPathSeparator(dir[dir_len - 1])) {
     snprintf(dest, dest_size, "%s%s", dir, filename);
   } else {
+    /* Use / as internal separator, FS_NormalizePath can fix it later if needed
+       but Windows handles / fine. */
     snprintf(dest, dest_size, "%s/%s", dir, filename);
   }
 }
@@ -213,11 +263,12 @@ void FS_Init(fs_state *state, memory_arena *arena) {
 b32 FS_LoadDirectory(fs_state *state, const char *path) {
   /* Resolve to absolute path */
   char resolved[FS_MAX_PATH];
-  if (!realpath(path, resolved)) {
-    /* If realpath fails, try using the path as-is */
+  if (!Platform_GetRealPath(path, resolved, FS_MAX_PATH)) {
+    /* If resolving fails, try using the path as-is */
     strncpy(resolved, path, FS_MAX_PATH - 1);
     resolved[FS_MAX_PATH - 1] = '\0';
   }
+  FS_NormalizePath(resolved);
 
   /* Create temporary memory scope for listing */
   temporary_memory temp = BeginTemporaryMemory(state->arena);
@@ -229,9 +280,10 @@ b32 FS_LoadDirectory(fs_state *state, const char *path) {
     return false;
   }
 
-  /* Store current path */
+  /* Store current path and normalize it */
   strncpy(state->current_path, resolved, FS_MAX_PATH - 1);
   state->current_path[FS_MAX_PATH - 1] = '\0';
+  FS_NormalizePath(state->current_path);
 
   /* Clear existing entries */
   state->entry_count = 0;
@@ -291,12 +343,15 @@ b32 FS_NavigateUp(fs_state *state) {
   strncpy(parent, state->current_path, FS_MAX_PATH);
   parent[FS_MAX_PATH - 1] = '\0';
 
-  char *last_slash = strrchr(parent, '/');
-  if (last_slash == parent) {
+  const char *last_sep = FS_FindLastSeparator(parent);
+  if (last_sep == parent) {
     /* Parent is root */
     parent[1] = '\0';
-  } else if (last_slash) {
-    *last_slash = '\0';
+  } else if (last_sep) {
+    /* Truncate at separator, but handle Windows drives like C:/ later if
+     * needed. For now, just truncate. */
+    char *sep_ptr = (char *)last_sep;
+    *sep_ptr = '\0';
   }
 
   return FS_LoadDirectory(state, parent);
@@ -360,54 +415,18 @@ b32 FS_NavigateHome(fs_state *state) {
 
 /* ===== File Operations ===== */
 
-b32 FS_Delete(const char *path) {
-  struct stat st;
-  if (stat(path, &st) != 0)
-    return false;
-
-  if (S_ISDIR(st.st_mode)) {
-    return rmdir(path) == 0;
-  }
-  return unlink(path) == 0;
-}
+b32 FS_Delete(const char *path) { return Platform_Delete(path); }
 
 b32 FS_Rename(const char *old_path, const char *new_path) {
-  return rename(old_path, new_path) == 0;
+  return Platform_Rename(old_path, new_path);
 }
 
-b32 FS_CreateDirectory(const char *path) { return mkdir(path, 0755) == 0; }
-
-b32 FS_CreateFile(const char *path) {
-  FILE *f = fopen(path, "w");
-  if (f) {
-    fclose(f);
-    return true;
-  }
-  return false;
+b32 FS_CreateDirectory(const char *path) {
+  return Platform_CreateDirectory(path);
 }
+
+b32 FS_CreateFile(const char *path) { return Platform_CreateFile(path); }
 
 b32 FS_Copy(const char *src, const char *dst) {
-  FILE *src_file = fopen(src, "rb");
-  if (!src_file)
-    return false;
-
-  FILE *dst_file = fopen(dst, "wb");
-  if (!dst_file) {
-    fclose(src_file);
-    return false;
-  }
-
-  char buffer[8192];
-  usize bytes;
-  while ((bytes = fread(buffer, 1, sizeof(buffer), src_file)) > 0) {
-    if (fwrite(buffer, 1, bytes, dst_file) != bytes) {
-      fclose(src_file);
-      fclose(dst_file);
-      return false;
-    }
-  }
-
-  fclose(src_file);
-  fclose(dst_file);
-  return true;
+  return Platform_Copy(src, dst);
 }

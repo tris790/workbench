@@ -8,10 +8,18 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#define FS_MAX_PATH 4096
+#define FS_MAX_NAME 256
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
+
+#ifdef _WIN32
+#define strcasecmp _stricmp
+#endif
 
 /* ===== Basic Types ===== */
 

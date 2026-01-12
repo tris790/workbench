@@ -13,8 +13,6 @@
 
 /* ===== Configuration ===== */
 
-#define FS_MAX_PATH 512
-#define FS_MAX_NAME 256
 #define FS_MAX_ENTRIES 2048
 
 /* ===== File Icon Types ===== */
@@ -136,5 +134,11 @@ const char *FS_GetFilename(const char *path);
 /* Join path components */
 void FS_JoinPath(char *dest, usize dest_size, const char *dir,
                  const char *filename);
+
+/* Path utilities */
+b32 FS_IsPathSeparator(char c);
+b32 FS_PathsEqual(const char *p1, const char *p2);
+const char *FS_FindLastSeparator(const char *path);
+void FS_NormalizePath(char *path);
 
 #endif /* FS_H */

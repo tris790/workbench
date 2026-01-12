@@ -1,11 +1,11 @@
 /*
- * pty_linux.c - Linux PTY implementation using forkpty()
+ * linux_pty.c - Linux PTY implementation using forkpty()
  *
  * Spawns a shell in a pseudo-terminal with proper signal handling.
  * C99, handmade hero style.
  */
 
-#include "workbench_pty.h"
+#include "../../terminal/workbench_pty.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -34,6 +34,7 @@ static const char *get_default_shell(void) {
 }
 
 PTY *PTY_Create(const char *shell, const char *cwd) {
+  /* Manual memory management is acceptable in the platform layer */
   PTY *pty = malloc(sizeof(PTY));
   if (!pty)
     return NULL;
@@ -44,7 +45,8 @@ PTY *PTY_Create(const char *shell, const char *cwd) {
   pty->alive = true;
 
   /* Set initial terminal size */
-  struct winsize ws = {.ws_row = (unsigned short)pty->rows, .ws_col = (unsigned short)pty->cols};
+  struct winsize ws = {.ws_row = (unsigned short)pty->rows,
+                       .ws_col = (unsigned short)pty->cols};
 
   pid_t pid = forkpty(&pty->master_fd, NULL, NULL, &ws);
 
@@ -63,7 +65,9 @@ PTY *PTY_Create(const char *shell, const char *cwd) {
         /* Fallback to home if cwd fails */
         const char *home = getenv("HOME");
         if (home)
-          chdir(home);
+          if (chdir(home) < 0) {
+            /* last resort */
+          }
       }
     }
 
