@@ -55,12 +55,11 @@ static void push_line_to_scrollback(Terminal *term, u32 line) {
   if (!term->scrollback)
     return;
 
-  u32 dest_line = (term->scrollback_start + term->scrollback_count) %
-                  term->scrollback_size;
+  u32 dest_line =
+      (term->scrollback_start + term->scrollback_count) % term->scrollback_size;
 
   memcpy(&term->scrollback[dest_line * term->cols],
-         &term->screen[line * term->cols],
-         term->cols * sizeof(terminal_cell));
+         &term->screen[line * term->cols], term->cols * sizeof(terminal_cell));
 
   if (term->scrollback_count < term->scrollback_size) {
     term->scrollback_count++;
@@ -217,30 +216,54 @@ static void handle_sgr(Terminal *term, i32 *params, i32 count) {
       break;
 
     /* Foreground colors (30-37) */
-    case 30: case 31: case 32: case 33:
-    case 34: case 35: case 36: case 37:
+    case 30:
+    case 31:
+    case 32:
+    case 33:
+    case 34:
+    case 35:
+    case 36:
+    case 37:
       term->current_attr.fg = (u8)(code - 30);
       break;
     case 39:
       term->current_attr.fg = TERM_DEFAULT_FG;
       break;
     /* Bright foreground colors (90-97) */
-    case 90: case 91: case 92: case 93:
-    case 94: case 95: case 96: case 97:
+    case 90:
+    case 91:
+    case 92:
+    case 93:
+    case 94:
+    case 95:
+    case 96:
+    case 97:
       term->current_attr.fg = (u8)((code - 90) + 8);
       break;
 
     /* Background colors (40-47) */
-    case 40: case 41: case 42: case 43:
-    case 44: case 45: case 46: case 47:
+    case 40:
+    case 41:
+    case 42:
+    case 43:
+    case 44:
+    case 45:
+    case 46:
+    case 47:
       term->current_attr.bg = (u8)(code - 40);
       break;
     case 49:
       term->current_attr.bg = TERM_DEFAULT_BG;
       break;
     /* Bright background colors (100-107) */
-    case 100: case 101: case 102: case 103:
-    case 104: case 105: case 106: case 107:
+    case 100:
+    case 101:
+    case 102:
+    case 103:
+    case 104:
+    case 105:
+    case 106:
+    case 107:
       term->current_attr.bg = (u8)((code - 100) + 8);
       break;
 
@@ -347,7 +370,8 @@ static void handle_csi(Terminal *term, ansi_result *result) {
       /* Clear entire screen */
       clear_screen_cells(term);
       /* Clear scrollback too for both 2 (ED) and 3 (Clear History) */
-      /* This is a user-preference choice to match "Ctrl+L cleans buffer" request */
+      /* This is a user-preference choice to match "Ctrl+L cleans buffer"
+       * request */
       term->scrollback_count = 0;
       term->scrollback_start = 0;
       term->scroll_offset = 0;
@@ -396,7 +420,8 @@ static void handle_csi(Terminal *term, ansi_result *result) {
 
   case 'r': /* DECSTBM - Set Top and Bottom Margins */
     term->scroll_top = (count > 0 && params[0] > 0) ? (u32)(params[0] - 1) : 0;
-    term->scroll_bottom = (count > 1 && params[1] > 0) ? (u32)params[1] : term->rows;
+    term->scroll_bottom =
+        (count > 1 && params[1] > 0) ? (u32)params[1] : term->rows;
     if (term->scroll_top >= term->rows)
       term->scroll_top = 0;
     if (term->scroll_bottom > term->rows)
@@ -427,7 +452,8 @@ static void handle_csi(Terminal *term, ansi_result *result) {
                 to_move * sizeof(terminal_cell));
       }
       for (i32 i = 0; i < n && term->cursor_x + i < term->cols; i++) {
-        clear_cell(&term->screen[term->cursor_y * term->cols + term->cursor_x + i]);
+        clear_cell(
+            &term->screen[term->cursor_y * term->cols + term->cursor_x + i]);
       }
     }
     break;
@@ -512,7 +538,7 @@ static void put_char(Terminal *term, u32 codepoint) {
     u32 prev_x = term->cols - 1;
     terminal_cell *last_cell = &term->screen[prev_y * term->cols + prev_x];
     last_cell->attr.wrapped = 1;
-    
+
     term->cursor_x = 0;
     term->cursor_y++;
     if (term->cursor_y >= term->scroll_bottom) {
@@ -521,7 +547,8 @@ static void put_char(Terminal *term, u32 codepoint) {
     }
   }
 
-  terminal_cell *cell = &term->screen[term->cursor_y * term->cols + term->cursor_x];
+  terminal_cell *cell =
+      &term->screen[term->cursor_y * term->cols + term->cursor_x];
   cell->codepoint = codepoint;
   cell->attr = term->current_attr;
   cell->attr.wrapped = 0; /* Clear wrap flag for new char */
@@ -595,6 +622,12 @@ Terminal *Terminal_Create(u32 cols, u32 rows) {
   term->scroll_bottom = rows;
   term->cursor_visible = true;
 
+  /* Initialize selection */
+  term->is_selecting = false;
+  term->has_selection = false;
+  memset(&term->sel_start, 0, sizeof(terminal_coord));
+  memset(&term->sel_end, 0, sizeof(terminal_coord));
+
   /* Allocate screen buffer */
   term->screen = malloc(cols * rows * sizeof(terminal_cell));
   if (!term->screen) {
@@ -605,7 +638,8 @@ Terminal *Terminal_Create(u32 cols, u32 rows) {
 
   /* Allocate scrollback */
   term->scrollback_size = TERMINAL_SCROLLBACK_LINES;
-  term->scrollback = malloc(term->scrollback_size * cols * sizeof(terminal_cell));
+  term->scrollback =
+      malloc(term->scrollback_size * cols * sizeof(terminal_cell));
   if (!term->scrollback) {
     /* Continue without scrollback */
     term->scrollback_size = 0;
@@ -711,7 +745,7 @@ void Terminal_Update(Terminal *term) {
   while (term->read_tail != term->read_head) {
     u8 byte = term->read_buffer[term->read_tail];
     term->read_tail = (term->read_tail + 1) % term->read_buffer_size;
-    
+
     /* DEBUG: Log removed */
 
     /* Release lock briefly to allow reader thread to continue */
@@ -722,9 +756,10 @@ void Terminal_Update(Terminal *term) {
 
   pthread_mutex_unlock(&term->buffer_mutex);
 
-  /* Do NOT reset scroll to bottom on update - allows reading history while output arrives */
+  /* Do NOT reset scroll to bottom on update - allows reading history while
+   * output arrives */
   if (term->dirty && term->scroll_offset > 0) {
-      /* logic removed */
+    /* logic removed */
   }
 }
 
@@ -736,282 +771,370 @@ void Terminal_Resize(Terminal *term, u32 cols, u32 rows) {
     return;
 
   /* O(N) Strategy:
-     1. Allocate a dynamic "builder" buffer to hold the ENTIRE new state (lines).
-        We don't know the exact new line count, but it scales roughly inverse to width.
-        Let's start with capacity = current_total_lines * old_cols / new_cols * 1.5 + cushion */
-        
+     1. Allocate a dynamic "builder" buffer to hold the ENTIRE new state
+     (lines). We don't know the exact new line count, but it scales roughly
+     inverse to width. Let's start with capacity = current_total_lines *
+     old_cols / new_cols * 1.5 + cushion */
+
   /* Trim trailing empty lines from screen to prevent preserving "void" */
   u32 screen_rows_used = 0;
   for (i32 y = (i32)term->rows - 1; y >= 0; y--) {
-      b32 empty = true;
-      for (u32 x = 0; x < term->cols; x++) {
-          terminal_cell *c = &term->screen[y * term->cols + x];
-          if (c->codepoint != 0 && c->codepoint != ' ') { empty = false; break; }
-          if (c->attr.bg != TERM_DEFAULT_BG) { empty = false; break; }
+    b32 empty = true;
+    for (u32 x = 0; x < term->cols; x++) {
+      terminal_cell *c = &term->screen[y * term->cols + x];
+      if (c->codepoint != 0 && c->codepoint != ' ') {
+        empty = false;
+        break;
       }
-      if (!empty) {
-          screen_rows_used = (u32)(y + 1);
-          break;
+      if (c->attr.bg != TERM_DEFAULT_BG) {
+        empty = false;
+        break;
       }
+    }
+    if (!empty) {
+      screen_rows_used = (u32)(y + 1);
+      break;
+    }
   }
-  
+
   /* Ensure we keep at least up to the cursor */
   if (term->cursor_y >= screen_rows_used) {
-      screen_rows_used = term->cursor_y + 1;
+    screen_rows_used = term->cursor_y + 1;
   }
 
   u32 total_old_lines = term->scrollback_count + screen_rows_used;
-  u32 estimated_capacity = (total_old_lines * term->cols) / cols + total_old_lines + 100;
-  
-  /* We use a temporary struct to hold pointers to rows to avoid copying large blocks twice. 
-     However, to be "zero memmove" for the *re-ingest*, we want to append new rows 
-     directly to a growing list. */
-  
+  u32 estimated_capacity =
+      (total_old_lines * term->cols) / cols + total_old_lines + 100;
+
+  /* We use a temporary struct to hold pointers to rows to avoid copying large
+     blocks twice. However, to be "zero memmove" for the *re-ingest*, we want to
+     append new rows directly to a growing list. */
+
   typedef struct {
-      terminal_cell *cells; /* cols elements */
-      u32 len; /* Always cols actually, but good for debug */
+    terminal_cell *cells; /* cols elements */
+    u32 len;              /* Always cols actually, but good for debug */
   } Line;
-  
+
   Line *lines = malloc(estimated_capacity * sizeof(Line));
   u32 line_count = 0;
   u32 line_capacity = estimated_capacity;
-  
+
   u32 new_cursor_x = 0;
   u32 new_cursor_y = 0; /* Index in 'lines' initially */
   b32 cursor_found = false;
-  
+
+  b32 sel_start_found = false;
+  b32 sel_end_found = false;
+  u32 new_sel_start_x = 0, new_sel_start_y = 0;
+  u32 new_sel_end_x = 0, new_sel_end_y = 0;
+
   /* Buffer for current logical line (unwrapped) */
   u32 logical_cap = 4096;
   terminal_cell *logical_line = malloc(logical_cap * sizeof(terminal_cell));
-  
+
   u32 i = 0;
   while (i < total_old_lines) {
-      /* 2. Stream Logical Lines (Merge Wrapped) */
-      u32 logical_len = 0;
-      b32 line_has_cursor = false;
-      u32 cursor_offset = 0;
-      
-      /* Collect consecutive wrapped lines into `logical_line` */
-      while (i < total_old_lines) {
-          /* Get source row */
-          terminal_cell *src_row;
-          b32 row_is_cursor = false;
-          
-          if (i < term->scrollback_count) {
-              u32 idx = (term->scrollback_start + i) % term->scrollback_size;
-              src_row = &term->scrollback[idx * term->cols];
-          } else {
-              u32 screen_y = i - term->scrollback_count;
-              src_row = &term->screen[screen_y * term->cols];
-              if (screen_y == term->cursor_y) row_is_cursor = true;
-          }
-          
-          /* Check wrap on last cell */
-          terminal_cell *last_cell = &src_row[term->cols - 1];
-          b32 is_wrapped = last_cell->attr.wrapped;
-          
-          /* Determine copy length */
-          u32 copy_len = term->cols;
-          
-          if (!is_wrapped) {
-              /* Trim empty space from non-wrapped lines */
-              while (copy_len > 0) {
-                  terminal_cell *c = &src_row[copy_len - 1];
-                  /* Treat NULL or empty space with default BG as empty */
-                  if (c->codepoint != 0 && c->codepoint != ' ') break;
-                  if (c->attr.bg != TERM_DEFAULT_BG || c->attr.reverse) break;
-                  copy_len--;
-              }
-          }
-          
-          /* Expand logical buffer if needed */
-          if (logical_len + copy_len > logical_cap) {
-              logical_cap = (logical_len + copy_len > logical_cap * 2) ? (logical_len + copy_len + 1024) : (logical_cap * 2);
-              logical_line = realloc(logical_line, logical_cap * sizeof(terminal_cell));
-          }
-          
-          /* Cursor Check */
-          if (row_is_cursor) {
-              /* Ensure copy covers cursor if it was in the whitespace */
-              if (copy_len <= term->cursor_x) copy_len = term->cursor_x + 1;
-              line_has_cursor = true;
-              cursor_offset = logical_len + term->cursor_x;
-          }
-          
-          /* Copy to logical */
-          for(u32 k=0; k<copy_len; k++) {
-              logical_line[logical_len + k] = src_row[k];
-              logical_line[logical_len + k].attr.wrapped = 0; /* Clear wrap flag */
-          }
-          logical_len += copy_len;
-          
-          i++;
-          if (!is_wrapped) break;
+    /* 2. Stream Logical Lines (Merge Wrapped) */
+    u32 logical_len = 0;
+    b32 line_has_cursor = false;
+    u32 cursor_offset = 0;
+
+    b32 line_has_sel_start = false;
+    b32 line_has_sel_end = false;
+    u32 sel_start_offset = 0;
+    u32 sel_end_offset = 0;
+
+    /* Collect consecutive wrapped lines into `logical_line` */
+    while (i < total_old_lines) {
+      /* Get source row */
+      terminal_cell *src_row;
+      b32 row_is_cursor = false;
+      b32 row_is_sel_start = false;
+      b32 row_is_sel_end = false;
+
+      if (i < term->scrollback_count) {
+        u32 idx = (term->scrollback_start + i) % term->scrollback_size;
+        src_row = &term->scrollback[idx * term->cols];
+      } else {
+        u32 screen_y = i - term->scrollback_count;
+        src_row = &term->screen[screen_y * term->cols];
+        if (screen_y == term->cursor_y)
+          row_is_cursor = true;
       }
-      
-      /* Ensure empty explicit lines exist as 1-height (unless completely empty logical split?) */
-      if (logical_len == 0) {
-          logical_len = 1; 
-          clear_cell(&logical_line[0]);
-      } 
-      
-      /* 3. Reflow Logical Line into New Chunks */
-      u32 processed = 0;
-      while (processed < logical_len) {
-          u32 chunk_len = cols;
-          if (processed + chunk_len > logical_len) {
-              chunk_len = logical_len - processed;
-          }
-          
-          /* Allocate New Line */
-          if (line_count >= line_capacity) {
-              line_capacity *= 2;
-              lines = realloc(lines, line_capacity * sizeof(Line));
-          }
-          
-          terminal_cell *new_row = malloc(cols * sizeof(terminal_cell));
-          for(u32 c=0; c<cols; c++) clear_cell(&new_row[c]);
-          
-          /* Copy Content */
-          for(u32 k=0; k<chunk_len; k++) {
-              new_row[k] = logical_line[processed + k];
-          }
-          
-          /* Set Wrap Flag */
-          if (chunk_len == cols && processed + chunk_len < logical_len) {
-              new_row[cols - 1].attr.wrapped = 1;
-          }
-          
-          /* Track Cursor */
-          if (line_has_cursor && !cursor_found) {
-              if (cursor_offset >= processed && cursor_offset < processed + chunk_len) {
-                  new_cursor_x = cursor_offset - processed;
-                  new_cursor_y = line_count;
-                  cursor_found = true;
-              }
-          }
-          
-          lines[line_count].cells = new_row;
-          lines[line_count].len = cols;
-          line_count++;
-          
-          processed += chunk_len;
+
+      if (term->has_selection) {
+        if (i == term->sel_start.y)
+          row_is_sel_start = true;
+        if (i == term->sel_end.y)
+          row_is_sel_end = true;
       }
+
+      /* Check wrap on last cell */
+      terminal_cell *last_cell = &src_row[term->cols - 1];
+      b32 is_wrapped = last_cell->attr.wrapped;
+
+      /* Determine copy length */
+      u32 copy_len = term->cols;
+
+      if (!is_wrapped) {
+        /* Trim empty space from non-wrapped lines */
+        while (copy_len > 0) {
+          terminal_cell *c = &src_row[copy_len - 1];
+          /* Treat NULL or empty space with default BG as empty */
+          if (c->codepoint != 0 && c->codepoint != ' ')
+            break;
+          if (c->attr.bg != TERM_DEFAULT_BG || c->attr.reverse)
+            break;
+          copy_len--;
+        }
+      }
+
+      /* Expand logical buffer if needed */
+      if (logical_len + copy_len > logical_cap) {
+        logical_cap = (logical_len + copy_len > logical_cap * 2)
+                          ? (logical_len + copy_len + 1024)
+                          : (logical_cap * 2);
+        logical_line =
+            realloc(logical_line, logical_cap * sizeof(terminal_cell));
+      }
+
+      /* Coordinate Checks (ensure copy covers coordinate if it was in the
+       * whitespace) */
+      if (row_is_cursor) {
+        if (copy_len <= term->cursor_x)
+          copy_len = term->cursor_x + 1;
+        line_has_cursor = true;
+        cursor_offset = logical_len + term->cursor_x;
+      }
+      if (row_is_sel_start) {
+        if (copy_len <= term->sel_start.x)
+          copy_len = term->sel_start.x + 1;
+        line_has_sel_start = true;
+        sel_start_offset = logical_len + term->sel_start.x;
+      }
+      if (row_is_sel_end) {
+        if (copy_len <= term->sel_end.x)
+          copy_len = term->sel_end.x + 1;
+        line_has_sel_end = true;
+        sel_end_offset = logical_len + term->sel_end.x;
+      }
+
+      /* Copy to logical */
+      for (u32 k = 0; k < copy_len; k++) {
+        logical_line[logical_len + k] = src_row[k];
+        logical_line[logical_len + k].attr.wrapped = 0; /* Clear wrap flag */
+      }
+      logical_len += copy_len;
+
+      i++;
+      if (!is_wrapped)
+        break;
+    }
+
+    /* Ensure empty explicit lines exist as 1-height (unless completely empty
+     * logical split?) */
+    if (logical_len == 0) {
+      logical_len = 1;
+      clear_cell(&logical_line[0]);
+    }
+
+    /* 3. Reflow Logical Line into New Chunks */
+    u32 processed = 0;
+    while (processed < logical_len) {
+      u32 chunk_len = cols;
+      if (processed + chunk_len > logical_len) {
+        chunk_len = logical_len - processed;
+      }
+
+      /* Allocate New Line */
+      if (line_count >= line_capacity) {
+        line_capacity *= 2;
+        lines = realloc(lines, line_capacity * sizeof(Line));
+      }
+
+      terminal_cell *new_row = malloc(cols * sizeof(terminal_cell));
+      for (u32 c = 0; c < cols; c++)
+        clear_cell(&new_row[c]);
+
+      /* Copy Content */
+      for (u32 k = 0; k < chunk_len; k++) {
+        new_row[k] = logical_line[processed + k];
+      }
+
+      /* Set Wrap Flag */
+      if (chunk_len == cols && processed + chunk_len < logical_len) {
+        new_row[cols - 1].attr.wrapped = 1;
+      }
+
+      /* Track Coordinates */
+      if (line_has_cursor && !cursor_found) {
+        if (cursor_offset >= processed &&
+            cursor_offset < processed + chunk_len) {
+          new_cursor_x = cursor_offset - processed;
+          new_cursor_y = line_count;
+          cursor_found = true;
+        }
+      }
+      if (line_has_sel_start && !sel_start_found) {
+        if (sel_start_offset >= processed &&
+            sel_start_offset < processed + chunk_len) {
+          new_sel_start_x = sel_start_offset - processed;
+          new_sel_start_y = line_count;
+          sel_start_found = true;
+        }
+      }
+      if (line_has_sel_end && !sel_end_found) {
+        if (sel_end_offset >= processed &&
+            sel_end_offset < processed + chunk_len) {
+          new_sel_end_x = sel_end_offset - processed;
+          new_sel_end_y = line_count;
+          sel_end_found = true;
+        }
+      }
+
+      lines[line_count].cells = new_row;
+      lines[line_count].len = cols;
+      line_count++;
+
+      processed += chunk_len;
+    }
   }
   free(logical_line);
-  
+
   /* 4. Commit to Terminal State */
-  /* We have 'line_count' lines in 'lines'. Need to split into Scrollback + Screen. */
-  
+  /* We have 'line_count' lines in 'lines'. Need to split into Scrollback +
+   * Screen. */
+
   u32 final_sb_count = 0;
-  
+
   /* Determine start index for screen */
   u32 screen_start_idx = 0;
-  
+
   if (line_count > rows) {
-      /* Full screen + some scrollback */
-      screen_start_idx = line_count - rows;
-      final_sb_count = screen_start_idx;
+    /* Full screen + some scrollback */
+    screen_start_idx = line_count - rows;
+    final_sb_count = screen_start_idx;
   } else {
-      /* Fits entirely in screen (at top) */
-      screen_start_idx = 0;
-      /* Rest is empty padding */
-      final_sb_count = 0;
+    /* Fits entirely in screen (at top) */
+    screen_start_idx = 0;
+    /* Rest is empty padding */
+    final_sb_count = 0;
   }
-  
+
   /* === SCROLLBACK === */
   /* If we have more history than max size, trim top */
   u32 sb_lines_to_keep = final_sb_count;
   u32 sb_source_start = 0;
-  
+
   if (sb_lines_to_keep > term->scrollback_size && term->scrollback_size > 0) {
-      sb_source_start = sb_lines_to_keep - term->scrollback_size;
-      sb_lines_to_keep = term->scrollback_size;
+    sb_source_start = sb_lines_to_keep - term->scrollback_size;
+    sb_lines_to_keep = term->scrollback_size;
   }
-  
+
   /* Reallocate Scrollback Buffer */
-  if (term->scrollback) free(term->scrollback);
+  if (term->scrollback)
+    free(term->scrollback);
   term->scrollback = NULL;
-  
+
   if (term->scrollback_size > 0) {
-      term->scrollback = malloc(term->scrollback_size * cols * sizeof(terminal_cell));
-      /* Copy lines into ring buffer (linear fill is fine since we just reset start=0) */
-      u32 dst_idx = 0;
-      for (u32 k = 0; k < sb_lines_to_keep; k++) {
-          terminal_cell *src = lines[sb_source_start + k].cells;
-          terminal_cell *dst = &term->scrollback[dst_idx * cols];
-          memcpy(dst, src, cols * sizeof(terminal_cell));
-          dst_idx++;
-      }
-      term->scrollback_count = sb_lines_to_keep;
-      term->scrollback_start = 0;
+    term->scrollback =
+        malloc(term->scrollback_size * cols * sizeof(terminal_cell));
+    /* Copy lines into ring buffer (linear fill is fine since we just reset
+     * start=0) */
+    u32 dst_idx = 0;
+    for (u32 k = 0; k < sb_lines_to_keep; k++) {
+      terminal_cell *src = lines[sb_source_start + k].cells;
+      terminal_cell *dst = &term->scrollback[dst_idx * cols];
+      memcpy(dst, src, cols * sizeof(terminal_cell));
+      dst_idx++;
+    }
+    term->scrollback_count = sb_lines_to_keep;
+    term->scrollback_start = 0;
   } else {
-      term->scrollback_count = 0;
-      term->scrollback_start = 0;
+    term->scrollback_count = 0;
+    term->scrollback_start = 0;
   }
-  
+
   /* === SCREEN === */
   /* New Screen Buffer */
   terminal_cell *new_screen = malloc(rows * cols * sizeof(terminal_cell));
-  for(u32 x=0; x<rows*cols; x++) clear_cell(&new_screen[x]);
-  
+  for (u32 x = 0; x < rows * cols; x++)
+    clear_cell(&new_screen[x]);
+
   /* Copy applicable lines to screen */
   /* If line_count < rows, we fill 0..line_count */
   /* If line_count >= rows, we fill screen_start_idx..line_count */
-  
+
   u32 screen_fill_count = (line_count > rows) ? rows : line_count;
   /* source starts at screen_start_idx */
-  
+
   for (u32 k = 0; k < screen_fill_count; k++) {
-      terminal_cell *src = lines[screen_start_idx + k].cells;
-      terminal_cell *dst = &new_screen[k * cols];
-      memcpy(dst, src, cols * sizeof(terminal_cell));
+    terminal_cell *src = lines[screen_start_idx + k].cells;
+    terminal_cell *dst = &new_screen[k * cols];
+    memcpy(dst, src, cols * sizeof(terminal_cell));
   }
-  
+
   /* Replace Screen */
-  if (term->screen) free(term->screen);
+  if (term->screen)
+    free(term->screen);
   term->screen = new_screen;
-  
+
   /* Update Cursor */
   /* new_cursor_y is absolute index in 'lines'. map to screen. */
   if (cursor_found) {
-      if (new_cursor_y >= screen_start_idx) {
-          term->cursor_y = new_cursor_y - screen_start_idx;
-          term->cursor_x = new_cursor_x;
-      } else {
-          /* Cursor is in allowed scrollback? 
-             Actually standard terms might pull it to top? 
-             Let's clamp to 0,0 if it scrolled off. */
-          term->cursor_y = 0;
-          term->cursor_x = new_cursor_x;
-          /* If we support viewport following cursor? */
-      }
+    if (new_cursor_y >= screen_start_idx) {
+      term->cursor_y = new_cursor_y - screen_start_idx;
+      term->cursor_x = new_cursor_x;
+    } else {
+      /* Cursor is in allowed scrollback?
+         Actually standard terms might pull it to top?
+         Let's clamp to 0,0 if it scrolled off. */
+      term->cursor_y = 0;
+      term->cursor_x = new_cursor_x;
+      /* If we support viewport following cursor? */
+    }
   } else {
-      /* Default to top left if lost? or bottom left? */
-      term->cursor_x = 0;
-      term->cursor_y = (screen_fill_count > 0) ? screen_fill_count - 1 : 0;
+    /* Default to top left if lost? or bottom left? */
+    term->cursor_x = 0;
+    term->cursor_y = (screen_fill_count > 0) ? screen_fill_count - 1 : 0;
   }
-  
+
+  /* Update selection positions (absolute virtual indices) */
+  if (term->has_selection) {
+    /* If either end was lost (not found in current flow), clear selection */
+    if (sel_start_found && sel_end_found) {
+      term->sel_start.x = new_sel_start_x;
+      term->sel_start.y = new_sel_start_y;
+      term->sel_end.x = new_sel_end_x;
+      term->sel_end.y = new_sel_end_y;
+    } else {
+      term->has_selection = false;
+    }
+  }
+
   /* CLEANUP */
-  for (u32 k=0; k<line_count; k++) {
-      if (lines[k].cells) free(lines[k].cells);
+  for (u32 k = 0; k < line_count; k++) {
+    if (lines[k].cells)
+      free(lines[k].cells);
   }
   free(lines);
-  
+
   term->cols = cols;
   term->rows = rows;
   term->scroll_offset = 0;
   term->scroll_top = 0;
   term->scroll_bottom = rows;
-  
+
   /* Clamp cursor */
-  if (term->cursor_x >= cols) term->cursor_x = cols - 1;
-  if (term->cursor_y >= rows) term->cursor_y = rows - 1;
-  
+  if (term->cursor_x >= cols)
+    term->cursor_x = cols - 1;
+  if (term->cursor_y >= rows)
+    term->cursor_y = rows - 1;
+
   if (term->pty) {
     PTY_Resize(term->pty, cols, rows);
   }
-  
+
   term->dirty = true;
 }
 
@@ -1020,7 +1143,7 @@ void Terminal_Write(Terminal *term, const char *data, u32 size) {
     return;
 
   PTY_Write(term->pty, data, size);
-  
+
   /* User input snaps to bottom */
   if (term->scroll_offset > 0) {
     term->scroll_offset = 0;
@@ -1102,24 +1225,26 @@ const terminal_cell *Terminal_GetCell(Terminal *term, u32 x, u32 y) {
   /* Calculate virtual line index (0 = oldest scrollback line) */
   /* Virtual height = scrollback_count + rows */
   /* Viewport starts at: scrollback_count - scroll_offset */
-  
-  i32 virtual_line = (i32)term->scrollback_count - (i32)term->scroll_offset + (i32)y;
+
+  i32 virtual_line =
+      (i32)term->scrollback_count - (i32)term->scroll_offset + (i32)y;
 
   if (virtual_line < 0) {
-      /* Viewing before start of history (shouldn't happen with clamped offset) */
-      return NULL;
+    /* Viewing before start of history (shouldn't happen with clamped offset) */
+    return NULL;
   }
-  
+
   if (virtual_line < (i32)term->scrollback_count) {
-      /* Line is in scrollback */
-      u32 actual_line = (term->scrollback_start + virtual_line) % term->scrollback_size;
-      return &term->scrollback[actual_line * term->cols + x];
+    /* Line is in scrollback */
+    u32 actual_line =
+        (term->scrollback_start + virtual_line) % term->scrollback_size;
+    return &term->scrollback[actual_line * term->cols + x];
   } else {
-      /* Line is in screen */
-      u32 screen_y = (u32)(virtual_line - (i32)term->scrollback_count);
-      if (screen_y < term->rows) {
-          return &term->screen[screen_y * term->cols + x];
-      }
+    /* Line is in screen */
+    u32 screen_y = (u32)(virtual_line - (i32)term->scrollback_count);
+    if (screen_y < term->rows) {
+      return &term->screen[screen_y * term->cols + x];
+    }
   }
 
   return NULL;
@@ -1150,6 +1275,11 @@ void Terminal_Clear(Terminal *term) {
   term->cursor_x = 0;
   term->cursor_y = 0;
   term->scroll_offset = 0;
+
+  /* Clear selection on clear screen */
+  term->is_selecting = false;
+  term->has_selection = false;
+
   term->dirty = true;
 }
 
@@ -1168,25 +1298,26 @@ const char *Terminal_GetCWD(Terminal *term) {
  * Returns the column after the prompt, or 0 if not found.
  */
 static u32 detect_prompt_end(Terminal *term) {
-  if (!term) return 0;
-  
+  if (!term)
+    return 0;
+
   u32 y = term->cursor_y;
   u32 last_prompt_pos = 0;
-  
+
   /* Scan the line for prompt characters */
   for (u32 x = 0; x < term->cols && x < term->cursor_x; x++) {
     terminal_cell *cell = &term->screen[y * term->cols + x];
     u32 cp = cell->codepoint;
-    
+
     /* Common prompt endings */
     if (cp == '$' || cp == '#' || cp == '>' || cp == '%') {
       /* Check if next char is space (common pattern: "$ " or "> ") */
       if (x + 1 < term->cols) {
         terminal_cell *next = &term->screen[y * term->cols + x + 1];
         if (next->codepoint == ' ') {
-          last_prompt_pos = x + 2;  /* After "$ " */
+          last_prompt_pos = x + 2; /* After "$ " */
         } else {
-          last_prompt_pos = x + 1;  /* After "$" */
+          last_prompt_pos = x + 1; /* After "$" */
         }
       } else {
         last_prompt_pos = x + 1;
@@ -1206,78 +1337,242 @@ static u32 detect_prompt_end(Terminal *term) {
       }
     }
   }
-  
+
   return last_prompt_pos;
 }
 
-const char* Terminal_GetCurrentLine(Terminal *term) {
-  if (!term) return NULL;
-  
+const char *Terminal_GetCurrentLine(Terminal *term) {
+  if (!term)
+    return NULL;
+
   /* Detect where prompt ends */
   u32 prompt_end = detect_prompt_end(term);
   term->prompt_end_col = prompt_end;
-  
+
   /* Extract text from prompt end to cursor */
   u32 y = term->cursor_y;
   u32 len = 0;
-  
+
   for (u32 x = prompt_end; x < term->cursor_x && x < term->cols; x++) {
     terminal_cell *cell = &term->screen[y * term->cols + x];
     u32 cp = cell->codepoint;
-    
+
     if (cp == 0 || (cp == ' ' && len == 0)) {
       /* Skip leading spaces and nulls (only if at start of input) */
-      if (len == 0) continue;
+      if (len == 0)
+        continue;
       /* Otherwise fallthrough to add space */
     }
-    
+
     /* Add character to buffer (simple conversion) */
     if (len < sizeof(term->current_line) - 1) {
-        if (cp < 128) {
-            term->current_line[len++] = (char)cp;
-        } else {
-            /* Replace non-ASCII with ? for now to keep length correct/safe */
-            /* TODO: Real UTF-8 would be better but requires more logic */
-            term->current_line[len++] = '?';
-        }
+      if (cp < 128) {
+        term->current_line[len++] = (char)cp;
+      } else {
+        /* Replace non-ASCII with ? for now to keep length correct/safe */
+        /* TODO: Real UTF-8 would be better but requires more logic */
+        term->current_line[len++] = '?';
+      }
     }
   }
-  
+
   term->current_line[len] = '\0';
   term->current_line_len = len;
-  
+
   return term->current_line;
 }
 
-
 b32 Terminal_IsCursorAtEOL(Terminal *term) {
-  if (!term) return false;
-  
+  if (!term)
+    return false;
+
   u32 y = term->cursor_y;
   u32 x = term->cursor_x;
-  
+
   /* Check if cursor is at end of content on this line */
   /* Look at cell at cursor position - if it's empty/space, we're at EOL */
-  if (x >= term->cols) return true;
-  
+  if (x >= term->cols)
+    return true;
+
   terminal_cell *cell = &term->screen[y * term->cols + x];
-  
+
   /* If current cell is empty (null or space), we're at end of input */
   if (cell->codepoint == 0 || cell->codepoint == ' ') {
     /* But verify there's no content after cursor */
     for (u32 cx = x + 1; cx < term->cols; cx++) {
       terminal_cell *c = &term->screen[y * term->cols + cx];
       if (c->codepoint != 0 && c->codepoint != ' ') {
-        return false;  /* Content after cursor, not at EOL */
+        return false; /* Content after cursor, not at EOL */
       }
     }
     return true;
   }
-  
+
   return false;
 }
 
+/* ===== Selection Implementation ===== */
+
+static i32 get_virtual_line(Terminal *term, u32 y) {
+  /* y is viewport relative (0 = top of visible screen) */
+  /* Scroll offset 0 = bottom, offset max = top */
+  return (i32)term->scrollback_count - (i32)term->scroll_offset + (i32)y;
+}
+
+void Terminal_StartSelection(Terminal *term, u32 x, u32 y) {
+  if (!term)
+    return;
+  term->sel_start.x = x;
+  term->sel_start.y = (u32)get_virtual_line(term, y);
+  term->sel_end = term->sel_start;
+  term->is_selecting = true;
+  term->has_selection = true; /* Selection exists as soon as we start */
+  term->dirty = true;
+}
+
+void Terminal_MoveSelection(Terminal *term, u32 x, u32 y) {
+  if (!term || !term->is_selecting)
+    return;
+  term->sel_end.x = x;
+  term->sel_end.y = (u32)get_virtual_line(term, y);
+  term->dirty = true;
+}
+
+void Terminal_EndSelection(Terminal *term) {
+  if (!term)
+    return;
+  term->is_selecting = false;
+  /* If start == end, we can clear it if we want click-to-deselect,
+     but usually we keep the highlight until next interaction. */
+  if (term->sel_start.x == term->sel_end.x &&
+      term->sel_start.y == term->sel_end.y) {
+    term->has_selection = false;
+  }
+}
+
+void Terminal_ClearSelection(Terminal *term) {
+  if (!term)
+    return;
+  term->is_selecting = false;
+  term->has_selection = false;
+  term->dirty = true;
+}
+
+b32 Terminal_IsCellSelected(Terminal *term, u32 x, u32 y) {
+  if (!term || !term->has_selection)
+    return false;
+
+  i32 vy = get_virtual_line(term, y);
+  terminal_coord start = term->sel_start;
+  terminal_coord end = term->sel_end;
+
+  /* Normalize start/end so start is always before/above end */
+  if (start.y > end.y || (start.y == end.y && start.x > end.x)) {
+    terminal_coord tmp = start;
+    start = end;
+    end = tmp;
+  }
+
+  if (vy < (i32)start.y || vy > (i32)end.y)
+    return false;
+  if (vy > (i32)start.y && vy < (i32)end.y)
+    return true;
+
+  if (start.y == end.y) {
+    return (u32)x >= start.x && (u32)x <= end.x;
+  }
+
+  if (vy == (i32)start.y)
+    return (u32)x >= start.x;
+  if (vy == (i32)end.y)
+    return (u32)x <= end.x;
+
+  return false;
+}
+
+char *Terminal_GetSelectionText(Terminal *term) {
+  if (!term || !term->has_selection)
+    return NULL;
+
+  terminal_coord start = term->sel_start;
+  terminal_coord end = term->sel_end;
+
+  /* Normalize */
+  if (start.y > end.y || (start.y == end.y && start.x > end.x)) {
+    terminal_coord tmp = start;
+    start = end;
+    end = tmp;
+  }
+
+  /* Estimate buffer size: (rows * cols * 4 bytes for UTF-8) + newlines */
+  u32 num_lines = end.y - start.y + 1;
+  usize capacity = num_lines * (term->cols + 1) * 4 + 1;
+  char *buffer = malloc(capacity);
+  if (!buffer)
+    return NULL;
+
+  usize len = 0;
+  for (u32 y = start.y; y <= end.y; y++) {
+    u32 x_start = (y == start.y) ? start.x : 0;
+    u32 x_end = (y == end.y) ? end.x : term->cols - 1;
+
+    /* Clamp x_end to current terminal width */
+    if (x_end >= term->cols)
+      x_end = term->cols - 1;
+
+    /* Get line data */
+    const terminal_cell *row_data = NULL;
+    if (y < term->scrollback_count) {
+      u32 idx = (term->scrollback_start + y) % term->scrollback_size;
+      row_data = &term->scrollback[idx * term->cols];
+    } else {
+      u32 screen_y = y - term->scrollback_count;
+      if (screen_y < term->rows) {
+        row_data = &term->screen[screen_y * term->cols];
+      }
+    }
+
+    if (!row_data)
+      continue;
+
+    b32 line_wrapped = row_data[term->cols - 1].attr.wrapped;
+
+    /* Extract text from cells */
+    for (u32 x = x_start; x <= x_end; x++) {
+      u32 cp = row_data[x].codepoint;
+      if (cp == 0)
+        cp = ' ';
+
+      /* Simple UTF-8 encoding */
+      if (cp < 0x80) {
+        buffer[len++] = (char)cp;
+      } else if (cp < 0x800) {
+        buffer[len++] = (char)(0xC0 | (cp >> 6));
+        buffer[len++] = (char)(0x80 | (cp & 0x3F));
+      } else if (cp < 0x10000) {
+        buffer[len++] = (char)(0xE0 | (cp >> 12));
+        buffer[len++] = (char)(0x80 | ((cp >> 6) & 0x3F));
+        buffer[len++] = (char)(0x80 | (cp & 0x3F));
+      } else {
+        buffer[len++] = (char)(0xF0 | (cp >> 18));
+        buffer[len++] = (char)(0x80 | ((cp >> 12) & 0x3F));
+        buffer[len++] = (char)(0x80 | ((cp >> 6) & 0x3F));
+        buffer[len++] = (char)(0x80 | (cp & 0x3F));
+      }
+    }
+
+    /* Add newline if not end of selection AND not wrapped line */
+    if (y < end.y && !line_wrapped) {
+      buffer[len++] = '\n';
+    }
+  }
+
+  buffer[len] = '\0';
+  return buffer;
+}
+
 u32 Terminal_GetCursorCol(Terminal *term) {
-  if (!term) return 0;
+  if (!term)
+    return 0;
   return term->cursor_x;
 }

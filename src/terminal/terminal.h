@@ -9,14 +9,20 @@
 #define TERMINAL_H
 
 #include "ansi_parser.h"
-#include "workbench_pty.h"
 #include "types.h"
+#include "workbench_pty.h"
 #include <pthread.h>
+
+/* Terminal coordinate (absolute) */
+typedef struct {
+  u32 x;
+  u32 y; /* Absolute virtual line index (0 = oldest scrollback line) */
+} terminal_coord;
 
 /* Terminal cell attributes */
 typedef struct {
-  u8 fg;         /* Foreground color index (0-15 for basic, 16-255 for extended) */
-  u8 bg;         /* Background color index */
+  u8 fg; /* Foreground color index (0-15 for basic, 16-255 for extended) */
+  u8 bg; /* Background color index */
   u8 bold : 1;
   u8 dim : 1;
   u8 italic : 1;
@@ -29,13 +35,13 @@ typedef struct {
 } cell_attr;
 
 /* Default attributes */
-#define TERM_DEFAULT_FG 7  /* White */
-#define TERM_DEFAULT_BG 0  /* Black */
+#define TERM_DEFAULT_FG 7 /* White */
+#define TERM_DEFAULT_BG 0 /* Black */
 
 /* Single cell in terminal buffer */
 typedef struct {
-  u32 codepoint;       /* Unicode codepoint (UTF-32) */
-  cell_attr attr;      /* Visual attributes */
+  u32 codepoint;  /* Unicode codepoint (UTF-32) */
+  cell_attr attr; /* Visual attributes */
 } terminal_cell;
 
 /* Terminal scroll buffer configuration */
@@ -51,9 +57,9 @@ struct Terminal {
 
   /* Scrollback buffer (ring buffer of lines) */
   terminal_cell *scrollback;
-  u32 scrollback_size;     /* Number of lines in scrollback */
-  u32 scrollback_start;    /* Start index in ring buffer */
-  u32 scrollback_count;    /* Number of valid lines */
+  u32 scrollback_size;  /* Number of lines in scrollback */
+  u32 scrollback_start; /* Start index in ring buffer */
+  u32 scrollback_count; /* Number of valid lines */
 
   /* Scroll offset (0 = at bottom, showing live output) */
   i32 scroll_offset;
@@ -95,12 +101,18 @@ struct Terminal {
   /* Dirty flag for rendering optimization */
   b32 dirty;
 
+  /* Selection state */
+  terminal_coord sel_start;
+  terminal_coord sel_end;
+  b32 is_selecting;
+  b32 has_selection;
+
   /* Current input line extraction (for suggestions) */
-  char current_line[1024];      /* Extracted current input line */
+  char current_line[1024]; /* Extracted current input line */
   u32 current_line_len;
-  u32 prompt_end_col;           /* Estimated column where prompt ends */
-  
-  char cwd[512];          /* Current working directory (from OSC 7) */
+  u32 prompt_end_col; /* Estimated column where prompt ends */
+
+  char cwd[512]; /* Current working directory (from OSC 7) */
 };
 
 /* Initialize terminal with given dimensions */
@@ -148,12 +160,32 @@ const char *Terminal_GetCWD(Terminal *term);
 /* ===== Suggestion Support ===== */
 
 /* Extract current input line from cursor row (text after prompt) */
-const char* Terminal_GetCurrentLine(Terminal *term);
+const char *Terminal_GetCurrentLine(Terminal *term);
 
 /* Check if cursor is at end of input (for suggestion acceptance) */
 b32 Terminal_IsCursorAtEOL(Terminal *term);
 
 /* Get cursor column position */
 u32 Terminal_GetCursorCol(Terminal *term);
+
+/* ===== Selection API ===== */
+
+/* Start selection at given viewport coordinates */
+void Terminal_StartSelection(Terminal *term, u32 x, u32 y);
+
+/* Update selection end point at given viewport coordinates */
+void Terminal_MoveSelection(Terminal *term, u32 x, u32 y);
+
+/* End selection */
+void Terminal_EndSelection(Terminal *term);
+
+/* Clear selection */
+void Terminal_ClearSelection(Terminal *term);
+
+/* Check if cell at viewport coordinates is selected */
+b32 Terminal_IsCellSelected(Terminal *term, u32 x, u32 y);
+
+/* Get selected text as a null-terminated string (caller must free) */
+char *Terminal_GetSelectionText(Terminal *term);
 
 #endif /* TERMINAL_H */

@@ -12,6 +12,7 @@
 #include "theme.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* Terminal dimensions in cells */
@@ -85,6 +86,7 @@ void TerminalPanel_Init(terminal_panel_state *state) {
       SHELL_FISH; /* Default to fish shell on Linux per user request */
 #endif
   state->suggestions = Suggestion_Create(NULL); /* Default history path */
+  state->selection_scroll_accumulator = 0.0f;
 }
 
 void TerminalPanel_Destroy(terminal_panel_state *state) {
@@ -163,14 +165,122 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
     SmoothValue_Update(&state->cursor_blink, dt);
   }
 
-  /* Handle click-to-focus */
+  /* Handle mouse input for focus and selection */
   if (state->visible && state->anim.current > 0.5f &&
       state->last_bounds.w > 0) {
-    if (Input_MousePressed(MOUSE_LEFT) &&
-        UI_PointInRect(Input_GetMousePos(), state->last_bounds)) {
+    v2i mouse_pos = Input_GetMousePos();
+    b32 in_bounds = UI_PointInRect(mouse_pos, state->last_bounds);
+
+    if (Input_MousePressed(MOUSE_LEFT) && in_bounds) {
       Input_SetFocus(INPUT_TARGET_TERMINAL);
       state->has_focus = true;
+
+      /* Start selection */
+      if (state->terminal) {
+        /* Calculate cell coordinates */
+        rect content = {
+            .x = state->last_bounds.x + 4,
+            .y = state->last_bounds.y + 8,
+            .w = state->last_bounds.w - 8,
+            .h = state->last_bounds.h - 8,
+        };
+
+        /* TODO: These should be synced with Render's cell_width/height
+         * calculation */
+        /* For now using defaults or measuring if mono_font were available here
+         * globally */
+        /* Actually we can approximate or use a better way.
+           Let's use the same logic as in Render. */
+        i32 cell_w = 8;
+        i32 cell_h = 16;
+        font *mono_font = ui->font;
+        if (mono_font) {
+          cell_w = Font_MeasureWidth(mono_font, "M");
+          if (cell_w <= 0)
+            cell_w = 8;
+          cell_h = Font_GetLineHeight(mono_font);
+          if (cell_h <= 0)
+            cell_h = 16;
+        }
+
+        if (UI_PointInRect(mouse_pos, content)) {
+          u32 tx = (u32)((mouse_pos.x - content.x) / cell_w);
+          u32 ty = (u32)((mouse_pos.y - content.y) / cell_h);
+          Terminal_StartSelection(state->terminal, tx, ty);
+        } else {
+          Terminal_ClearSelection(state->terminal);
+        }
+      }
+
       Input_ConsumeMouse();
+    }
+
+    if (Input_MouseDown(MOUSE_LEFT) && state->terminal &&
+        state->terminal->is_selecting) {
+      rect content = {
+          .x = state->last_bounds.x + 4,
+          .y = state->last_bounds.y + 8,
+          .w = state->last_bounds.w - 8,
+          .h = state->last_bounds.h - 8,
+      };
+
+      i32 cell_w = 8;
+      i32 cell_h = 16;
+      font *mono_font = ui->font;
+      if (mono_font) {
+        cell_w = Font_MeasureWidth(mono_font, "M");
+        if (cell_w <= 0)
+          cell_w = 8;
+        cell_h = Font_GetLineHeight(mono_font);
+        if (cell_h <= 0)
+          cell_h = 16;
+      }
+
+      /* Smooth auto-scroll when selecting outside bounds */
+      f32 scroll_delta = 0.0f;
+      if (mouse_pos.y < content.y) {
+        scroll_delta = (f32)(content.y - mouse_pos.y) * 10.0f * dt;
+      } else if (mouse_pos.y >= content.y + content.h) {
+        scroll_delta =
+            (f32)(content.y + content.h - 1 - mouse_pos.y) * 10.0f * dt;
+      }
+
+      if (scroll_delta != 0.0f) {
+        state->selection_scroll_accumulator += scroll_delta;
+        i32 lines = (i32)state->selection_scroll_accumulator;
+        if (lines != 0) {
+          Terminal_Scroll(state->terminal, lines);
+          state->selection_scroll_accumulator -= (f32)lines;
+        }
+      } else {
+        state->selection_scroll_accumulator = 0.0f;
+      }
+
+      /* Clamp mouse to content area for selection coordinate calculation */
+      i32 mx = mouse_pos.x;
+      i32 my = mouse_pos.y;
+      if (mx < content.x)
+        mx = content.x;
+      if (mx >= content.x + content.w)
+        mx = content.x + content.w - 1;
+      if (my < content.y)
+        my = content.y;
+      if (my >= content.y + content.h)
+        my = content.y + content.h - 1;
+
+      u32 tx = (u32)((mx - content.x) / cell_w);
+      u32 ty = (u32)((my - content.y) / cell_h);
+
+      /* Clamp tx to current columns */
+      if (tx >= state->terminal->cols)
+        tx = state->terminal->cols - 1;
+
+      Terminal_MoveSelection(state->terminal, tx, ty);
+    }
+
+    if (Input_MouseReleased(MOUSE_LEFT) && state->terminal &&
+        state->terminal->is_selecting) {
+      Terminal_EndSelection(state->terminal);
     }
   }
 
@@ -332,6 +442,37 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
       Terminal_Write(state->terminal, "\x1b", 1);
     }
 
+    /* ===== Copy/Paste Shortcuts ===== */
+    if (mods & MOD_CTRL) {
+      /* Ctrl+C or Ctrl+Shift+C: Copy */
+      if (Input_KeyPressed(KEY_C)) {
+        if (state->terminal->has_selection) {
+          char *text = Terminal_GetSelectionText(state->terminal);
+          if (text) {
+            Platform_SetClipboard(text);
+            free(text);
+            /* Maybe clear selection on copy? Terminal apps usually don't,
+               but GUI apps do. Let's keep it highlighted. */
+            Input_ConsumeKeys();
+            goto skip_normal_input;
+          }
+        } else if (mods & MOD_SHIFT) {
+          /* Shift+Ctrl+C is standard terminal copy */
+          /* (Already handled by selection check above if text selected) */
+        }
+      }
+      /* Ctrl+V or Ctrl+Shift+V: Paste */
+      if (Input_KeyPressed(KEY_V)) {
+        char buffer[4096];
+        char *text = Platform_GetClipboard(buffer, sizeof(buffer));
+        if (text) {
+          Terminal_Write(state->terminal, text, (u32)strlen(text));
+          Input_ConsumeKeys();
+          goto skip_normal_input;
+        }
+      }
+    }
+
     /* Ctrl+key combinations (except Ctrl+F which is handled above) */
     if (mods & MOD_CTRL) {
       for (int k = KEY_A; k <= KEY_Z; k++) {
@@ -343,7 +484,6 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
         }
       }
     }
-
     /* Regular text input */
     u32 text = Input_GetTextInput();
     if (text > 0 && !(mods & MOD_CTRL)) {
@@ -361,6 +501,8 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
     /* Consume all keyboard input when terminal has focus */
     Input_ConsumeKeys();
     Input_ConsumeText();
+
+  skip_normal_input:;
   }
 
   /* ===== Update Suggestions ===== */
@@ -510,10 +652,16 @@ void TerminalPanel_Render(terminal_panel_state *state, ui_context *ui,
         bg_cell = tmp;
       }
 
-      /* Draw background if not default */
-      if (attr.bg != TERM_DEFAULT_BG || attr.reverse) {
+      /* Draw background if not default OR selected */
+      b32 selected = Terminal_IsCellSelected(state->terminal, x, y);
+      if (attr.bg != TERM_DEFAULT_BG || attr.reverse || selected) {
         rect cell_rect = {px, py, cell_width, cell_height};
-        Render_DrawRect(r, cell_rect, bg_cell);
+        color actual_bg = bg_cell;
+        if (selected) {
+          /* Highlight color: light blue with some transparency */
+          actual_bg = (color){60, 120, 180, 180};
+        }
+        Render_DrawRect(r, cell_rect, actual_bg);
       }
 
       /* Draw cursor */

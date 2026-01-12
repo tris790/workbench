@@ -135,6 +135,9 @@ b32 Input_MousePressed(mouse_button button);
 /* Check if mouse button is down */
 b32 Input_MouseDown(mouse_button button);
 
+/* Check if mouse button was released this frame */
+b32 Input_MouseReleased(mouse_button button);
+
 /* Get scroll delta (respects consumption) */
 f32 Input_GetScrollDelta(void);
 

@@ -151,6 +151,14 @@ b32 Input_MouseDown(mouse_button button) {
   return g_input.raw.mouse_down[button];
 }
 
+b32 Input_MouseReleased(mouse_button button) {
+  if (g_input.mouse_consumed)
+    return false;
+  if (button >= MOUSE_BUTTON_COUNT)
+    return false;
+  return g_input.raw.mouse_released[button];
+}
+
 f32 Input_GetScrollDelta(void) {
   if (g_input.scroll_consumed)
     return 0.0f;
