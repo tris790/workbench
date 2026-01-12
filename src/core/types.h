@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 /* ===== Basic Types ===== */
 
@@ -80,6 +81,9 @@ static inline void ArenaInit(memory_arena *arena, void *base, usize size) {
 
 static inline void *ArenaPush(memory_arena *arena, usize size) {
   if (arena->used + size > arena->size) {
+    fprintf(stderr,
+            "Arena out of memory! Requested: %zu, Used: %zu, Total: %zu\n",
+            size, arena->used, arena->size);
     return NULL;
   }
   void *result = arena->base + arena->used;
@@ -96,6 +100,25 @@ static inline void ArenaReset(memory_arena *arena) { arena->used = 0; }
 
 static inline usize ArenaRemaining(memory_arena *arena) {
   return arena->size - arena->used;
+}
+
+/* ===== Temporary Memory ===== */
+
+typedef struct {
+  memory_arena *arena;
+  usize used;
+} temporary_memory;
+
+static inline temporary_memory BeginTemporaryMemory(memory_arena *arena) {
+  temporary_memory temp;
+  temp.arena = arena;
+  temp.used = arena->used;
+  return temp;
+}
+
+static inline void EndTemporaryMemory(temporary_memory temp) {
+  Assert(temp.arena->used >= temp.used);
+  temp.arena->used = temp.used;
 }
 
 #endif /* TYPES_H */

@@ -228,7 +228,7 @@ void Layout_SetMode(layout_state *layout, layout_mode mode) {
     explorer_state *dst = &layout->panels[dst_idx].explorer;
 
     /* Navigate to same path */
-    Explorer_NavigateTo(dst, src->fs.current_path);
+    Explorer_NavigateTo(dst, src->fs.current_path, false);
 
     /* Force watcher to watch the correct path (in case NavigateTo returned
      * early) */

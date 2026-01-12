@@ -98,7 +98,7 @@ int main(int argc, char **argv) {
   if (argc > 1) {
     panel *p = Layout_GetActivePanel(&layout);
     if (p) {
-      Explorer_NavigateTo(&p->explorer, argv[1]);
+      Explorer_NavigateTo(&p->explorer, argv[1], false);
     }
   }
 
@@ -179,9 +179,6 @@ int main(int argc, char **argv) {
               panel *p = Layout_GetActivePanel(&layout);
               if (p && p->explorer.mode != EXPLORER_MODE_NORMAL) {
                 Explorer_Cancel(&p->explorer);
-              } else {
-                printf("Escape pressed, exiting...\n");
-                goto cleanup;
               }
             }
             /* Terminal and Dialog handle their own ESC */
@@ -357,7 +354,6 @@ int main(int argc, char **argv) {
     Platform_SleepMs(16); /* ~60fps target */
   }
 
-cleanup:
   UI_Shutdown(&ui);
   if (main_font)
     Font_Free(main_font);

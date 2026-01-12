@@ -26,6 +26,9 @@
 #define EXPLORER_ICON_PADDING 6
 #define EXPLORER_BREADCRUMB_HEIGHT 32
 #define EXPLORER_DOUBLE_CLICK_MS 400
+#define EXPLORER_SCROLLBAR_WIDTH 6
+#define EXPLORER_SCROLLBAR_GUTTER 12
+#define EXPLORER_SCROLLBAR_OFFSET 8
 
 /* ===== Visibility Helpers ===== */
 
@@ -181,13 +184,45 @@ void Explorer_Shutdown(explorer_state *state) {
 
 /* ===== Navigation ===== */
 
-b32 Explorer_NavigateTo(explorer_state *state, const char *path) {
+b32 Explorer_NavigateTo(explorer_state *state, const char *path,
+                        b32 keep_filter) {
   if (strcmp(state->fs.current_path, path) == 0)
     return true;
 
   if (FS_LoadDirectory(&state->fs, path)) {
-    /* Clear quick filter on navigation */
-    QuickFilter_Clear(&state->filter);
+    if (keep_filter) {
+      /* Update filter text to match the new location relative to search start
+       */
+      size_t start_len = strlen(state->search_start_path);
+
+      /* Ensure we are still inside the search root */
+      if (strncmp(path, state->search_start_path, start_len) == 0) {
+        const char *rel_path = path + start_len;
+
+        /* Skip leading slash of relative path if present */
+        if (rel_path[0] == '/') {
+          rel_path++;
+        }
+
+        /* Construct new filter text */
+        char new_filter[256];
+        if (rel_path[0] != '\0') {
+          snprintf(new_filter, sizeof(new_filter), "%s/", rel_path);
+        } else {
+          new_filter[0] = '\0'; /* At root of search */
+        }
+
+        QuickFilter_SetBuffer(&state->filter, new_filter);
+
+        /* Do NOT update search_start_path - it acts as the anchor */
+      } else {
+        /* Navigated outside search root - clear filter */
+        QuickFilter_Clear(&state->filter);
+      }
+    } else {
+      /* Clear quick filter on navigation */
+      QuickFilter_Clear(&state->filter);
+    }
 
     /* Update file watcher to watch new directory */
     FSWatcher_WatchDirectory(&state->watcher, path);
@@ -417,7 +452,8 @@ static void HandleNormalInput(explorer_state *state, ui_context *ui) {
         char target_path[FS_MAX_PATH];
         strncpy(target_path, entry->path, FS_MAX_PATH - 1);
         target_path[FS_MAX_PATH - 1] = '\0';
-        Explorer_NavigateTo(state, target_path);
+        Explorer_NavigateTo(state, target_path,
+                            QuickFilter_IsActive(&state->filter));
       } else {
         Platform_OpenFile(entry->path);
       }
@@ -426,7 +462,7 @@ static void HandleNormalInput(explorer_state *state, ui_context *ui) {
 
   /* Go home */
   if (Input_KeyPressed(KEY_H) && (input->modifiers & MOD_CTRL)) {
-    Explorer_NavigateTo(state, FS_GetHomePath());
+    Explorer_NavigateTo(state, FS_GetHomePath(), false);
   }
 
   /* History Navigation */
@@ -622,7 +658,8 @@ void Explorer_Update(explorer_state *state, ui_context *ui) {
                 char target_path[FS_MAX_PATH];
                 strncpy(target_path, entry->path, FS_MAX_PATH - 1);
                 target_path[FS_MAX_PATH - 1] = '\0';
-                Explorer_NavigateTo(state, target_path);
+                Explorer_NavigateTo(state, target_path,
+                                    QuickFilter_IsActive(&state->filter));
               } else {
                 Platform_OpenFile(entry->path);
               }
@@ -727,11 +764,7 @@ void Explorer_Update(explorer_state *state, ui_context *ui) {
         }
       }
     } else if (filter_was_active && !filter_is_active) {
-      /* Filter just ended */
-      if (state->search_start_path[0] != '\0' &&
-          strcmp(state->fs.current_path, state->search_start_path) != 0) {
-        FS_LoadDirectory(&state->fs, state->search_start_path);
-      }
+      /* Filter just ended - stay in current directory (do not revert) */
     }
 
     /* If filter state or content changed, reset selection */
@@ -938,7 +971,13 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
     if (visible_index >= start_visible && visible_index <= end_visible) {
       i32 item_y = list_area.y + (visible_index * state->item_height) -
                    (i32)state->scroll.offset.y;
-      rect item_bounds = {list_area.x, item_y, list_area.w, state->item_height};
+      i32 actual_width = list_area.w;
+      if (state->scroll.content_size.y > state->scroll.view_size.y) {
+        actual_width -=
+            EXPLORER_SCROLLBAR_GUTTER; /* Reserve space for scrollbar */
+      }
+      rect item_bounds = {list_area.x, item_y, actual_width,
+                          state->item_height};
 
       b32 is_selected = ((i32)i == state->fs.selected_index);
       b32 is_hovered = UI_PointInRect(ui->input.mouse_pos, item_bounds);
@@ -965,7 +1004,8 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
     f32 scroll_ratio = max_scroll > 0 ? state->scroll.offset.y / max_scroll : 0;
     i32 bar_y = list_area.y + (i32)((list_area.h - bar_height) * scroll_ratio);
 
-    rect scrollbar = {list_area.x + list_area.w - 8, bar_y, 6, bar_height};
+    rect scrollbar = {list_area.x + list_area.w - EXPLORER_SCROLLBAR_OFFSET,
+                      bar_y, EXPLORER_SCROLLBAR_WIDTH, bar_height};
     color bar_color = th->text_muted;
     bar_color.a = 100;
     Render_DrawRectRounded(ctx, scrollbar, 3.0f, bar_color);

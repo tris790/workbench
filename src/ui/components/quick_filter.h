@@ -49,6 +49,12 @@ void QuickFilter_Render(quick_filter_state *state, ui_context *ui, rect bounds);
 /* Clear the filter and hide the UI */
 void QuickFilter_Clear(quick_filter_state *state);
 
+/* Clear the filter buffer but keep the UI active */
+void QuickFilter_ClearBuffer(quick_filter_state *state);
+
+/* Set the filter buffer text and force active */
+void QuickFilter_SetBuffer(quick_filter_state *state, const char *text);
+
 /* Check if filter is currently active (has content) */
 b32 QuickFilter_IsActive(quick_filter_state *state);
 

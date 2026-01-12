@@ -219,9 +219,13 @@ b32 FS_LoadDirectory(fs_state *state, const char *path) {
     resolved[FS_MAX_PATH - 1] = '\0';
   }
 
+  /* Create temporary memory scope for listing */
+  temporary_memory temp = BeginTemporaryMemory(state->arena);
+
   /* Load directory listing from platform */
   directory_listing listing = {0};
   if (!Platform_ListDirectory(resolved, &listing, state->arena)) {
+    EndTemporaryMemory(temp);
     return false;
   }
 
@@ -272,6 +276,7 @@ b32 FS_LoadDirectory(fs_state *state, const char *path) {
   }
 
   Platform_FreeDirectoryListing(&listing);
+  EndTemporaryMemory(temp);
   return true;
 }
 

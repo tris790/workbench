@@ -18,6 +18,11 @@ b32 Platform_ListDirectory(const char *path, directory_listing *listing,
   listing->capacity = 2048;
   listing->entries = ArenaPushArray(arena, file_info, listing->capacity);
 
+  if (!listing->entries) {
+    closedir(dir);
+    return false;
+  }
+
   struct dirent *entry;
   while ((entry = readdir(dir)) != NULL) {
     if (strcmp(entry->d_name, ".") == 0)
@@ -27,10 +32,12 @@ b32 Platform_ListDirectory(const char *path, directory_listing *listing,
       break;
 
     file_info *info = &listing->entries[listing->count];
+    memset(info, 0, sizeof(file_info));
+
     strncpy(info->name, entry->d_name, sizeof(info->name) - 1);
     info->name[sizeof(info->name) - 1] = '\0';
 
-    char full_path[512];
+    char full_path[4096];
     snprintf(full_path, sizeof(full_path), "%s/%s", path, entry->d_name);
 
     struct stat st;
@@ -43,6 +50,8 @@ b32 Platform_ListDirectory(const char *path, directory_listing *listing,
         info->type = FILE_TYPE_FILE;
       info->size = st.st_size;
       info->modified_time = st.st_mtime;
+    } else {
+      info->type = FILE_TYPE_FILE;
     }
 
     listing->count++;
@@ -113,7 +122,8 @@ void Platform_OpenFile(const char *path) {
   char command[2048];
   /* Use xdg-open to open file with default application */
   /* Redirect output to silence spurious messages */
-  snprintf(command, sizeof(command), "xdg-open \"%s\" > /dev/null 2>&1 &", path);
+  snprintf(command, sizeof(command), "xdg-open \"%s\" > /dev/null 2>&1 &",
+           path);
   int result = system(command);
   (void)result;
 }

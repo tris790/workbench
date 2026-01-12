@@ -185,12 +185,32 @@ void QuickFilter_Render(quick_filter_state *state, ui_context *ui,
 
 /* ===== Utility ===== */
 
+/* Clear the filter and hide the UI */
 void QuickFilter_Clear(quick_filter_state *state) {
   state->buffer[0] = '\0';
   state->input_state.cursor_pos = 0;
   state->input_state.selection_start = -1;
   state->active = false;
   state->fade_anim.target = 0.0f;
+}
+
+void QuickFilter_ClearBuffer(quick_filter_state *state) {
+  state->buffer[0] = '\0';
+  state->input_state.cursor_pos = 0;
+  state->input_state.selection_start = -1;
+  /* Force active/visible */
+  state->active = true;
+  state->fade_anim.target = 1.0f;
+}
+
+void QuickFilter_SetBuffer(quick_filter_state *state, const char *text) {
+  strncpy(state->buffer, text, QUICK_FILTER_MAX_INPUT - 1);
+  state->buffer[QUICK_FILTER_MAX_INPUT - 1] = '\0';
+  state->input_state.cursor_pos = (i32)strlen(state->buffer);
+  state->input_state.selection_start = -1;
+  /* Force active/visible */
+  state->active = true;
+  state->fade_anim.target = 1.0f;
 }
 
 b32 QuickFilter_IsActive(quick_filter_state *state) { return state->active; }

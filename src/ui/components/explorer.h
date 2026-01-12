@@ -105,7 +105,10 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
                      b32 has_focus);
 
 /* Navigate to specific path */
-b32 Explorer_NavigateTo(explorer_state *state, const char *path);
+/* Navigate to specific path. If keep_filter is true, clears filter buffer but
+ * keeps it active. */
+b32 Explorer_NavigateTo(explorer_state *state, const char *path,
+                        b32 keep_filter);
 
 /* Refresh current directory */
 void Explorer_Refresh(explorer_state *state);
