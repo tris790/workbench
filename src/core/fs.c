@@ -402,11 +402,16 @@ void FS_MoveSelection(fs_state *state, i32 delta) {
   FS_SetSelection(state, state->selected_index + delta);
 }
 
-const char *FS_GetCurrentPath(fs_state *state) { return state->current_path; }
-
 const char *FS_GetHomePath(void) {
   const char *home = getenv("HOME");
-  return home ? home : "/";
+  if (home)
+    return home;
+
+#ifdef _WIN32
+  return "C:/";
+#else
+  return "/";
+#endif
 }
 
 b32 FS_NavigateHome(fs_state *state) {

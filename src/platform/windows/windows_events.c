@@ -25,13 +25,17 @@ void PushEvent(platform_window *window, platform_event *event) {
 
 u32 GetModifierState(void) {
   u32 mods = 0;
-  if (GetKeyState(VK_SHIFT) & 0x8000)
+  if ((GetKeyState(VK_SHIFT) & 0x8000) || (GetKeyState(VK_LSHIFT) & 0x8000) ||
+      (GetKeyState(VK_RSHIFT) & 0x8000))
     mods |= MOD_SHIFT;
-  if (GetKeyState(VK_CONTROL) & 0x8000)
+  if ((GetKeyState(VK_CONTROL) & 0x8000) ||
+      (GetKeyState(VK_LCONTROL) & 0x8000) ||
+      (GetKeyState(VK_RCONTROL) & 0x8000))
     mods |= MOD_CTRL;
-  if (GetKeyState(VK_MENU) & 0x8000)
+  if ((GetKeyState(VK_MENU) & 0x8000) || (GetKeyState(VK_LMENU) & 0x8000) ||
+      (GetKeyState(VK_RMENU) & 0x8000))
     mods |= MOD_ALT;
-  if ((GetKeyState(VK_LWIN) | GetKeyState(VK_RWIN)) & 0x8000)
+  if ((GetKeyState(VK_LWIN) & 0x8000) || (GetKeyState(VK_RWIN) & 0x8000))
     mods |= MOD_SUPER;
   return mods;
 }
@@ -184,6 +188,35 @@ key_code VirtualKeyToKeyCode(WPARAM vk) {
     return KEY_COMMA;
   case VK_OEM_PERIOD:
     return KEY_PERIOD;
+  case VK_BROWSER_BACK:
+    return KEY_BROWSER_BACK;
+  case VK_BROWSER_FORWARD:
+    return KEY_BROWSER_FORWARD;
+  case VK_LSHIFT:
+    return KEY_LSHIFT;
+  case VK_RSHIFT:
+    return KEY_RSHIFT;
+  case VK_LCONTROL:
+    return KEY_LCTRL;
+  case VK_RCONTROL:
+    return KEY_RCTRL;
+  case VK_LMENU:
+    return KEY_LALT;
+  case VK_RMENU:
+    return KEY_RALT;
+  case VK_LWIN:
+    return KEY_LSUPER;
+  case VK_RWIN:
+    return KEY_RSUPER;
+  /* Generic mappings if L/R not distinguished by windows in some cases?
+     Usually windows sends L/R VKs but let's map generic just in case?
+     No, VK_SHIFT is a "virtual" virtual key, usually LSHIFT/RSHIFT are sent. */
+  case VK_SHIFT:
+    return KEY_LSHIFT; /* fallback */
+  case VK_CONTROL:
+    return KEY_LCTRL; /* fallback */
+  case VK_MENU:
+    return KEY_LALT; /* fallback */
   case VK_OEM_2:
     return KEY_SLASH; /* / ? */
   default:
@@ -240,7 +273,26 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   case WM_SYSKEYDOWN: {
     if (window) {
       window->last_vk = wParam;
+
       u32 mods = GetModifierState();
+      /* BRUTE FORCE ALT FIX */
+      if ((GetAsyncKeyState(VK_MENU) & 0x8000) || (msg == WM_SYSKEYDOWN) ||
+          ((lParam >> 29) & 1)) {
+        mods |= 4; /* MOD_ALT is 4 */
+      }
+      if (GetAsyncKeyState(VK_CONTROL) & 0x8000)
+        mods |= 2; /* MOD_CTRL is 2 */
+      if (GetAsyncKeyState(VK_SHIFT) & 0x8000)
+        mods |= 1; /* MOD_SHIFT is 1 */
+
+#ifdef WB_DEBUG
+      char debug_buf[256];
+      snprintf(debug_buf, sizeof(debug_buf),
+               "WinEvent_BRUTE: Msg=0x%X Key=0x%X Mods=%d (AltSet=%d)\n", msg,
+               (unsigned int)wParam, mods, (mods & 4) != 0);
+      OutputDebugStringA(debug_buf);
+      printf("%s", debug_buf);
+#endif
 
       /* Check if this key will produce a printable character via WM_CHAR.
        * If so, we'll wait for WM_CHAR to send the EVENT_KEY_DOWN so we can
@@ -266,7 +318,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         PushEvent(window, &event);
       }
     }
-    return 0;
+
+    /* IMPORTANT: Return 0 for WM_SYSKEYDOWN to prevent default system handling
+       (like sending focus to menu bar) unless we want system behavior. For
+       Alt+Left/Right, we want to handle it. */
+    if (msg == WM_SYSKEYDOWN)
+      return 0;
+    break;
   }
 
   case WM_KEYUP:
@@ -278,7 +336,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
       event.data.keyboard.modifiers = GetModifierState();
       PushEvent(window, &event);
     }
-    return 0;
+    break;
   }
 
   case WM_CHAR: {
@@ -402,6 +460,34 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
       PushEvent(window, &event);
     }
     return 0;
+  }
+
+  case WM_APPCOMMAND: {
+    if (window) {
+      UINT cmd = GET_APPCOMMAND_LPARAM(lParam);
+      if (cmd == APPCOMMAND_BROWSER_BACKWARD) {
+        platform_event event = {0};
+        event.type = EVENT_KEY_DOWN;
+        event.data.keyboard.key = KEY_BROWSER_BACK;
+        event.data.keyboard.modifiers = GetModifierState();
+        PushEvent(window, &event);
+
+        event.type = EVENT_KEY_UP;
+        PushEvent(window, &event);
+        return TRUE;
+      } else if (cmd == APPCOMMAND_BROWSER_FORWARD) {
+        platform_event event = {0};
+        event.type = EVENT_KEY_DOWN;
+        event.data.keyboard.key = KEY_BROWSER_FORWARD;
+        event.data.keyboard.modifiers = GetModifierState();
+        PushEvent(window, &event);
+
+        event.type = EVENT_KEY_UP;
+        PushEvent(window, &event);
+        return TRUE;
+      }
+    }
+    break;
   }
 
   case WM_PAINT: {
