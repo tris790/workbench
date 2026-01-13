@@ -3,9 +3,8 @@
  */
 
 #include "layout.h"
-#include "input.h"
+#include "../core/input.h"
 
-#include <stdio.h>
 #include <string.h>
 
 #define SPLITTER_WIDTH 4.0f
@@ -29,7 +28,9 @@ void Layout_Init(layout_state *layout, memory_arena *arena) {
 
   /* Initialize terminal panels (one per split as requested) */
   TerminalPanel_Init(&layout->panels[0].terminal);
+  layout->panels[0].terminal.resizer_id = UI_GenID("TerminalResizer0");
   TerminalPanel_Init(&layout->panels[1].terminal);
+  layout->panels[1].terminal.resizer_id = UI_GenID("TerminalResizer1");
 
   layout->panels[0].active = true;
   layout->panels[1].active = false;
@@ -148,7 +149,7 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
   /* Update terminal panels FIRST (they have input priority when focused) */
   for (int i = 0; i < 2; i++) {
     TerminalPanel_Update(&layout->panels[i].terminal, ui, ui->dt,
-                         (u32)i == layout->active_panel_idx);
+                         (u32)i == layout->active_panel_idx, bounds.h);
   }
 
   /* Update explorer only if it has focus (keys not consumed by terminal) */

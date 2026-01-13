@@ -5,16 +5,15 @@
  */
 
 #include "explorer.h"
+#include "../../core/fuzzy_match.h"
+#include "../../core/input.h"
+#include "../../core/text.h"
+#include "../../core/theme.h"
 #include "breadcrumb.h"
 #include "context_menu.h"
-#include "core/text.h"
 #include "dialog.h"
 #include "file_item.h"
-#include "fuzzy_match.h"
-#include "icons.h"
-#include "input.h"
 #include "quick_filter.h"
-#include "theme.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -610,7 +609,8 @@ void Explorer_Update(explorer_state *state, ui_context *ui) {
   state->scroll.offset.y = state->scroll.scroll_v.current;
 
   /* Handle mouse scroll when hovering over list */
-  if (state->list_bounds.w > 0 && state->list_bounds.h > 0) {
+  if (state->list_bounds.w > 0 && state->list_bounds.h > 0 &&
+      ui->active == UI_ID_NONE) {
     if (UI_PointInRect(input->mouse_pos, state->list_bounds)) {
       if (input->scroll_delta != 0) {
         state->scroll.target_offset.y -= input->scroll_delta * 80.0f;
@@ -980,7 +980,8 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
                           state->item_height};
 
       b32 is_selected = ((i32)i == state->fs.selected_index);
-      b32 is_hovered = UI_PointInRect(ui->input.mouse_pos, item_bounds);
+      b32 is_hovered = (ui->active == UI_ID_NONE) &&
+                       UI_PointInRect(ui->input.mouse_pos, item_bounds);
       file_item_config item_config = {.icon_size = EXPLORER_ICON_SIZE,
                                       .icon_padding = EXPLORER_ICON_PADDING,
                                       .show_size = state->show_size_column};

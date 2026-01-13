@@ -42,6 +42,13 @@ typedef struct {
   /* Selection scrolling */
   f32 selection_scroll_accumulator; /* Accumulates scroll distance during
                                        selection drags */
+
+  /* Resizing state */
+  b32 dragging;          /* Is the top border being dragged? */
+  f32 drag_start_y;      /* Mouse Y when drag started */
+  f32 drag_start_ratio;  /* Height ratio when drag started */
+  f32 drag_avail_height; /* Available height captured at start of drag */
+  ui_id resizer_id;      /* UI ID for resize handle */
 } terminal_panel_state;
 
 /* Initialize terminal panel state */
@@ -57,7 +64,7 @@ void TerminalPanel_Toggle(terminal_panel_state *state, const char *cwd);
 
 /* Update terminal state (call each frame) */
 void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
-                          b32 is_active);
+                          b32 is_active, f32 available_height);
 
 /* Render terminal panel in given bounds (bottom portion of bounds) */
 void TerminalPanel_Render(terminal_panel_state *state, ui_context *ui,

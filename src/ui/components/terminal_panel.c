@@ -140,7 +140,7 @@ void TerminalPanel_Toggle(terminal_panel_state *state, const char *cwd) {
 }
 
 void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
-                          b32 is_active) {
+                          b32 is_active, f32 available_height) {
   (void)ui; /* Used to be for ui->input, now using centralized Input_* API */
   if (!state)
     return;
@@ -163,6 +163,50 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
       blink_timer = 0.0f;
     }
     SmoothValue_Update(&state->cursor_blink, dt);
+  }
+
+  /* Handle resizing */
+  if (state->visible && state->last_bounds.w > 0) {
+    rect resize_handle = {.x = state->last_bounds.x,
+                          .y = state->last_bounds.y - 4,
+                          .w = state->last_bounds.w,
+                          .h = 8};
+
+    v2i mouse_pos = Input_GetMousePos();
+    b32 hover = UI_PointInRect(mouse_pos, resize_handle);
+
+    if (!state->dragging && hover && Input_MousePressed(MOUSE_LEFT) &&
+        ui->active == UI_ID_NONE) {
+      state->dragging = true;
+      ui->active = state->resizer_id;
+      state->drag_start_y = (f32)mouse_pos.y;
+      state->drag_start_ratio = state->height_ratio;
+      state->drag_avail_height = available_height;
+      Input_ConsumeMouse();
+    }
+  }
+
+  if (state->dragging) {
+    if (Input_MouseDown(MOUSE_LEFT)) {
+      v2i mouse_pos = Input_GetMousePos();
+      f32 dy = state->drag_start_y - (f32)mouse_pos.y;
+      f32 h = (state->drag_avail_height > 1.0f) ? state->drag_avail_height
+                                                : available_height;
+
+      if (h > 1.0f) {
+        f32 d_ratio = dy / h;
+        state->height_ratio = state->drag_start_ratio + d_ratio;
+        if (state->height_ratio < 0.1f)
+          state->height_ratio = 0.1f;
+        if (state->height_ratio > 0.8f)
+          state->height_ratio = 0.8f;
+      }
+    } else {
+      state->dragging = false;
+      if (ui->active == state->resizer_id) {
+        ui->active = UI_ID_NONE;
+      }
+    }
   }
 
   /* Handle mouse input for focus and selection */
@@ -578,7 +622,16 @@ void TerminalPanel_Render(terminal_panel_state *state, ui_context *ui,
   /* Draw top border / resize handle */
   rect border = {panel_bounds.x, panel_bounds.y, panel_bounds.w, 2};
   color border_color = th->border;
-  if (state->has_focus) {
+
+  /* Check hover for render feedback */
+  rect hit_rect = {panel_bounds.x, panel_bounds.y - 2, panel_bounds.w, 6};
+  b32 hover_border = UI_PointInRect(ui->input.mouse_pos, hit_rect);
+
+  if (state->dragging) {
+    border_color = th->accent;
+  } else if (hover_border) {
+    border_color = th->accent_hover; /* Highlight on hover */
+  } else if (state->has_focus) {
     border_color = th->accent;
   }
   Render_DrawRect(r, border, border_color);
