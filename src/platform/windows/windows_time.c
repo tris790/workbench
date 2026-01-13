@@ -1,3 +1,4 @@
+#ifdef _WIN32
 /*
  * windows_time.c - Windows time and sleep functions
  *
@@ -27,3 +28,4 @@ u64 Platform_GetTimeMs(void) {
 }
 
 void Platform_SleepMs(u32 ms) { Sleep(ms); }
+#endif /* _WIN32 */

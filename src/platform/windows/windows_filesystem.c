@@ -1,3 +1,4 @@
+#ifdef _WIN32
 /*
  * windows_filesystem.c - Windows file system operations
  *
@@ -281,3 +282,4 @@ b32 Platform_GetRealPath(const char *path, char *out_path, usize out_size) {
 
   return true;
 }
+#endif /* _WIN32 */

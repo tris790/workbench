@@ -8,7 +8,7 @@
 #ifndef WORKBENCH_PTY_H
 #define WORKBENCH_PTY_H
 
-#include "types.h"
+#include "../core/types.h"
 
 typedef struct PTY PTY;
 
@@ -34,7 +34,8 @@ void PTY_Resize(PTY *pty, u32 cols, u32 rows);
 /* Check if child process is still alive */
 b32 PTY_IsAlive(PTY *pty);
 
-/* Get file descriptor for poll/select (Linux-specific, returns -1 on Windows) */
+/* Get file descriptor for poll/select (Linux-specific, returns -1 on Windows)
+ */
 i32 PTY_GetFD(PTY *pty);
 
 #endif /* WORKBENCH_PTY_H */

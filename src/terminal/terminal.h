@@ -8,8 +8,8 @@
 #ifndef TERMINAL_H
 #define TERMINAL_H
 
+#include "../core/types.h"
 #include "ansi_parser.h"
-#include "types.h"
 #include "workbench_pty.h"
 #include <pthread.h>
 

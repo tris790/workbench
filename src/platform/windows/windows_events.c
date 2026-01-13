@@ -1,3 +1,4 @@
+#ifdef _WIN32
 /*
  * windows_events.c - Windows event handling
  *
@@ -285,15 +286,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
       if (GetAsyncKeyState(VK_SHIFT) & 0x8000)
         mods |= 1; /* MOD_SHIFT is 1 */
 
-#ifdef WB_DEBUG
-      char debug_buf[256];
-      snprintf(debug_buf, sizeof(debug_buf),
-               "WinEvent_BRUTE: Msg=0x%X Key=0x%X Mods=%d (AltSet=%d)\n", msg,
-               (unsigned int)wParam, mods, (mods & 4) != 0);
-      OutputDebugStringA(debug_buf);
-      printf("%s", debug_buf);
-#endif
-
       /* Check if this key will produce a printable character via WM_CHAR.
        * If so, we'll wait for WM_CHAR to send the EVENT_KEY_DOWN so we can
        * include the character codepoint in a single event. */
@@ -542,3 +534,4 @@ void Platform_WaitEvents(platform_window *window) {
     return;
   WaitMessage();
 }
+#endif /* _WIN32 */

@@ -1,3 +1,4 @@
+#ifdef _WIN32
 /*
  * windows_fs_watcher.c - Windows File System Watcher Implementation
  *
@@ -84,3 +85,4 @@ b32 FSWatcher_Poll(fs_watcher *watcher) {
 
   return false;
 }
+#endif /* _WIN32 */

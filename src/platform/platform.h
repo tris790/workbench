@@ -9,7 +9,7 @@
 #ifndef PLATFORM_H
 #define PLATFORM_H
 
-#include "types.h"
+#include "../core/types.h"
 
 /* ===== Forward Declarations ===== */
 

@@ -6,12 +6,11 @@
  */
 
 #include "terminal_panel.h"
-#include "input.h"
-#include "platform.h"
-#include "renderer.h"
-#include "theme.h"
+#include "../../core/input.h"
+#include "../../core/theme.h"
+#include "../../platform/platform.h"
+#include "../../renderer/renderer.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 

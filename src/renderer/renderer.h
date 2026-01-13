@@ -8,7 +8,7 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
-#include "types.h"
+#include "../core/types.h"
 
 /* ===== Color ===== */
 

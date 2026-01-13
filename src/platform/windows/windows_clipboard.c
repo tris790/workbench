@@ -1,3 +1,4 @@
+#ifdef _WIN32
 /*
  * windows_clipboard.c - Windows clipboard implementation
  *
@@ -88,3 +89,4 @@ b32 Platform_SetClipboard(const char *text) {
   CloseClipboard();
   return true;
 }
+#endif /* _WIN32 */

@@ -8,11 +8,11 @@
 #ifndef TERMINAL_PANEL_H
 #define TERMINAL_PANEL_H
 
-#include "animation.h"
-#include "suggestion.h"
-#include "terminal.h"
-#include "types.h"
-#include "ui.h"
+#include "../../core/animation.h"
+#include "../../core/types.h"
+#include "../../terminal/suggestion.h"
+#include "../../terminal/terminal.h"
+#include "../ui.h"
 
 /* Shell operation mode */
 typedef enum {

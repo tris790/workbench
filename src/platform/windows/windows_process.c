@@ -1,3 +1,4 @@
+#ifdef _WIN32
 /*
  * windows_process.c - Windows process spawning and management
  *
@@ -194,3 +195,4 @@ void Platform_ProcessFree(platform_process *process) {
 
   free(process);
 }
+#endif /* _WIN32 */

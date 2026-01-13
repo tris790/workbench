@@ -5,6 +5,8 @@
  * C99, handmade hero style.
  */
 
+#ifdef _WIN32
+
 #define WIN32_LEAN_AND_MEAN
 #include "../../terminal/workbench_pty.h"
 #include <stdio.h>
@@ -248,3 +250,5 @@ i32 PTY_GetFD(PTY *pty) {
   (void)pty;
   return -1; /* Not used on Windows */
 }
+
+#endif /* _WIN32 */

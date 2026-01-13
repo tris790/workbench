@@ -1,3 +1,4 @@
+#ifdef _WIN32
 /*
  * windows_platform.c - Windows platform initialization and cleanup
  *
@@ -29,3 +30,4 @@ void Platform_Shutdown(void) {
 
   memset(&g_platform, 0, sizeof(g_platform));
 }
+#endif /* _WIN32 */

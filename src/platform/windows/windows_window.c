@@ -1,3 +1,4 @@
+#ifdef _WIN32
 /*
  * windows_window.c - Windows window management with software rendering
  *
@@ -215,3 +216,4 @@ void Platform_PresentFrame(platform_window *window) {
   BitBlt(window->hdc, 0, 0, window->width, window->height, window->mem_dc, 0, 0,
          SRCCOPY);
 }
+#endif /* _WIN32 */

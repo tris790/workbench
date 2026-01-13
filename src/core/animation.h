@@ -8,7 +8,7 @@
 #ifndef ANIMATION_H
 #define ANIMATION_H
 
-#include "renderer.h"
+#include "../renderer/renderer.h"
 #include "types.h"
 
 /* ===== Basic Interpolation ===== */

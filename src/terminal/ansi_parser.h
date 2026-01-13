@@ -8,7 +8,7 @@
 #ifndef ANSI_PARSER_H
 #define ANSI_PARSER_H
 
-#include "types.h"
+#include "../core/types.h"
 
 /* Parser state machine states */
 typedef enum {
@@ -17,18 +17,18 @@ typedef enum {
   ANSI_STATE_CSI,      /* Control Sequence Introducer (ESC [) */
   ANSI_STATE_OSC,      /* Operating System Command (ESC ]) */
   ANSI_STATE_OSC_TEXT, /* Reading OSC text */
-  ANSI_STATE_DCS,      /* Device Control String (ESC P), APC (ESC _), PM (ESC ^) */
+  ANSI_STATE_DCS, /* Device Control String (ESC P), APC (ESC _), PM (ESC ^) */
   ANSI_STATE_DCS_ESCAPE /* ESC seen within DCS/APC/PM */
 } ansi_state;
 
 /* Action types returned by parser */
 typedef enum {
   ANSI_ACTION_NONE,
-  ANSI_ACTION_PRINT,     /* Print character */
-  ANSI_ACTION_EXECUTE,   /* Control character (CR, LF, etc.) */
-  ANSI_ACTION_CSI,       /* CSI sequence complete */
-  ANSI_ACTION_OSC,       /* OSC sequence complete */
-  ANSI_ACTION_DCS,       /* DCS sequence complete */
+  ANSI_ACTION_PRINT,   /* Print character */
+  ANSI_ACTION_EXECUTE, /* Control character (CR, LF, etc.) */
+  ANSI_ACTION_CSI,     /* CSI sequence complete */
+  ANSI_ACTION_OSC,     /* OSC sequence complete */
+  ANSI_ACTION_DCS,     /* DCS sequence complete */
 } ansi_action;
 
 /* CSI command codes */
@@ -74,15 +74,15 @@ typedef struct {
 typedef struct {
   ansi_action action;
   union {
-    u32 character;    /* For PRINT action */
-    u8 control;       /* For EXECUTE action */
+    u32 character; /* For PRINT action */
+    u8 control;    /* For EXECUTE action */
     struct {
       char command;
       b32 private_mode;
       i32 *params;
       i32 param_count;
-    } csi;            /* For CSI action */
-    const char *osc;  /* For OSC action */
+    } csi;           /* For CSI action */
+    const char *osc; /* For OSC action */
   } data;
 } ansi_result;
 

@@ -1,3 +1,4 @@
+#ifdef _WIN32
 /*
  * windows_font.c - DirectWrite font implementation for Windows
  *
@@ -844,3 +845,4 @@ void Font_RenderText(font *f, u32 *pixels, i32 fb_width, i32 fb_height,
     pen_x += glyph->advance;
   }
 }
+#endif /* _WIN32 */
