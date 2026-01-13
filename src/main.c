@@ -5,20 +5,19 @@
  * C99, handmade hero style.
  */
 
-#include "animation.h"
 #include "commands.h"
-#include "components/command_palette.h"
-#include "components/context_menu.h"
-#include "components/explorer.h"
 #include "core/assets_embedded.h"
-#include "font.h"
-#include "input.h"
-#include "key_repeat.h"
-#include "layout.h" /* Now using layout system */
-#include "platform.h"
-#include "renderer.h"
-#include "theme.h"
-#include "ui.h"
+#include "core/input.h"
+#include "core/key_repeat.h"
+#include "core/theme.h"
+#include "platform/platform.h"
+#include "renderer/font.h"
+#include "renderer/renderer.h"
+#include "ui/components/command_palette.h"
+#include "ui/components/context_menu.h"
+#include "ui/components/explorer.h"
+#include "ui/layout.h" /* Now using layout system */
+#include "ui/ui.h"
 
 #include <stdio.h>
 #include <stdlib.h>

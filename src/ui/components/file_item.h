@@ -8,8 +8,8 @@
 #ifndef FILE_ITEM_H
 #define FILE_ITEM_H
 
-#include "fs.h"
-#include "ui.h"
+#include "../../core/fs.h"
+#include "../ui.h"
 
 /* Configuration for file item rendering */
 typedef struct {

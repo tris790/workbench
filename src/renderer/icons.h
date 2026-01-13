@@ -8,9 +8,9 @@
 #ifndef ICONS_H
 #define ICONS_H
 
-#include "fs.h"
+#include "../core/fs.h"
+#include "../core/theme.h"
 #include "renderer.h"
-#include "theme.h"
 
 /* Draw an icon for the given file type */
 void Icon_Draw(render_context *ctx, rect bounds, file_icon_type type, color c);

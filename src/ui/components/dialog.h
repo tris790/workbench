@@ -8,8 +8,8 @@
 #ifndef DIALOG_H
 #define DIALOG_H
 
-#include "text.h"
-#include "ui.h"
+#include "../../core/text.h"
+#include "../ui.h"
 
 /* ===== Dialog Types ===== */
 

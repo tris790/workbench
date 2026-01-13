@@ -7,6 +7,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "fs.h"
+#include "../platform/platform.h"
 #include <strings.h>
 
 #include <stdio.h>

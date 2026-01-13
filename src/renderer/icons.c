@@ -5,7 +5,7 @@
  */
 
 #include "icons.h"
-#include "theme.h"
+#include "../core/theme.h"
 
 /* ===== Helper: Draw a simple line (1px thick rect) ===== */
 

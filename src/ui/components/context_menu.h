@@ -8,9 +8,8 @@
 #ifndef CONTEXT_MENU_H
 #define CONTEXT_MENU_H
 
-#include "animation.h"
-#include "fs.h"
-#include "ui.h"
+#include "../../core/animation.h"
+#include "../ui.h"
 
 /* ===== Configuration ===== */
 

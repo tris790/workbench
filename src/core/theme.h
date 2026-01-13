@@ -8,7 +8,7 @@
 #ifndef THEME_H
 #define THEME_H
 
-#include "renderer.h"
+#include "../renderer/renderer.h"
 
 /* ===== Theme Structure ===== */
 

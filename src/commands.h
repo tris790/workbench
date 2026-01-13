@@ -1,15 +1,15 @@
 /*
  * commands.h - Global Command Registration
  *
- * Defines functions to register application commands with the 
+ * Defines functions to register application commands with the
  * command palette.
  */
 
 #ifndef COMMANDS_H
 #define COMMANDS_H
 
-#include "layout.h"
-#include "components/command_palette.h"
+#include "ui/components/command_palette.h"
+#include "ui/layout.h"
 
 /* Initialize the commands module with layout context */
 void Commands_Init(layout_state *layout);

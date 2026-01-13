@@ -8,10 +8,10 @@
 #ifndef LAYOUT_H
 #define LAYOUT_H
 
-#include "explorer.h"
-#include "renderer.h"
-#include "terminal_panel.h"
-#include "types.h"
+#include "../core/types.h"
+#include "../renderer/renderer.h"
+#include "components/explorer.h"
+#include "components/terminal_panel.h"
 #include "ui.h"
 
 typedef enum {

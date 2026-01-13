@@ -9,8 +9,8 @@
 #ifndef COMMAND_PALETTE_H
 #define COMMAND_PALETTE_H
 
-#include "fs.h"
-#include "ui.h"
+#include "../../core/fs.h"
+#include "../ui.h"
 
 /* ===== Configuration ===== */
 

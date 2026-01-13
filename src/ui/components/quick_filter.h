@@ -8,9 +8,9 @@
 #ifndef QUICK_FILTER_H
 #define QUICK_FILTER_H
 
-#include "animation.h"
-#include "types.h"
-#include "ui.h"
+#include "../../core/animation.h"
+#include "../../core/types.h"
+#include "../ui.h"
 
 /* ===== Configuration ===== */
 

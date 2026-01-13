@@ -8,11 +8,11 @@
 #ifndef EXPLORER_H
 #define EXPLORER_H
 
-#include "fs.h"
-#include "fs_watcher.h"
+#include "../../core/fs.h"
+#include "../../core/fs_watcher.h"
+#include "../../core/text.h"
+#include "../ui.h"
 #include "quick_filter.h"
-#include "text.h"
-#include "ui.h"
 
 /* ===== Explorer State ===== */
 

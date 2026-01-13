@@ -8,7 +8,7 @@
 #ifndef BREADCRUMB_H
 #define BREADCRUMB_H
 
-#include "ui.h"
+#include "../ui.h"
 
 /* Render a breadcrumb path bar.
  * Automatically truncates long paths with "..." prefix.

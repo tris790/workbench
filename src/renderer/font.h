@@ -8,7 +8,7 @@
 #ifndef FONT_H
 #define FONT_H
 
-#include "types.h"
+#include "../core/types.h"
 
 /* Forward declaration for color (defined in renderer.h) */
 typedef struct {

@@ -9,11 +9,11 @@
 #ifndef UI_H
 #define UI_H
 
-#include "animation.h"
-#include "platform.h"
-#include "renderer.h"
-#include "theme.h"
-#include "types.h"
+#include "../core/animation.h"
+#include "../core/theme.h"
+#include "../core/types.h"
+#include "../platform/platform.h"
+#include "../renderer/renderer.h"
 
 /* ===== Configuration ===== */
 
@@ -234,9 +234,9 @@ typedef struct {
   u64 frame_count;
 
   /* Modal state */
-  ui_id active_modal;    /* Modal active in this frame */
-  ui_id next_modal;      /* Modal to be active next frame */
-  ui_id current_modal;   /* Currently processing modal (in BeginModal/EndModal) */
+  ui_id active_modal;  /* Modal active in this frame */
+  ui_id next_modal;    /* Modal to be active next frame */
+  ui_id current_modal; /* Currently processing modal (in BeginModal/EndModal) */
 
   /* Hover animations */
   ui_id hover_anim_id;
