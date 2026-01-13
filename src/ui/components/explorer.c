@@ -467,12 +467,12 @@ static void HandleNormalInput(explorer_state *state, ui_context *ui) {
 
   /* History Navigation */
   if ((Input_KeyPressed(KEY_LEFT) && (input->modifiers & MOD_ALT)) ||
-      input->mouse_pressed[MOUSE_X1]) {
+      Input_KeyPressed(KEY_BROWSER_BACK) || input->mouse_pressed[MOUSE_X1]) {
     Explorer_GoBack(state);
   }
 
   if ((Input_KeyPressed(KEY_RIGHT) && (input->modifiers & MOD_ALT)) ||
-      input->mouse_pressed[MOUSE_X2]) {
+      Input_KeyPressed(KEY_BROWSER_FORWARD) || input->mouse_pressed[MOUSE_X2]) {
     Explorer_GoForward(state);
   }
 
