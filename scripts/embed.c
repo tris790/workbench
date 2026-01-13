@@ -24,8 +24,7 @@ typedef struct {
 
 Asset g_assets[] = {
     {"assets/fonts/JetBrainsMono-Regular.ttf", "asset_font_regular"},
-    {"assets/workbench_icon.png", "asset_icon_png"},
-    {"workbench.desktop", "asset_desktop_file"}};
+    {"assets/workbench_icon.png", "asset_icon_png"}};
 
 int main(int argc, char **argv) {
   const char *output_c = "src/core/assets_embedded.c";
