@@ -23,9 +23,13 @@
 #pragma comment(lib, "dwrite.lib")
 #pragma comment(lib, "uuid.lib")
 
-/* Manually define IID_IDWriteFactory for cross-compilation */
+/* Manually define IIDs for cross-compilation */
 DEFINE_GUID(IID_IDWriteFactory, 0xb859ee5a, 0xd838, 0x4b5b, 0xa2, 0xe8, 0x1a,
             0xdc, 0x7d, 0x93, 0xdb, 0x48);
+DEFINE_GUID(IID_IDWriteFontFileLoader, 0x727cad4e, 0x0d65, 0x49ce, 0x8f, 0xf9,
+            0xfa, 0x19, 0x31, 0x63, 0x15, 0x90);
+DEFINE_GUID(IID_IDWriteFontFileStream, 0x6d48655c, 0xe508, 0x4903, 0x90, 0xa7,
+            0x33, 0x67, 0xc9, 0x63, 0x66, 0x5a);
 
 /* ===== Constants ===== */
 
@@ -85,6 +89,172 @@ static void ToWide(const char *utf8, wchar_t *out, i32 out_len) {
   MultiByteToWideChar(CP_UTF8, 0, utf8, -1, out, out_len);
 }
 
+/* ===== Memory Font Loader implementation ===== */
+
+typedef struct {
+  const void *data;
+  usize size;
+} MemoryFontKey;
+
+typedef struct {
+  IDWriteFontFileStreamVtbl *lpVtbl;
+  LONG ref_count;
+  const void *data;
+  UINT64 size;
+} MemoryFontStream;
+
+typedef struct {
+  IDWriteFontFileLoaderVtbl *lpVtbl;
+  LONG ref_count;
+} MemoryFontLoader;
+
+/* Forward declarations for VTable methods */
+static HRESULT STDMETHODCALLTYPE MemoryFontStream_QueryInterface(
+    IDWriteFontFileStream *This, REFIID riid, void **ppvObject);
+static ULONG STDMETHODCALLTYPE
+MemoryFontStream_AddRef(IDWriteFontFileStream *This);
+static ULONG STDMETHODCALLTYPE
+MemoryFontStream_Release(IDWriteFontFileStream *This);
+static HRESULT STDMETHODCALLTYPE MemoryFontStream_ReadFileFragment(
+    IDWriteFontFileStream *This, const void **fragmentStart, UINT64 fileOffset,
+    UINT64 fragmentSize, void **fragmentContext);
+static void STDMETHODCALLTYPE MemoryFontStream_ReleaseFileFragment(
+    IDWriteFontFileStream *This, void *fragmentContext);
+static HRESULT STDMETHODCALLTYPE
+MemoryFontStream_GetFileSize(IDWriteFontFileStream *This, UINT64 *fileSize);
+static HRESULT STDMETHODCALLTYPE MemoryFontStream_GetLastWriteTime(
+    IDWriteFontFileStream *This, UINT64 *lastWriteTime);
+
+static IDWriteFontFileStreamVtbl g_MemoryFontStreamVtbl = {
+    MemoryFontStream_QueryInterface,
+    MemoryFontStream_AddRef,
+    MemoryFontStream_Release,
+    MemoryFontStream_ReadFileFragment,
+    MemoryFontStream_ReleaseFileFragment,
+    MemoryFontStream_GetFileSize,
+    MemoryFontStream_GetLastWriteTime};
+
+static HRESULT STDMETHODCALLTYPE MemoryFontLoader_QueryInterface(
+    IDWriteFontFileLoader *This, REFIID riid, void **ppvObject);
+static ULONG STDMETHODCALLTYPE
+MemoryFontLoader_AddRef(IDWriteFontFileLoader *This);
+static ULONG STDMETHODCALLTYPE
+MemoryFontLoader_Release(IDWriteFontFileLoader *This);
+static HRESULT STDMETHODCALLTYPE MemoryFontLoader_CreateStreamFromKey(
+    IDWriteFontFileLoader *This, const void *fontFileReferenceKey,
+    UINT32 fontFileReferenceKeySize, IDWriteFontFileStream **fontFileStream);
+
+static IDWriteFontFileLoaderVtbl g_MemoryFontLoaderVtbl = {
+    MemoryFontLoader_QueryInterface, MemoryFontLoader_AddRef,
+    MemoryFontLoader_Release, MemoryFontLoader_CreateStreamFromKey};
+
+static MemoryFontLoader g_MemoryFontLoader = {&g_MemoryFontLoaderVtbl, 1};
+
+static HRESULT STDMETHODCALLTYPE MemoryFontStream_QueryInterface(
+    IDWriteFontFileStream *This, REFIID riid, void **ppvObject) {
+  if (IsEqualIID(riid, &IID_IUnknown) ||
+      IsEqualIID(riid, &IID_IDWriteFontFileStream)) {
+    *ppvObject = This;
+    IDWriteFontFileStream_AddRef(This);
+    return S_OK;
+  }
+  *ppvObject = NULL;
+  return E_NOINTERFACE;
+}
+
+static ULONG STDMETHODCALLTYPE
+MemoryFontStream_AddRef(IDWriteFontFileStream *This) {
+  MemoryFontStream *self = (MemoryFontStream *)This;
+  return InterlockedIncrement(&self->ref_count);
+}
+
+static ULONG STDMETHODCALLTYPE
+MemoryFontStream_Release(IDWriteFontFileStream *This) {
+  MemoryFontStream *self = (MemoryFontStream *)This;
+  ULONG count = InterlockedDecrement(&self->ref_count);
+  if (count == 0) {
+    free(self);
+  }
+  return count;
+}
+
+static HRESULT STDMETHODCALLTYPE MemoryFontStream_ReadFileFragment(
+    IDWriteFontFileStream *This, const void **fragmentStart, UINT64 fileOffset,
+    UINT64 fragmentSize, void **fragmentContext) {
+  MemoryFontStream *self = (MemoryFontStream *)This;
+  if (fileOffset + fragmentSize > self->size) {
+    return E_FAIL;
+  }
+  *fragmentStart = (const u8 *)self->data + fileOffset;
+  *fragmentContext = NULL;
+  return S_OK;
+}
+
+static void STDMETHODCALLTYPE MemoryFontStream_ReleaseFileFragment(
+    IDWriteFontFileStream *This, void *fragmentContext) {
+  (void)fragmentContext;
+}
+
+static HRESULT STDMETHODCALLTYPE
+MemoryFontStream_GetFileSize(IDWriteFontFileStream *This, UINT64 *fileSize) {
+  MemoryFontStream *self = (MemoryFontStream *)This;
+  *fileSize = self->size;
+  return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE MemoryFontStream_GetLastWriteTime(
+    IDWriteFontFileStream *This, UINT64 *lastWriteTime) {
+  *lastWriteTime = 0;
+  return E_NOTIMPL;
+}
+
+static HRESULT STDMETHODCALLTYPE MemoryFontLoader_QueryInterface(
+    IDWriteFontFileLoader *This, REFIID riid, void **ppvObject) {
+  if (IsEqualIID(riid, &IID_IUnknown) ||
+      IsEqualIID(riid, &IID_IDWriteFontFileLoader)) {
+    *ppvObject = This;
+    IDWriteFontFileLoader_AddRef(This);
+    return S_OK;
+  }
+  *ppvObject = NULL;
+  return E_NOINTERFACE;
+}
+
+static ULONG STDMETHODCALLTYPE
+MemoryFontLoader_AddRef(IDWriteFontFileLoader *This) {
+  MemoryFontLoader *self = (MemoryFontLoader *)This;
+  return InterlockedIncrement(&self->ref_count);
+}
+
+static ULONG STDMETHODCALLTYPE
+MemoryFontLoader_Release(IDWriteFontFileLoader *This) {
+  (void)This;
+  return 1;
+}
+
+static HRESULT STDMETHODCALLTYPE MemoryFontLoader_CreateStreamFromKey(
+    IDWriteFontFileLoader *This, const void *fontFileReferenceKey,
+    UINT32 fontFileReferenceKeySize, IDWriteFontFileStream **fontFileStream) {
+  (void)This;
+  if (fontFileReferenceKeySize != sizeof(MemoryFontKey)) {
+    return E_INVALIDARG;
+  }
+  const MemoryFontKey *key = (const MemoryFontKey *)fontFileReferenceKey;
+
+  MemoryFontStream *stream =
+      (MemoryFontStream *)calloc(1, sizeof(MemoryFontStream));
+  if (!stream)
+    return E_OUTOFMEMORY;
+
+  stream->lpVtbl = &g_MemoryFontStreamVtbl;
+  stream->ref_count = 1;
+  stream->data = key->data;
+  stream->size = key->size;
+
+  *fontFileStream = (IDWriteFontFileStream *)stream;
+  return S_OK;
+}
+
 /* ===== Font System Lifecycle ===== */
 
 b32 Font_SystemInit(void) {
@@ -102,6 +272,10 @@ b32 Font_SystemInit(void) {
     return false;
   }
 
+  /* Register memory font loader */
+  IDWriteFactory_RegisterFontFileLoader(
+      g_font_system.factory, (IDWriteFontFileLoader *)&g_MemoryFontLoader);
+
   Font_Log("Font: System initialized successfully");
   g_font_system.initialized = true;
   return true;
@@ -112,6 +286,8 @@ void Font_SystemShutdown(void) {
     return;
 
   if (g_font_system.factory) {
+    IDWriteFactory_UnregisterFontFileLoader(
+        g_font_system.factory, (IDWriteFontFileLoader *)&g_MemoryFontLoader);
     IDWriteFactory_Release(g_font_system.factory);
     g_font_system.factory = NULL;
   }
@@ -344,6 +520,64 @@ font *Font_LoadFromFile(const char *path, i32 size_pixels) {
 
   UpdateFontMetrics(f);
   Font_Log("Font loaded from file: %ls (%dpx)", abs_path, size_pixels);
+  return f;
+}
+
+font *Font_LoadFromMemory(const void *data, usize size, i32 size_pixels) {
+  if (!g_font_system.initialized) {
+    if (!Font_SystemInit())
+      return NULL;
+  }
+
+  MemoryFontKey key = {data, size};
+  IDWriteFontFile *font_file = NULL;
+  HRESULT hr = IDWriteFactory_CreateCustomFontFileReference(
+      g_font_system.factory, &key, sizeof(key),
+      (IDWriteFontFileLoader *)&g_MemoryFontLoader, &font_file);
+
+  if (FAILED(hr)) {
+    Font_Log("Font: CreateCustomFontFileReference failed (0x%08X)",
+             (unsigned int)hr);
+    return Font_Load("Segoe UI", size_pixels);
+  }
+
+  /* Analyze file to get type */
+  BOOL isSupported;
+  DWRITE_FONT_FILE_TYPE fileType;
+  DWRITE_FONT_FACE_TYPE faceType;
+  UINT32 numberOfFaces;
+  hr = IDWriteFontFile_Analyze(font_file, &isSupported, &fileType, &faceType,
+                               &numberOfFaces);
+
+  if (FAILED(hr) || !isSupported) {
+    Font_Log("Font: Memory font analysis failed or unsupported");
+    IDWriteFontFile_Release(font_file);
+    return Font_Load("Segoe UI", size_pixels);
+  }
+
+  font *f = calloc(1, sizeof(font));
+  if (!f) {
+    IDWriteFontFile_Release(font_file);
+    return NULL;
+  }
+  f->size_pixels = size_pixels;
+
+  /* Create face from the custom font file */
+  IDWriteFontFile *files[] = {font_file};
+  hr = IDWriteFactory_CreateFontFace(g_font_system.factory, faceType, 1, files,
+                                     0, DWRITE_FONT_SIMULATIONS_NONE, &f->face);
+
+  IDWriteFontFile_Release(font_file);
+
+  if (FAILED(hr)) {
+    Font_Log("Font: CreateFontFace failed for memory font (0x%08X)",
+             (unsigned int)hr);
+    free(f);
+    return Font_Load("Segoe UI", size_pixels);
+  }
+
+  UpdateFontMetrics(f);
+  Font_Log("Font loaded from memory (%zu bytes, %dpx)", size, size_pixels);
   return f;
 }
 

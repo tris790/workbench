@@ -134,6 +134,7 @@ Single script: `./build.sh [debug|release]`
 5. **Dark theme** - easy on the eyes, professional look
 
 ### Visual Design
+- **Icon**: Use the custom workbench icon for the application.
 - **Use icons** for compactness (not emojis - they look cheap)
 - System fonts for native feel
 - Command palette inspired by VSCode

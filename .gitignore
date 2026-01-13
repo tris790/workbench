@@ -1,1 +1,4 @@
 build/
+src/core/assets_embedded.c
+src/core/assets_embedded.h
+src/platform/protocols/

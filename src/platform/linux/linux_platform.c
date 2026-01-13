@@ -25,13 +25,13 @@ static void RegistryGlobal(void *data, struct wl_registry *registry, u32 name,
   } else if (strcmp(interface, wl_seat_interface.name) == 0) {
     g_platform.seat =
         wl_registry_bind(registry, name, &wl_seat_interface, Min(version, 5));
-    /* Seat listener added in events module usually, but we need to ensure it's hooked up.
-     * For simplicity, we'll keep the seat listener in linux_events.c and we might need to 
-     * call a registration function or extern the listener. 
-     * 
-     * Actually, better approach: define listeners in their respective modules and extern them 
-     * or register them here.
-     * 
+    /* Seat listener added in events module usually, but we need to ensure it's
+     * hooked up. For simplicity, we'll keep the seat listener in linux_events.c
+     * and we might need to call a registration function or extern the listener.
+     *
+     * Actually, better approach: define listeners in their respective modules
+     * and extern them or register them here.
+     *
      * Let's include the headers or extern them.
      */
   } else if (strcmp(interface, zxdg_decoration_manager_v1_interface.name) ==
@@ -70,11 +70,79 @@ static const struct xdg_wm_base_listener xdg_wm_base_listener = {
 };
 
 /* ===== Seat & Data Device Listeners ===== */
-/* These are defined in linux_events.c and linux_clipboard.c but we need to hook them up.
- * Use forward declarations or externs.
+/* These are defined in linux_events.c and linux_clipboard.c but we need to hook
+ * them up. Use forward declarations or externs.
  */
+#include "../../core/assets_embedded.h"
+#include <errno.h>
+#include <sys/stat.h>
+
 extern const struct wl_seat_listener seat_listener;
 extern const struct wl_data_device_listener data_device_listener;
+
+static void EnsureDir(const char *path) {
+  char tmp[512];
+  char *p = NULL;
+  usize len;
+
+  snprintf(tmp, sizeof(tmp), "%s", path);
+  len = strlen(tmp);
+  if (tmp[len - 1] == '/')
+    tmp[len - 1] = 0;
+  for (p = tmp + 1; *p; p++) {
+    if (*p == '/') {
+      *p = 0;
+      mkdir(tmp, S_IRWXU);
+      *p = '/';
+    }
+  }
+  mkdir(tmp, S_IRWXU);
+}
+
+static void Platform_SelfInstall(void) {
+  const char *home = getenv("HOME");
+  if (!home)
+    return;
+
+  char exe_path[1024];
+  ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+  if (len == -1)
+    return;
+  exe_path[len] = '\0';
+
+  char dir[512];
+  char path[1024];
+  FILE *f;
+
+  /* 1. Install Icon */
+  snprintf(dir, sizeof(dir), "%s/.local/share/icons", home);
+  EnsureDir(dir);
+  snprintf(path, sizeof(path), "%s/workbench_icon.png", dir);
+  f = fopen(path, "wb");
+  if (f) {
+    fwrite(asset_icon_png_data, 1, asset_icon_png_size, f);
+    fclose(f);
+  }
+
+  /* 2. Install Desktop File */
+  snprintf(dir, sizeof(dir), "%s/.local/share/applications", home);
+  EnsureDir(dir);
+  snprintf(path, sizeof(path), "%s/workbench.desktop", dir);
+  f = fopen(path, "w");
+  if (f) {
+    fprintf(f, "[Desktop Entry]\n");
+    fprintf(f, "Type=Application\n");
+    fprintf(f, "Name=Workbench\n");
+    fprintf(f, "Comment=A modern development workbench and file manager\n");
+    fprintf(f, "Exec=%s\n", exe_path);
+    fprintf(f, "Icon=workbench_icon\n");
+    fprintf(f, "Terminal=false\n");
+    fprintf(f, "Categories=Development;IDE;System;FileTools;FileManager;\n");
+    fprintf(f, "Keywords=development;editor;terminal;file;browser;manager;\n");
+    fprintf(f, "StartupWMClass=workbench\n");
+    fclose(f);
+  }
+}
 
 /* ===== Platform Init/Shutdown ===== */
 
@@ -95,11 +163,12 @@ b32 Platform_Init(void) {
 
   /* Hook up listeners that were bound in registry roundtrip */
   if (g_platform.xdg_wm_base) {
-      xdg_wm_base_add_listener(g_platform.xdg_wm_base, &xdg_wm_base_listener, NULL);
+    xdg_wm_base_add_listener(g_platform.xdg_wm_base, &xdg_wm_base_listener,
+                             NULL);
   }
-  
+
   if (g_platform.seat) {
-      wl_seat_add_listener(g_platform.seat, &seat_listener, NULL);
+    wl_seat_add_listener(g_platform.seat, &seat_listener, NULL);
   }
 
   if (g_platform.seat && g_platform.data_device_manager) {
@@ -113,6 +182,9 @@ b32 Platform_Init(void) {
     fprintf(stderr, "Missing required Wayland interfaces\n");
     return false;
   }
+
+  /* Ensure app is installed to desktop (icon + .desktop file) */
+  Platform_SelfInstall();
 
   g_platform.initialized = true;
   return true;

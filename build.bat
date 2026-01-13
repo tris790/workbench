@@ -11,6 +11,10 @@ if "%1"=="release" set MODE=release
 REM Create build directory
 if not exist build mkdir build
 
+REM Build and run the embedding tool (native C approach)
+cl /nologo /O2 scripts/embed.c /Fe:build/embed.exe
+build\embed.exe
+
 REM Set compiler flags based on mode
 if "%MODE%"=="release" (
     echo Building in RELEASE mode...
@@ -27,7 +31,7 @@ REM Include paths
 set INCLUDES=/I src /I src\core /I src\platform /I src\renderer /I src\ui
 
 REM Source files - Core
-set CORE_SRC=src\core\animation.c src\core\fs.c src\core\theme.c
+set CORE_SRC=src\core\animation.c src\core\fs.c src\core\theme.c src\core\assets_embedded.c
 
 REM Source files - Platform (Windows)
 set PLATFORM_SRC=src\platform\windows\windows_platform.c ^
@@ -39,7 +43,8 @@ set PLATFORM_SRC=src\platform\windows\windows_platform.c ^
     src\platform\windows\windows_time.c ^
     src\platform\windows\windows_fs_watcher.c ^
     src\platform\windows\windows_font.c ^
-    src\platform\windows\windows_pty.c
+    src\platform\windows\windows_pty.c ^
+    src\platform\windows\workbench.rc
 
 REM Source files - Renderer
 set RENDERER_SRC=src\renderer\renderer_software.c src\renderer\icons.c

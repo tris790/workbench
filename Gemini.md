@@ -136,7 +136,9 @@ Output: `build/wb`
 5. **Dark theme** - easy on the eyes, professional look
 
 ### Visual Design
+- **Icon**: Use the custom workbench icon for the application.
 - **Use icons** for compactness (not emojis - they look cheap)
+- **Portable binary**: Assets (fonts, icons) are embedded in the binary. On Linux, the app self-installs its desktop entry and icon on the first run.
 - System fonts for native feel
 - Command palette inspired by VSCode
 

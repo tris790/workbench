@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Workbench
+Comment=A modern development workbench and file manager
+Exec=wb
+Icon=workbench_icon
+Terminal=false
+Categories=Development;IDE;System;FileTools;FileManager;
+Keywords=development;editor;terminal;file;browser;manager;
+StartupWMClass=workbench

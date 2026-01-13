@@ -33,6 +33,8 @@ font *Font_Load(const char *name, i32 size_pixels);
 
 /* Load font from file path */
 font *Font_LoadFromFile(const char *path, i32 size_pixels);
+/* Load font from memory */
+font *Font_LoadFromMemory(const void *data, usize size, i32 size_pixels);
 
 /* Free font resources */
 void Font_Free(font *f);

@@ -147,6 +147,36 @@ font *Font_LoadFromFile(const char *path, i32 size_pixels) {
   return f;
 }
 
+font *Font_LoadFromMemory(const void *data, usize size, i32 size_pixels) {
+  if (!g_font_system.initialized) {
+    if (!Font_SystemInit())
+      return NULL;
+  }
+
+  font *f = calloc(1, sizeof(font));
+  if (!f)
+    return NULL;
+
+  if (FT_New_Memory_Face(g_font_system.library, (const FT_Byte *)data,
+                         (FT_Long)size, 0, &f->face) != 0) {
+    free(f);
+    return NULL;
+  }
+
+  if (FT_Set_Pixel_Sizes(f->face, 0, size_pixels) != 0) {
+    FT_Done_Face(f->face);
+    free(f);
+    return NULL;
+  }
+
+  f->size_pixels = size_pixels;
+  f->ascender = (i32)(f->face->size->metrics.ascender >> 6);
+  f->descender = (i32)(f->face->size->metrics.descender >> 6);
+  f->line_height = (i32)(f->face->size->metrics.height >> 6);
+
+  return f;
+}
+
 void Font_Free(font *f) {
   if (!f)
     return;

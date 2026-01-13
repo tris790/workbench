@@ -24,6 +24,8 @@ static b32 RegisterWindowClass(void) {
   wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
   wc.lpfnWndProc = WndProc;
   wc.hInstance = g_platform.instance;
+  wc.hIcon = LoadIcon(g_platform.instance, MAKEINTRESOURCE(1));
+  wc.hIconSm = LoadIcon(g_platform.instance, MAKEINTRESOURCE(1));
   wc.hCursor = LoadCursor(NULL, IDC_ARROW);
   wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
   wc.lpszClassName = WINDOW_CLASS_NAME;

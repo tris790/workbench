@@ -4,6 +4,11 @@ set -e
 # ensure build dir
 mkdir -p build
 
+# Build and run the embedding tool (native C approach)
+# We can use zig cc as a cross-platform C compiler
+zig cc -O2 scripts/embed.c -o build/embed
+./build/embed
+
 echo "Cross-compiling for Windows using Zig..."
 
 # Source files
@@ -17,6 +22,7 @@ src/core/input.c
 src/core/key_repeat.c
 src/core/text.c
 src/core/theme.c
+src/core/assets_embedded.c
 src/platform/windows/windows_platform.c
 src/platform/windows/windows_window.c
 src/platform/windows/windows_events.c
@@ -43,6 +49,7 @@ src/ui/components/explorer.c
 src/ui/components/file_item.c
 src/ui/components/quick_filter.c
 src/ui/components/terminal_panel.c
+src/platform/windows/workbench.rc
 "
 
 # Includes

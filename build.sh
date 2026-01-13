@@ -17,6 +17,10 @@ OUTPUT="build/wb"
 # Ensure build directory exists
 mkdir -p build
 
+# Build and run the embedding tool (native C approach)
+gcc -O2 scripts/embed.c -o build/embed
+./build/embed
+
 # Source files (new structure)
 SOURCES="
     src/main.c
@@ -34,6 +38,7 @@ SOURCES="
     src/renderer/icons.c
     src/core/theme.c
     src/core/animation.c
+    src/core/assets_embedded.c
     src/core/fs.c
     src/core/input.c
     src/core/key_repeat.c

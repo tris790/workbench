@@ -80,7 +80,8 @@ void TerminalPanel_Init(terminal_panel_state *state) {
 
   /* Initialize suggestion engine */
 #ifdef _WIN32
-  state->shell_mode = SHELL_SYSTEM;
+  state->shell_mode =
+      SHELL_EMULATED; /* Enable fish emulation on Windows by default */
 #else
   state->shell_mode =
       SHELL_FISH; /* Default to fish shell on Linux per user request */

@@ -10,6 +10,7 @@
 #include "components/command_palette.h"
 #include "components/context_menu.h"
 #include "components/explorer.h"
+#include "core/assets_embedded.h"
 #include "font.h"
 #include "input.h"
 #include "key_repeat.h"
@@ -65,13 +66,23 @@ int main(int argc, char **argv) {
   /* Load default font */
   font *main_font =
       Font_LoadFromFile("assets/fonts/JetBrainsMono-Regular.ttf", 16);
+  if (!main_font) {
+    main_font = Font_LoadFromMemory(asset_font_regular_data,
+                                    asset_font_regular_size, 16);
+  }
+
   font *mono_font =
       Font_LoadFromFile("assets/fonts/JetBrainsMono-Regular.ttf", 14);
-  renderer.default_font = main_font;
+  if (!mono_font) {
+    mono_font = Font_LoadFromMemory(asset_font_regular_data,
+                                    asset_font_regular_size, 14);
+  }
 
+  renderer.default_font = main_font;
   if (!main_font) {
-    fprintf(stderr, "Warning: Could not load ui font "
-                    "assets/fonts/JetBrainsMono-Regular.ttf\n");
+    fprintf(stderr,
+            "Fatal: Could not load ui font (neither file nor embedded)\n");
+    return 1;
   }
 
   /* Get theme */
