@@ -140,4 +140,7 @@ b32 FS_PathsEqual(const char *p1, const char *p2);
 const char *FS_FindLastSeparator(const char *path);
 void FS_NormalizePath(char *path);
 
+/* Resolve path (handles ~ and relative paths) */
+b32 FS_ResolvePath(const char *path, char *out_path, usize out_size);
+
 #endif /* FS_H */

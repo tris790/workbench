@@ -436,3 +436,42 @@ b32 FS_CreateFile(const char *path) { return Platform_CreateFile(path); }
 b32 FS_Copy(const char *src, const char *dst) {
   return Platform_Copy(src, dst);
 }
+
+b32 FS_ResolvePath(const char *path, char *out_path, usize out_size) {
+  if (!path || path[0] == '\0')
+    return false;
+
+  char expanded[FS_MAX_PATH];
+  expanded[0] = '\0';
+
+  /* Handle ~ expansion */
+  if (path[0] == '~') {
+    const char *home = FS_GetHomePath();
+    if (path[1] == '/' || path[1] == '\\') {
+      snprintf(expanded, sizeof(expanded), "%s%s", home, path + 1);
+    } else if (path[1] == '\0') {
+      strncpy(expanded, home, sizeof(expanded) - 1);
+      expanded[sizeof(expanded) - 1] = '\0';
+    } else {
+      /* Handles cases like ~user - not fully supported but we'll try as-is */
+      strncpy(expanded, path, sizeof(expanded) - 1);
+      expanded[sizeof(expanded) - 1] = '\0';
+    }
+  } else {
+    strncpy(expanded, path, sizeof(expanded) - 1);
+    expanded[sizeof(expanded) - 1] = '\0';
+  }
+
+  /* Use platform to get absolute/real path */
+  if (Platform_GetRealPath(expanded, out_path, out_size)) {
+    FS_NormalizePath(out_path);
+    return true;
+  }
+
+  /* Fallback: just normalize the expanded path if realpath fails (e.g. doesn't
+   * exist yet but we want to refer to it) */
+  strncpy(out_path, expanded, out_size - 1);
+  out_path[out_size - 1] = '\0';
+  FS_NormalizePath(out_path);
+  return true;
+}

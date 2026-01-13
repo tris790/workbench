@@ -16,6 +16,8 @@ SOURCES="
 src/main.c
 src/commands.c
 src/core/animation.c
+src/core/args.c
+src/app_args.c
 src/core/fs.c
 src/core/fuzzy_match.c
 src/core/input.c

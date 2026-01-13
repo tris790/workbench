@@ -5,7 +5,9 @@
  * C99, handmade hero style.
  */
 
+#include "app_args.h"
 #include "commands.h"
+#include "core/args.h"
 #include "core/assets_embedded.h"
 #include "core/input.h"
 #include "core/key_repeat.h"
@@ -24,10 +26,9 @@
 #include <string.h>
 
 int main(int argc, char **argv) {
-  (void)argc;
-  (void)argv;
-
   printf("Workbench starting...\n");
+
+  app_args args = Args_Parse(argc, argv);
 
   if (!Platform_Init()) {
     fprintf(stderr, "Failed to initialize platform\n");
@@ -100,13 +101,8 @@ int main(int argc, char **argv) {
   layout_state layout;
   Layout_Init(&layout, &arena);
 
-  /* Navigate active panel to starting directory */
-  if (argc > 1) {
-    panel *p = Layout_GetActivePanel(&layout);
-    if (p) {
-      Explorer_NavigateTo(&p->explorer, argv[1], false);
-    }
-  }
+  /* Navigate panels to starting directory/directories */
+  Args_Handle(&layout, &args);
 
   /* Initialize Command Palette */
   command_palette_state palette;

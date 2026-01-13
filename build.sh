@@ -55,6 +55,8 @@ SOURCES="
     src/ui/components/quick_filter.c
     src/ui/components/context_menu.c
     src/core/fuzzy_match.c
+    src/core/args.c
+    src/app_args.c
     src/commands.c
     src/platform/linux/linux_pty.c
     src/terminal/terminal.c
