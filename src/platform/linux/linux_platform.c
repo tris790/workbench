@@ -74,7 +74,6 @@ static const struct xdg_wm_base_listener xdg_wm_base_listener = {
  * them up. Use forward declarations or externs.
  */
 #include "../../core/assets_embedded.h"
-#include <errno.h>
 #include <sys/stat.h>
 
 extern const struct wl_seat_listener seat_listener;
@@ -223,8 +222,6 @@ void Platform_Shutdown(void) {
     wl_registry_destroy(g_platform.registry);
   if (g_platform.display)
     wl_display_disconnect(g_platform.display);
-
-  memset(&g_platform, 0, sizeof(g_platform));
 
   memset(&g_platform, 0, sizeof(g_platform));
 }

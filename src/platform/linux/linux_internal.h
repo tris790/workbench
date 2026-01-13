@@ -9,15 +9,15 @@
 #define _XOPEN_SOURCE 700 // For strdup
 
 #include "../platform.h"
-#include <wayland-client.h>
-#include "xdg-shell-client-protocol.h"
-#include "xdg-decoration-client-protocol.h"
-#include <sys/mman.h>
-#include <unistd.h>
+#include "../protocols/xdg-decoration-client-protocol.h"
+#include "../protocols/xdg-shell-client-protocol.h"
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <wayland-client.h>
 
 /* ===== Platform State ===== */
 
