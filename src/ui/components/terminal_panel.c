@@ -162,7 +162,13 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
       SmoothValue_SetTarget(&state->cursor_blink, blink_target);
       blink_timer = 0.0f;
     }
-    SmoothValue_Update(&state->cursor_blink, dt);
+
+    if (!g_animations_enabled) {
+      state->cursor_blink.current = 1.0f;
+      state->cursor_blink.target = 1.0f;
+    } else {
+      SmoothValue_Update(&state->cursor_blink, dt);
+    }
   }
 
   /* Handle resizing */
@@ -282,11 +288,12 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
 
       /* Smooth auto-scroll when selecting outside bounds */
       f32 scroll_delta = 0.0f;
+      f32 scroll_speed = g_animations_enabled ? 10.0f : 100.0f;
       if (mouse_pos.y < content.y) {
-        scroll_delta = (f32)(content.y - mouse_pos.y) * 10.0f * dt;
+        scroll_delta = (f32)(content.y - mouse_pos.y) * scroll_speed * dt;
       } else if (mouse_pos.y >= content.y + content.h) {
         scroll_delta =
-            (f32)(content.y + content.h - 1 - mouse_pos.y) * 10.0f * dt;
+            (f32)(content.y + content.h - 1 - mouse_pos.y) * scroll_speed * dt;
       }
 
       if (scroll_delta != 0.0f) {

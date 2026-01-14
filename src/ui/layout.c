@@ -42,7 +42,9 @@ void Layout_Init(layout_state *layout, memory_arena *arena) {
 void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
   /* Animate split ratio towards target */
   f32 diff = layout->target_split_ratio - layout->split_ratio;
-  if (diff > 0.001f || diff < -0.001f) {
+  if (!g_animations_enabled) {
+    layout->split_ratio = layout->target_split_ratio;
+  } else if (diff > 0.001f || diff < -0.001f) {
     layout->split_ratio += diff * ui->dt * ANIMATION_SPEED;
   } else {
     layout->split_ratio = layout->target_split_ratio;

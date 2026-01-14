@@ -112,4 +112,7 @@ void SmoothValue_SetTarget(smooth_value *sv, f32 target);
 /* Set immediate value (no smoothing) */
 void SmoothValue_SetImmediate(smooth_value *sv, f32 value);
 
+/* Global flag to enable/disable animations */
+extern b32 g_animations_enabled;
+
 #endif /* ANIMATION_H */

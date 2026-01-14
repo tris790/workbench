@@ -829,7 +829,11 @@ b32 GL_InitEGL(gl_backend_state *state, struct wl_display *display,
 
   /* Initialize OpenGL state */
   glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  /* Use separate blend function to ensure alpha channel remains opaque (Over
+   * operator) */
+  glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE,
+                      GL_ONE_MINUS_SRC_ALPHA);
+
   glEnable(GL_SCISSOR_TEST);
   glDisable(GL_CULL_FACE);
   glDisable(GL_DEPTH_TEST);
@@ -956,6 +960,8 @@ static void LoadGLExtensions(void) {
   glUniform2f = (PFNGLUNIFORM2FPROC)wglGetProcAddress("glUniform2f");
   glUniform3f = (PFNGLUNIFORM3FPROC)wglGetProcAddress("glUniform3f");
   glUniform4f = (PFNGLUNIFORM4FPROC)wglGetProcAddress("glUniform4f");
+  glBlendFuncSeparate =
+      (PFNGLBLENDFUNCSEPARATEPROC)wglGetProcAddress("glBlendFuncSeparate");
 
   wglCreateContextAttribsARB =
       (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress(
@@ -1013,7 +1019,11 @@ b32 GL_InitWGL(gl_backend_state *state, HDC hdc, i32 width, i32 height) {
 
   /* Initialize OpenGL state */
   glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  /* Use separate blend function to ensure alpha channel remains opaque (Over
+   * operator) */
+  glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE,
+                      GL_ONE_MINUS_SRC_ALPHA);
+
   glEnable(0x0C11); /* GL_SCISSOR_TEST */
   glDisable(GL_CULL_FACE);
   glDisable(GL_DEPTH_TEST);

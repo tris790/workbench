@@ -95,7 +95,7 @@ if [ ! -f "$PROTO_DIR/xdg-shell-client-protocol.h" ] || [ "$XDG_SHELL_XML" -nt "
 fi
 
 # Compile
-echo "Compiling: $SOURCES"
+echo "Compiling..."
 $CC $CFLAGS $SOURCES -o $OUTPUT $LDFLAGS
 
 echo "Build complete: ./$OUTPUT"

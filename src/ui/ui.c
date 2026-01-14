@@ -1172,9 +1172,13 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
     }
 
     /* Update cursor blink */
-    state->cursor_blink += ctx->dt * 2.0f;
-    if (state->cursor_blink > 2.0f)
-      state->cursor_blink -= 2.0f;
+    if (!g_animations_enabled) {
+      state->cursor_blink = 0.0f; /* Always show cursor */
+    } else {
+      state->cursor_blink += ctx->dt * 2.0f;
+      if (state->cursor_blink > 2.0f)
+        state->cursor_blink -= 2.0f;
+    }
   }
 
   /* Drawing */

@@ -6,6 +6,8 @@
 
 #include "animation.h"
 
+b32 g_animations_enabled = true;
+
 /* ===== Animation API ===== */
 
 void Animation_Start(animation_state *anim, f32 from, f32 to, f32 duration_ms,
@@ -22,6 +24,13 @@ void Animation_Start(animation_state *anim, f32 from, f32 to, f32 duration_ms,
 void Animation_Update(animation_state *anim, f32 dt_ms) {
   if (anim->status != ANIM_RUNNING)
     return;
+
+  if (!g_animations_enabled) {
+    anim->elapsed_ms = anim->duration_ms;
+    anim->current_value = anim->end_value;
+    anim->status = ANIM_FINISHED;
+    return;
+  }
 
   anim->elapsed_ms += dt_ms;
 
@@ -63,6 +72,11 @@ b32 Animation_IsFinished(animation_state *anim) {
 void SmoothValue_Update(smooth_value *sv, f32 dt) {
   if (sv->current == sv->target)
     return;
+
+  if (!g_animations_enabled) {
+    sv->current = sv->target;
+    return;
+  }
 
   f32 diff = sv->target - sv->current;
   f32 step = sv->speed * dt;

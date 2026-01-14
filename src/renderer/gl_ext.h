@@ -3,7 +3,12 @@
 
 #ifdef _WIN32
 #include <GL/gl.h>
+#include <stddef.h>
 #include <windows.h>
+
+/* These types are sometimes missing on Windows GL headers */
+typedef ptrdiff_t GLintptr;
+typedef ptrdiff_t GLsizeiptr;
 
 /* ===== WGL Extensions ===== */
 
@@ -108,6 +113,10 @@ typedef void(APIENTRY *PFNGLUNIFORM3FPROC)(GLint location, GLfloat v0,
                                            GLfloat v1, GLfloat v2);
 typedef void(APIENTRY *PFNGLUNIFORM4FPROC)(GLint location, GLfloat v0,
                                            GLfloat v1, GLfloat v2, GLfloat v3);
+typedef void(APIENTRY *PFNGLBLENDFUNCSEPARATEPROC)(GLenum sfactorRGB,
+                                                   GLenum dfactorRGB,
+                                                   GLenum sfactorAlpha,
+                                                   GLenum dfactorAlpha);
 
 /* Function declarations */
 #ifdef GL_IMPLEMENTATION
@@ -147,6 +156,7 @@ GL_EXTERN PFNGLUNIFORM1FPROC glUniform1f;
 GL_EXTERN PFNGLUNIFORM2FPROC glUniform2f;
 GL_EXTERN PFNGLUNIFORM3FPROC glUniform3f;
 GL_EXTERN PFNGLUNIFORM4FPROC glUniform4f;
+GL_EXTERN PFNGLBLENDFUNCSEPARATEPROC glBlendFuncSeparate;
 
 GL_EXTERN PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB;
 GL_EXTERN PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB;

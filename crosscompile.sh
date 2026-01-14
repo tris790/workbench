@@ -34,6 +34,7 @@ src/platform/windows/windows_process.c
 src/platform/windows/windows_time.c
 src/platform/windows/windows_fs_watcher.c
 src/platform/windows/windows_font.c
+src/renderer/renderer_opengl.c
 src/renderer/renderer_software.c
 src/renderer/icons.c
 src/terminal/ansi_parser.c
@@ -60,7 +61,7 @@ INCLUDES="-Isrc -Isrc/core -Isrc/platform -Isrc/renderer -Isrc/ui -Isrc/ui/compo
 # Flags
 # -static to avoid dependency on libgcc/libstdc++ dlls if using mingw
 CFLAGS="-target x86_64-windows-gnu -std=c99 -g -gcodeview -DUNICODE -D_UNICODE -D_CRT_SECURE_NO_WARNINGS -DWB_DEBUG"
-LIBS="-luser32 -lgdi32 -lshell32 -lshlwapi -ldwrite -luuid"
+LIBS="-luser32 -lgdi32 -lshell32 -lshlwapi -ldwrite -luuid -lopengl32"
 
 # Compile
 # We use zig cc as a drop-in replacement for gcc/clang

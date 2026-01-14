@@ -80,8 +80,6 @@ int main(int argc, char **argv) {
     long size = ftell(in);
     fseek(in, 0, SEEK_SET);
 
-    printf("Embedding %s as %s...\n", g_assets[i].path, g_assets[i].name);
-
     fprintf(fc, "unsigned char %s_data[] = {\n    ", g_assets[i].name);
     for (long j = 0; j < size; j++) {
       fprintf(fc, "0x%02x%s", fgetc(in), (j == size - 1) ? "" : ", ");

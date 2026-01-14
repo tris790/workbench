@@ -3,15 +3,13 @@
  */
 
 #include "commands.h"
-#include "components/explorer.h"
+#include "ui/components/explorer.h"
 #include <stddef.h>
 
 /* Global context for callbacks */
 static layout_state *g_layout = NULL;
 
-void Commands_Init(layout_state *layout) {
-  g_layout = layout;
-}
+void Commands_Init(layout_state *layout) { g_layout = layout; }
 
 /* ===== Command Implementations ===== */
 
@@ -73,14 +71,26 @@ static void Cmd_ToggleHiddenFiles(void *user_data) {
   }
 }
 
+static void Cmd_ToggleAnimations(void *user_data) {
+  (void)user_data;
+  g_animations_enabled = !g_animations_enabled;
+}
+
 /* ===== Registration ===== */
 
 void Commands_Register(command_palette_state *palette) {
   CommandPalette_RegisterCommand(palette, "Toggle Split View", "F4", "Layout",
-                                  Cmd_ToggleSplitView, NULL);
-  CommandPalette_RegisterCommand(palette, "Home", "Ctrl + H", "Navigation", Cmd_Home, NULL);
-  CommandPalette_RegisterCommand(palette, "Refresh", "Ctrl + R", "File", Cmd_Refresh, NULL);
-  CommandPalette_RegisterCommand(palette, "New File", "Ctrl + N", "File", Cmd_NewFile, NULL);
-  CommandPalette_RegisterCommand(palette, "New Folder", "Ctrl + Shift + N", "File", Cmd_NewFolder, NULL);
-  CommandPalette_RegisterCommand(palette, "Toggle Hidden Files", "Ctrl + .", "File", Cmd_ToggleHiddenFiles, NULL);
+                                 Cmd_ToggleSplitView, NULL);
+  CommandPalette_RegisterCommand(palette, "Home", "Ctrl + H", "Navigation",
+                                 Cmd_Home, NULL);
+  CommandPalette_RegisterCommand(palette, "Refresh", "Ctrl + R", "File",
+                                 Cmd_Refresh, NULL);
+  CommandPalette_RegisterCommand(palette, "New File", "Ctrl + N", "File",
+                                 Cmd_NewFile, NULL);
+  CommandPalette_RegisterCommand(palette, "New Folder", "Ctrl + Shift + N",
+                                 "File", Cmd_NewFolder, NULL);
+  CommandPalette_RegisterCommand(palette, "Toggle Hidden Files", "Ctrl + .",
+                                 "File", Cmd_ToggleHiddenFiles, NULL);
+  CommandPalette_RegisterCommand(palette, "Toggle Animations", "Ctrl + Alt + A",
+                                 "UI", Cmd_ToggleAnimations, NULL);
 }
