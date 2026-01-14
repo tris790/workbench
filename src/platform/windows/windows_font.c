@@ -845,4 +845,18 @@ void Font_RenderText(font *f, u32 *pixels, i32 fb_width, i32 fb_height,
     pen_x += glyph->advance;
   }
 }
+
+b32 Font_GetGlyphBitmap(font *f, u32 codepoint, glyph_bitmap *out_glyph) {
+  cached_glyph *g = GetCachedGlyph(f, codepoint);
+  if (!g)
+    return false;
+
+  out_glyph->bitmap = g->bitmap;
+  out_glyph->width = g->width;
+  out_glyph->height = g->height;
+  out_glyph->bearing_x = g->bearing_x;
+  out_glyph->bearing_y = g->bearing_y;
+  out_glyph->advance = g->advance;
+  return true;
+}
 #endif /* _WIN32 */

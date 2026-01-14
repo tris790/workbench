@@ -67,4 +67,20 @@ void Font_RenderText(font *f, u32 *pixels, i32 fb_width, i32 fb_height,
                      u8 b, u8 a, i32 clip_x, i32 clip_y, i32 clip_w,
                      i32 clip_h);
 
+/* ===== Glyph Access ===== */
+
+typedef struct {
+  u8 *bitmap;
+  i32 width;
+  i32 height;
+  i32 bearing_x;
+  i32 bearing_y;
+  i32 advance;
+} glyph_bitmap;
+
+/* Get glyph bitmap for a codepoint (for GPU atlas generation)
+   Returns true on success, false if character not supported.
+   The bitmap field in out_glyph points to internal font cache, do not free. */
+b32 Font_GetGlyphBitmap(font *f, u32 codepoint, glyph_bitmap *out_glyph);
+
 #endif /* FONT_H */

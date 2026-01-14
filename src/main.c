@@ -26,7 +26,6 @@
 #include <string.h>
 
 int main(int argc, char **argv) {
-  printf("Workbench starting...\n");
 
   app_args args = Args_Parse(argc, argv);
 
@@ -58,10 +57,33 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  /* Initialize renderer */
-  renderer_backend *backend = Render_CreateSoftwareBackend();
+  /* Initialize renderer - try OpenGL first, fall back to software */
+  renderer_backend *backend = NULL;
+  const char *renderer_name = "Software";
+
+  if (Render_OpenGLAvailable()) {
+    backend = Render_CreateOpenGLBackend();
+    if (backend) {
+      renderer_name = "OpenGL";
+    }
+  }
+
+  if (!backend) {
+    backend = Render_CreateSoftwareBackend();
+    renderer_name = "Software";
+  }
+
+  printf("Workbench starting (%s) ...\n", renderer_name);
+
   render_context renderer = {0};
   Render_Init(&renderer, backend);
+  Render_SetWindow(&renderer, window);
+
+  /* Update window title to indicate renderer */
+  char title_with_renderer[256];
+  snprintf(title_with_renderer, sizeof(title_with_renderer), "Workbench (%s)",
+           renderer_name);
+  Platform_SetWindowTitle(window, title_with_renderer);
 
   /* Load default font */
   font *main_font =
@@ -347,8 +369,11 @@ int main(int argc, char **argv) {
 
       Render_EndFrame(&renderer);
 
-      /* Commit the frame to display */
-      Platform_PresentFrame(window);
+      /* Commit the frame to display if the backend doesn't handle it (e.g.
+       * Software) */
+      if (!renderer.backend->presents_frame) {
+        Platform_PresentFrame(window);
+      }
     }
 
     frame_count++;

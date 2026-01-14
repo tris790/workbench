@@ -10,6 +10,7 @@ Implement OpenGL rendering backend as an alternative to software rendering for i
 - Cross-platform (Linux + Windows)
 - Default to opengl renderer if available, otherwise software renderer
 - update Workbench starting (OpenGL) or (Software)
+- very performant oriented.
 
 ## Deliverables
 

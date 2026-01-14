@@ -217,6 +217,14 @@ static void Software_DrawText(render_context *ctx, v2i pos, const char *text,
                   ctx->clip.w, ctx->clip.h);
 }
 
+static void Software_SetWindow(render_context *ctx,
+                               struct platform_window *window) {
+  (void)ctx;
+  (void)window;
+  /* Software renderer doesn't need the platform window directly,
+     it uses pixels provided by the platform. */
+}
+
 /* ===== Backend Creation ===== */
 
 static renderer_backend g_software_backend = {
@@ -229,6 +237,8 @@ static renderer_backend g_software_backend = {
     .draw_rect = Software_DrawRect,
     .draw_rect_rounded = Software_DrawRectRounded,
     .draw_text = Software_DrawText,
+    .set_window = Software_SetWindow,
+    .presents_frame = false,
     .user_data = NULL};
 
 renderer_backend *Render_CreateSoftwareBackend(void) {
@@ -259,6 +269,12 @@ void Render_SetFramebuffer(render_context *ctx, u32 *pixels, i32 width,
   ctx->height = height;
   ctx->stride = width;
   ctx->clip = (rect){0, 0, width, height};
+}
+
+void Render_SetWindow(render_context *ctx, struct platform_window *window) {
+  if (ctx->backend && ctx->backend->set_window) {
+    ctx->backend->set_window(ctx, window);
+  }
 }
 
 void Render_BeginFrame(render_context *ctx) {

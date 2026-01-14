@@ -28,6 +28,7 @@ static inline u32 ColorToARGB(color c) {
 
 typedef struct render_context render_context;
 typedef struct renderer_backend renderer_backend;
+struct platform_window;
 
 /* Include font.h for font type */
 #include "font.h"
@@ -44,6 +45,8 @@ typedef void (*PFN_BackendDrawRectRounded)(render_context *ctx, rect r,
                                            f32 radius, color c);
 typedef void (*PFN_BackendDrawText)(render_context *ctx, v2i pos,
                                     const char *text, font *f, color c);
+typedef void (*PFN_BackendSetWindow)(render_context *ctx,
+                                     struct platform_window *window);
 
 struct renderer_backend {
   const char *name;
@@ -56,6 +59,9 @@ struct renderer_backend {
   PFN_BackendDrawRect draw_rect;
   PFN_BackendDrawRectRounded draw_rect_rounded;
   PFN_BackendDrawText draw_text;
+  PFN_BackendSetWindow set_window;
+
+  b32 presents_frame;
 
   /* Backend-specific data */
   void *user_data;
@@ -84,8 +90,14 @@ struct render_context {
 /* Create software rendering backend */
 renderer_backend *Render_CreateSoftwareBackend(void);
 
-/* Future: Create OpenGL backend */
-/* renderer_backend *Render_CreateOpenGLBackend(void); */
+/* Create OpenGL rendering backend */
+renderer_backend *Render_CreateOpenGLBackend(void);
+
+/* Check if OpenGL is available on this system */
+b32 Render_OpenGLAvailable(void);
+
+/* Get OpenGL backend state (for platform EGL integration) */
+void *Render_GetOpenGLState(renderer_backend *backend);
 
 /* ===== Renderer API ===== */
 
@@ -98,6 +110,9 @@ void Render_Shutdown(render_context *ctx);
 /* Set framebuffer (call after resize) */
 void Render_SetFramebuffer(render_context *ctx, u32 *pixels, i32 width,
                            i32 height);
+
+/* Set platform window (required for hardware backends) */
+void Render_SetWindow(render_context *ctx, struct platform_window *window);
 
 /* Begin frame (call before any draw operations) */
 void Render_BeginFrame(render_context *ctx);

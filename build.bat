@@ -47,7 +47,7 @@ set PLATFORM_SRC=src\platform\windows\windows_platform.c ^
     src\platform\windows\workbench.rc
 
 REM Source files - Renderer
-set RENDERER_SRC=src\renderer\renderer_software.c src\renderer\icons.c
+set RENDERER_SRC=src\renderer\renderer_software.c src\renderer\renderer_opengl.c src\renderer\icons.c
 
 REM Source files - UI
 set UI_SRC=src\ui\ui.c src\ui\layout.c src\ui\input.c src\ui\key_repeat.c src\ui\commands.c ^
@@ -61,7 +61,7 @@ REM Main entry point
 set MAIN_SRC=src\main.c
 
 REM Libraries
-set LIBS=user32.lib gdi32.lib shell32.lib shlwapi.lib dwrite.lib uuid.lib
+set LIBS=user32.lib gdi32.lib shell32.lib shlwapi.lib dwrite.lib uuid.lib opengl32.lib
 
 REM Output
 set OUTPUT=/Fe:build\wb.exe

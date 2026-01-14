@@ -260,6 +260,20 @@ static cached_glyph *GetCachedGlyph(font *f, u32 codepoint) {
   return glyph;
 }
 
+b32 Font_GetGlyphBitmap(font *f, u32 codepoint, glyph_bitmap *out_glyph) {
+  cached_glyph *g = GetCachedGlyph(f, codepoint);
+  if (!g)
+    return false;
+
+  out_glyph->bitmap = g->bitmap;
+  out_glyph->width = g->width;
+  out_glyph->height = g->height;
+  out_glyph->bearing_x = g->bearing_x;
+  out_glyph->bearing_y = g->bearing_y;
+  out_glyph->advance = g->advance;
+  return true;
+}
+
 /* ===== Text Measurement ===== */
 
 i32 Font_MeasureWidth(font *f, const char *text) {
