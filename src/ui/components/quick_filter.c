@@ -5,8 +5,9 @@
  */
 
 #include "quick_filter.h"
-#include "input.h"
-#include "theme.h"
+#include "../../core/input.h"
+#include "../../core/text.h"
+#include "../../core/theme.h"
 #include <string.h>
 
 /* ===== Configuration ===== */
@@ -36,63 +37,62 @@ b32 QuickFilter_Update(quick_filter_state *state, ui_context *ui) {
   /* Update fade animation */
   SmoothValue_Update(&state->fade_anim, ui->dt);
 
-  /* Update cursor blink when active */
-  if (state->active) {
-    state->input_state.cursor_blink += ui->dt * 2.0f;
-    if (state->input_state.cursor_blink > 2.0f) {
-      state->input_state.cursor_blink -= 2.0f;
-    }
-  }
-
-  /* Check for ESC to clear filter */
-  if (state->active && ui->input.key_pressed[KEY_ESCAPE]) {
-    QuickFilter_Clear(state);
-    return true; /* Consumed the escape key */
-  }
-
-  /* Check for text input to activate/update filter */
+  /* Check for text input to activate filter if not already active */
   u32 text_input = Input_GetTextInput();
-
-  /* Accept printable ASCII characters */
-  if (text_input >= 32 && text_input < 127) {
-    /* Append character to buffer */
-    i32 len = (i32)strlen(state->buffer);
-    if (len < QUICK_FILTER_MAX_INPUT - 1) {
-      state->buffer[len] = (char)text_input;
-      state->buffer[len + 1] = '\0';
-      state->input_state.cursor_pos = len + 1;
-
-      /* Activate filter if not already active */
-      if (!state->active) {
-        state->active = true;
-        state->fade_anim.target = 1.0f;
-      }
-
-      /* Consume the text input */
-      Input_ConsumeText();
-      Input_ConsumeKeys();
-      return true;
-    }
+  if (!state->active && text_input >= 32 && text_input < 127) {
+    state->active = true;
+    state->fade_anim.target = 1.0f;
+    state->input_state.cursor_pos = 0;
+    state->input_state.selection_start = -1;
+    state->buffer[0] = '\0';
   }
 
-  /* Handle backspace when filter is active */
-  if (state->active && Input_KeyRepeat(KEY_BACKSPACE)) {
-    i32 len = (i32)strlen(state->buffer);
-    if (len > 0) {
-      state->buffer[len - 1] = '\0';
-      state->input_state.cursor_pos = len - 1;
-
-      /* If buffer is now empty, deactivate filter */
-      if (state->buffer[0] == '\0') {
-        QuickFilter_Clear(state);
-      }
-
-      Input_ConsumeKeys();
-      return true;
-    }
+  if (!state->active) {
+    return false;
   }
 
-  return state->active;
+  /* Handle ESC to clear filter (Success Criteria 33) */
+  if (ui->input.key_pressed[KEY_ESCAPE]) {
+    QuickFilter_Clear(state);
+    Input_ConsumeKeys();
+    return true;
+  }
+
+  /* Process text input using shared engine (Requirement 12) */
+  if (UI_ProcessTextInput(&state->input_state, state->buffer,
+                          QUICK_FILTER_MAX_INPUT, &ui->input)) {
+    /* Deactivate when buffer becomes empty (Requirement 22, Success Criteria
+     * 32) */
+    if (state->buffer[0] == '\0') {
+      QuickFilter_Clear(state);
+    }
+    Input_ConsumeKeys();
+    Input_ConsumeText();
+    return true;
+  }
+
+  /* Still check if empty after any interaction (e.g. word delete) */
+  if (state->buffer[0] == '\0') {
+    QuickFilter_Clear(state);
+  }
+
+  /* Update cursor blink */
+  state->input_state.cursor_blink += ui->dt * 2.0f;
+  if (state->input_state.cursor_blink > 2.0f) {
+    state->input_state.cursor_blink -= 2.0f;
+  }
+
+  /* Consume keys if we are active to prevent explorer navigation etc. */
+  if (Input_GetTextInput() >= 32 || Input_KeyRepeat(KEY_BACKSPACE) ||
+      Input_KeyRepeat(KEY_DELETE) || Input_KeyRepeat(KEY_LEFT) ||
+      Input_KeyRepeat(KEY_RIGHT) || Input_KeyRepeat(KEY_HOME) ||
+      Input_KeyRepeat(KEY_END) || (Input_GetModifiers() & MOD_CTRL)) {
+    Input_ConsumeKeys();
+    Input_ConsumeText();
+    return true;
+  }
+
+  return true;
 }
 
 /* ===== Rendering ===== */
@@ -147,11 +147,49 @@ void QuickFilter_Render(quick_filter_state *state, ui_context *ui,
   text_color.a = (u8)(text_color.a * fade);
 
   if (state->buffer[0] != '\0') {
+    /* Draw selection highlight if any */
+    if (state->input_state.selection_start >= 0) {
+      i32 start =
+          state->input_state.selection_start < state->input_state.selection_end
+              ? state->input_state.selection_start
+              : state->input_state.selection_end;
+      i32 end =
+          state->input_state.selection_start > state->input_state.selection_end
+              ? state->input_state.selection_start
+              : state->input_state.selection_end;
+
+      char temp[QUICK_FILTER_MAX_INPUT];
+      i32 start_byte = Text_UTF8ByteOffset(state->buffer, start);
+      strncpy(temp, state->buffer, (size_t)start_byte);
+      temp[start_byte] = '\0';
+      i32 start_x = text_pos.x + Font_MeasureWidth(f, temp);
+
+      i32 end_byte = Text_UTF8ByteOffset(state->buffer, end);
+      strncpy(temp, state->buffer, (size_t)end_byte);
+      temp[end_byte] = '\0';
+      i32 end_x = text_pos.x + Font_MeasureWidth(f, temp);
+
+      rect sel_rect = {start_x, text_y, end_x - start_x, Font_GetLineHeight(f)};
+      color sel_bg = th->accent;
+      sel_bg.a = (u8)(100 * fade);
+      Render_DrawRect(renderer, sel_rect, sel_bg);
+    }
+
     Render_DrawText(renderer, text_pos, state->buffer, f, text_color);
 
-    /* Draw cursor */
+    /* Draw cursor at correct position */
     if (state->input_state.cursor_blink < 1.0f) {
-      i32 cursor_x = text_x + Font_MeasureWidth(f, state->buffer);
+      char temp[QUICK_FILTER_MAX_INPUT];
+      i32 cursor_pos = state->input_state.cursor_pos;
+      i32 char_count = Text_UTF8Length(state->buffer);
+      if (cursor_pos > char_count)
+        cursor_pos = char_count;
+
+      i32 cursor_byte = Text_UTF8ByteOffset(state->buffer, cursor_pos);
+      strncpy(temp, state->buffer, (size_t)cursor_byte);
+      temp[cursor_byte] = '\0';
+
+      i32 cursor_x = text_pos.x + Font_MeasureWidth(f, temp);
       rect cursor_rect = {cursor_x, text_y, 2, Font_GetLineHeight(f)};
       color cursor_color = th->accent;
       cursor_color.a = (u8)(cursor_color.a * fade);

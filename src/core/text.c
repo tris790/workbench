@@ -137,3 +137,24 @@ i32 Text_GetWrappedHeight(i32 line_count, font *f) {
     return 0;
   return line_count * Font_GetLineHeight(f);
 }
+
+i32 Text_UTF8Length(const char *str) {
+  i32 len = 0;
+  while (*str) {
+    if ((*str & 0xC0) != 0x80)
+      len++;
+    str++;
+  }
+  return len;
+}
+
+i32 Text_UTF8ByteOffset(const char *str, i32 char_index) {
+  i32 byte = 0;
+  i32 ch = 0;
+  while (str[byte] && ch < char_index) {
+    if ((str[byte] & 0xC0) != 0x80)
+      ch++;
+    byte++;
+  }
+  return byte;
+}

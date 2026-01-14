@@ -40,4 +40,8 @@ wrapped_text Text_Wrap(memory_arena *arena, const char *text, font *f,
  */
 i32 Text_GetWrappedHeight(i32 line_count, font *f);
 
+/* UTF-8 Helpers */
+i32 Text_UTF8Length(const char *str);
+i32 Text_UTF8ByteOffset(const char *str, i32 char_index);
+
 #endif /* TEXT_H */

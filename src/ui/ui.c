@@ -5,7 +5,8 @@
  */
 
 #include "ui.h"
-#include "input.h"
+#include "../core/input.h"
+#include "../core/text.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -691,29 +692,6 @@ void UI_Separator(void) {
 
 /* ===== Text Input ===== */
 
-/* Helper: get length of UTF-8 string in characters */
-static i32 UTF8Length(const char *str) {
-  i32 len = 0;
-  while (*str) {
-    if ((*str & 0xC0) != 0x80)
-      len++;
-    str++;
-  }
-  return len;
-}
-
-/* Helper: get byte offset for character index */
-static i32 UTF8ByteOffset(const char *str, i32 char_index) {
-  i32 byte = 0;
-  i32 ch = 0;
-  while (str[byte] && ch < char_index) {
-    if ((str[byte] & 0xC0) != 0x80)
-      ch++;
-    byte++;
-  }
-  return byte;
-}
-
 /* Helper: push undo state */
 static void TextInputPushUndo(ui_text_state *state, const char *text) {
   if (state->undo_count < UI_MAX_UNDO_STATES) {
@@ -760,7 +738,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
   /* Ctrl+A - Select all */
   if (ctrl && input->key_pressed[KEY_A]) {
     state->selection_start = 0;
-    state->selection_end = UTF8Length(buffer); /* CHARS */
+    state->selection_end = Text_UTF8Length(buffer); /* CHARS */
     state->cursor_pos = state->selection_end;
   }
 
@@ -773,8 +751,8 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
       i32 end = state->selection_start > state->selection_end
                     ? state->selection_start
                     : state->selection_end;
-      i32 start_byte = UTF8ByteOffset(buffer, start);
-      i32 end_byte = UTF8ByteOffset(buffer, end);
+      i32 start_byte = Text_UTF8ByteOffset(buffer, start);
+      i32 end_byte = Text_UTF8ByteOffset(buffer, end);
       char temp[UI_MAX_TEXT_INPUT_SIZE];
       i32 len = end_byte - start_byte;
       if (len >= UI_MAX_TEXT_INPUT_SIZE)
@@ -795,8 +773,8 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
       i32 end = state->selection_start > state->selection_end
                     ? state->selection_start
                     : state->selection_end;
-      i32 start_byte = UTF8ByteOffset(buffer, start);
-      i32 end_byte = UTF8ByteOffset(buffer, end);
+      i32 start_byte = Text_UTF8ByteOffset(buffer, start);
+      i32 end_byte = Text_UTF8ByteOffset(buffer, end);
 
       /* Copy to clipboard */
       char temp[UI_MAX_TEXT_INPUT_SIZE];
@@ -834,8 +812,8 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
         i32 end = state->selection_start > state->selection_end
                       ? state->selection_start
                       : state->selection_end;
-        i32 start_byte = UTF8ByteOffset(buffer, start);
-        i32 end_byte = UTF8ByteOffset(buffer, end);
+        i32 start_byte = Text_UTF8ByteOffset(buffer, start);
+        i32 end_byte = Text_UTF8ByteOffset(buffer, end);
         TextInputPushUndo(state, buffer);
 
         i32 total_bytes = (i32)strlen(buffer);
@@ -851,13 +829,14 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
       i32 paste_len = (i32)strlen(clipboard);
       if (text_len + paste_len < buffer_size - 1) {
         TextInputPushUndo(state, buffer);
-        i32 cursor_byte = UTF8ByteOffset(buffer, state->cursor_pos);
+        i32 cursor_byte = Text_UTF8ByteOffset(buffer, state->cursor_pos);
         i32 total_bytes = (i32)strlen(buffer);
 
         memmove(buffer + cursor_byte + paste_len, buffer + cursor_byte,
                 (size_t)(total_bytes - cursor_byte + 1));
         memcpy(buffer + cursor_byte, clipboard, (size_t)paste_len);
-        state->cursor_pos += UTF8Length(clipboard); /* Advance char count */
+        state->cursor_pos +=
+            Text_UTF8Length(clipboard); /* Advance char count */
         changed = true;
         text_len = (i32)strlen(buffer);
       }
@@ -873,7 +852,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
   }
 
   /* Arrow keys for cursor movement */
-  if (input->key_pressed[KEY_LEFT]) {
+  if (input->key_pressed[KEY_LEFT] || Input_KeyRepeat(KEY_LEFT)) {
     if (shift && state->selection_start < 0) {
       state->selection_start = state->cursor_pos;
     }
@@ -883,17 +862,19 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
       if (state->cursor_pos > 0) {
         i32 cursor = state->cursor_pos - 1;
         /* Skip whitespace backwards */
-        while (cursor > 0 && buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
+        while (cursor > 0 &&
+               buffer[Text_UTF8ByteOffset(buffer, cursor)] == ' ') {
           cursor--;
         }
         /* Skip non-whitespace backwards */
-        while (cursor > 0 && buffer[UTF8ByteOffset(buffer, cursor)] != ' ') {
+        while (cursor > 0 &&
+               buffer[Text_UTF8ByteOffset(buffer, cursor)] != ' ') {
           cursor--;
         }
         /* If we stopped on space (and not at start), move forward one to be at
          * start of word */
-        if (cursor > 0 || buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
-          if (buffer[UTF8ByteOffset(buffer, cursor)] == ' ')
+        if (cursor > 0 || buffer[Text_UTF8ByteOffset(buffer, cursor)] == ' ') {
+          if (buffer[Text_UTF8ByteOffset(buffer, cursor)] == ' ')
             cursor++;
         }
         state->cursor_pos = cursor;
@@ -911,30 +892,30 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
     }
   }
 
-  if (input->key_pressed[KEY_RIGHT]) {
+  if (input->key_pressed[KEY_RIGHT] || Input_KeyRepeat(KEY_RIGHT)) {
     if (shift && state->selection_start < 0) {
       state->selection_start = state->cursor_pos;
     }
 
     if (ctrl) {
       /* Word jump right */
-      i32 char_count = UTF8Length(buffer);
+      i32 char_count = Text_UTF8Length(buffer);
       if (state->cursor_pos < char_count) {
         i32 cursor = state->cursor_pos;
         /* Skip non-whitespace forward */
         while (cursor < char_count &&
-               buffer[UTF8ByteOffset(buffer, cursor)] != ' ') {
+               buffer[Text_UTF8ByteOffset(buffer, cursor)] != ' ') {
           cursor++;
         }
         /* Skip whitespace forward */
         while (cursor < char_count &&
-               buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
+               buffer[Text_UTF8ByteOffset(buffer, cursor)] == ' ') {
           cursor++;
         }
         state->cursor_pos = cursor;
       }
     } else {
-      if (state->cursor_pos < UTF8Length(buffer)) {
+      if (state->cursor_pos < Text_UTF8Length(buffer)) {
         state->cursor_pos++;
       }
     }
@@ -947,7 +928,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
   }
 
   /* Home/End */
-  if (input->key_pressed[KEY_HOME]) {
+  if (input->key_pressed[KEY_HOME] || Input_KeyRepeat(KEY_HOME)) {
     if (shift && state->selection_start < 0) {
       state->selection_start = state->cursor_pos;
     }
@@ -959,11 +940,11 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
     }
   }
 
-  if (input->key_pressed[KEY_END]) {
+  if (input->key_pressed[KEY_END] || Input_KeyRepeat(KEY_END)) {
     if (shift && state->selection_start < 0) {
       state->selection_start = state->cursor_pos;
     }
-    state->cursor_pos = UTF8Length(buffer);
+    state->cursor_pos = Text_UTF8Length(buffer);
     if (shift) {
       state->selection_end = state->cursor_pos;
     } else {
@@ -981,8 +962,8 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
       i32 end = state->selection_start > state->selection_end
                     ? state->selection_start
                     : state->selection_end;
-      i32 start_byte = UTF8ByteOffset(buffer, start);
-      i32 end_byte = UTF8ByteOffset(buffer, end);
+      i32 start_byte = Text_UTF8ByteOffset(buffer, start);
+      i32 end_byte = Text_UTF8ByteOffset(buffer, end);
       TextInputPushUndo(state, buffer);
 
       i32 total_bytes = (i32)strlen(buffer);
@@ -1001,23 +982,25 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
         /* Word delete backward */
         i32 cursor = state->cursor_pos - 1;
         /* Skip whitespace backwards */
-        while (cursor > 0 && buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
+        while (cursor > 0 &&
+               buffer[Text_UTF8ByteOffset(buffer, cursor)] == ' ') {
           cursor--;
         }
         /* Skip non-whitespace backwards */
-        while (cursor > 0 && buffer[UTF8ByteOffset(buffer, cursor)] != ' ') {
+        while (cursor > 0 &&
+               buffer[Text_UTF8ByteOffset(buffer, cursor)] != ' ') {
           cursor--;
         }
         /* Adjust to delete from start of word */
-        if (cursor > 0 || buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
-          if (buffer[UTF8ByteOffset(buffer, cursor)] == ' ')
+        if (cursor > 0 || buffer[Text_UTF8ByteOffset(buffer, cursor)] == ' ') {
+          if (buffer[Text_UTF8ByteOffset(buffer, cursor)] == ' ')
             cursor++;
         }
         target_pos = cursor;
       }
 
-      i32 byte_pos = UTF8ByteOffset(buffer, state->cursor_pos);
-      i32 target_byte = UTF8ByteOffset(buffer, target_pos);
+      i32 byte_pos = Text_UTF8ByteOffset(buffer, state->cursor_pos);
+      i32 target_byte = Text_UTF8ByteOffset(buffer, target_pos);
       i32 total_bytes = (i32)strlen(buffer);
 
       memmove(buffer + target_byte, buffer + byte_pos,
@@ -1038,8 +1021,8 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
       i32 end = state->selection_start > state->selection_end
                     ? state->selection_start
                     : state->selection_end;
-      i32 start_byte = UTF8ByteOffset(buffer, start);
-      i32 end_byte = UTF8ByteOffset(buffer, end);
+      i32 start_byte = Text_UTF8ByteOffset(buffer, start);
+      i32 end_byte = Text_UTF8ByteOffset(buffer, end);
       TextInputPushUndo(state, buffer);
 
       i32 total_bytes = (i32)strlen(buffer);
@@ -1049,30 +1032,30 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
       state->selection_start = -1;
       changed = true;
       text_len = (i32)strlen(buffer);
-    } else if (state->cursor_pos < UTF8Length(buffer)) {
+    } else if (state->cursor_pos < Text_UTF8Length(buffer)) {
       TextInputPushUndo(state, buffer);
 
       i32 target_pos = state->cursor_pos + 1;
 
       if (ctrl) {
         /* Word delete forward */
-        i32 char_count = UTF8Length(buffer);
+        i32 char_count = Text_UTF8Length(buffer);
         i32 cursor = state->cursor_pos;
         /* Skip non-whitespace forward */
         while (cursor < char_count &&
-               buffer[UTF8ByteOffset(buffer, cursor)] != ' ') {
+               buffer[Text_UTF8ByteOffset(buffer, cursor)] != ' ') {
           cursor++;
         }
         /* Skip whitespace forward */
         while (cursor < char_count &&
-               buffer[UTF8ByteOffset(buffer, cursor)] == ' ') {
+               buffer[Text_UTF8ByteOffset(buffer, cursor)] == ' ') {
           cursor++;
         }
         target_pos = cursor;
       }
 
-      i32 byte_pos = UTF8ByteOffset(buffer, state->cursor_pos);
-      i32 target_byte = UTF8ByteOffset(buffer, target_pos);
+      i32 byte_pos = Text_UTF8ByteOffset(buffer, state->cursor_pos);
+      i32 target_byte = Text_UTF8ByteOffset(buffer, target_pos);
       i32 total_bytes = (i32)strlen(buffer);
 
       memmove(buffer + byte_pos, buffer + target_byte,
@@ -1092,8 +1075,8 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
       i32 end = state->selection_start > state->selection_end
                     ? state->selection_start
                     : state->selection_end;
-      i32 start_byte = UTF8ByteOffset(buffer, start);
-      i32 end_byte = UTF8ByteOffset(buffer, end);
+      i32 start_byte = Text_UTF8ByteOffset(buffer, start);
+      i32 end_byte = Text_UTF8ByteOffset(buffer, end);
       TextInputPushUndo(state, buffer);
 
       i32 total_bytes = (i32)strlen(buffer);
@@ -1108,7 +1091,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
     if (text_len < buffer_size - 2) {
       /* Simple ASCII for now */
       if (input->text_input < 128) {
-        i32 byte_pos = UTF8ByteOffset(buffer, state->cursor_pos);
+        i32 byte_pos = Text_UTF8ByteOffset(buffer, state->cursor_pos);
         /* Use fresh length */
         i32 total_bytes = (i32)strlen(buffer);
         memmove(buffer + byte_pos + 1, buffer + byte_pos,
@@ -1147,14 +1130,14 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
 
     /* Calculate cursor position from click */
     i32 click_x = ctx->input.mouse_pos.x - bounds.x - padding;
-    i32 text_len = UTF8Length(buffer);
+    i32 text_len = Text_UTF8Length(buffer);
     i32 best_pos = 0;
     i32 best_dist = 10000;
 
     for (i32 i = 0; i <= text_len; i++) {
       char temp[UI_MAX_TEXT_INPUT_SIZE];
-      strncpy(temp, buffer, (size_t)UTF8ByteOffset(buffer, i));
-      temp[UTF8ByteOffset(buffer, i)] = '\0';
+      strncpy(temp, buffer, (size_t)Text_UTF8ByteOffset(buffer, i));
+      temp[Text_UTF8ByteOffset(buffer, i)] = '\0';
       i32 w = Font_MeasureWidth(ctx->font, temp);
       i32 dist = click_x > w ? click_x - w : w - click_x;
       if (dist < best_dist) {
@@ -1235,12 +1218,12 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
                     : state->selection_end;
 
       char temp[UI_MAX_TEXT_INPUT_SIZE];
-      strncpy(temp, buffer, (size_t)UTF8ByteOffset(buffer, start));
-      temp[UTF8ByteOffset(buffer, start)] = '\0';
+      strncpy(temp, buffer, (size_t)Text_UTF8ByteOffset(buffer, start));
+      temp[Text_UTF8ByteOffset(buffer, start)] = '\0';
       i32 start_x = text_pos.x + Font_MeasureWidth(ctx->font, temp);
 
-      strncpy(temp, buffer, (size_t)UTF8ByteOffset(buffer, end));
-      temp[UTF8ByteOffset(buffer, end)] = '\0';
+      strncpy(temp, buffer, (size_t)Text_UTF8ByteOffset(buffer, end));
+      temp[Text_UTF8ByteOffset(buffer, end)] = '\0';
       i32 end_x = text_pos.x + Font_MeasureWidth(ctx->font, temp);
 
       rect sel_rect = {start_x, bounds.y + 2, end_x - start_x, bounds.h - 4};
@@ -1255,8 +1238,9 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
     /* Draw cursor */
     if (ctx->focused == id && state->cursor_blink < 1.0f) {
       char temp[UI_MAX_TEXT_INPUT_SIZE];
-      strncpy(temp, buffer, (size_t)UTF8ByteOffset(buffer, state->cursor_pos));
-      temp[UTF8ByteOffset(buffer, state->cursor_pos)] = '\0';
+      strncpy(temp, buffer,
+              (size_t)Text_UTF8ByteOffset(buffer, state->cursor_pos));
+      temp[Text_UTF8ByteOffset(buffer, state->cursor_pos)] = '\0';
       i32 cursor_x = text_pos.x + Font_MeasureWidth(ctx->font, temp);
 
       rect cursor_rect = {cursor_x, bounds.y + 3, 2, bounds.h - 6};

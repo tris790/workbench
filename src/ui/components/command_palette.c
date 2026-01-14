@@ -6,8 +6,9 @@
  */
 
 #include "command_palette.h"
-#include "fuzzy_match.h"
-#include "input.h"
+#include "../../core/fuzzy_match.h"
+#include "../../core/input.h"
+#include "../../core/text.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -329,13 +330,15 @@ void CommandPalette_Render(command_palette_state *state, ui_context *ui,
 
     /* Measure text up to selection start */
     char temp[PALETTE_MAX_INPUT];
-    strncpy(temp, state->input_buffer, (size_t)sel_start);
-    temp[sel_start] = '\0';
+    i32 start_byte = Text_UTF8ByteOffset(state->input_buffer, sel_start);
+    strncpy(temp, state->input_buffer, (size_t)start_byte);
+    temp[start_byte] = '\0';
     i32 start_x = text_pos.x + Font_MeasureWidth(f, temp);
 
     /* Measure text up to selection end */
-    strncpy(temp, state->input_buffer, (size_t)sel_end);
-    temp[sel_end] = '\0';
+    i32 end_byte = Text_UTF8ByteOffset(state->input_buffer, sel_end);
+    strncpy(temp, state->input_buffer, (size_t)end_byte);
+    temp[end_byte] = '\0';
     i32 end_x = text_pos.x + Font_MeasureWidth(f, temp);
 
     rect sel_rect = {start_x, text_pos.y, end_x - start_x, 18};
@@ -366,11 +369,13 @@ void CommandPalette_Render(command_palette_state *state, ui_context *ui,
       /* Measure text up to cursor position */
       char temp[PALETTE_MAX_INPUT];
       i32 cursor_pos = state->input_state.cursor_pos;
-      if (cursor_pos > (i32)strlen(state->input_buffer)) {
-        cursor_pos = (i32)strlen(state->input_buffer);
+      i32 char_count = Text_UTF8Length(state->input_buffer);
+      if (cursor_pos > char_count) {
+        cursor_pos = char_count;
       }
-      strncpy(temp, state->input_buffer, (size_t)cursor_pos);
-      temp[cursor_pos] = '\0';
+      i32 cursor_byte = Text_UTF8ByteOffset(state->input_buffer, cursor_pos);
+      strncpy(temp, state->input_buffer, (size_t)cursor_byte);
+      temp[cursor_byte] = '\0';
       v2i text_size = UI_MeasureText(temp, f);
       i32 cursor_x = text_pos.x + text_size.x;
       Render_DrawRect(renderer, (rect){cursor_x, text_pos.y, 2, 18},

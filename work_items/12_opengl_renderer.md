@@ -8,6 +8,8 @@ Implement OpenGL rendering backend as an alternative to software rendering for i
 - GPU-accelerated drawing
 - Support same primitives as software backend
 - Cross-platform (Linux + Windows)
+- Default to opengl renderer if available, otherwise software renderer
+- update Workbench starting (OpenGL) or (Software)
 
 ## Deliverables
 
@@ -42,4 +44,3 @@ Implement OpenGL rendering backend as an alternative to software rendering for i
 
 ## Notes
 - Target OpenGL 3.3 Core for compatibility
-- Consider Vulkan as future alternative
