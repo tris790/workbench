@@ -194,6 +194,9 @@ void Platform_DestroyWindow(platform_window *window);
 void Platform_SetWindowTitle(platform_window *window, const char *title);
 void Platform_GetWindowSize(platform_window *window, i32 *width, i32 *height);
 b32 Platform_WindowShouldClose(platform_window *window);
+void Platform_RequestQuit(platform_window *window);
+void Platform_SetFullscreen(platform_window *window, b32 fullscreen);
+b32 Platform_IsFullscreen(platform_window *window);
 
 /* ===== Event API ===== */
 

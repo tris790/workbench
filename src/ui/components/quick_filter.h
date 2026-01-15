@@ -60,5 +60,6 @@ b32 QuickFilter_IsActive(quick_filter_state *state);
 
 /* Get current filter query (empty string if not active) */
 const char *QuickFilter_GetQuery(quick_filter_state *state);
+void QuickFilter_Focus(quick_filter_state *state);
 
 #endif /* QUICK_FILTER_H */

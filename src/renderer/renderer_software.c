@@ -236,6 +236,7 @@ static renderer_backend g_software_backend = {
     .clear = Software_Clear,
     .draw_rect = Software_DrawRect,
     .draw_rect_rounded = Software_DrawRectRounded,
+    .set_clip_rect = NULL,
     .draw_text = Software_DrawText,
     .set_window = Software_SetWindow,
     .presents_frame = false,
@@ -272,6 +273,7 @@ void Render_SetFramebuffer(render_context *ctx, u32 *pixels, i32 width,
 }
 
 void Render_SetWindow(render_context *ctx, struct platform_window *window) {
+  ctx->window = window;
   if (ctx->backend && ctx->backend->set_window) {
     ctx->backend->set_window(ctx, window);
   }
@@ -302,6 +304,10 @@ void Render_SetClipRect(render_context *ctx, rect r) {
   i32 x1 = ClampI32(r.x + r.w, 0, ctx->width);
   i32 y1 = ClampI32(r.y + r.h, 0, ctx->height);
   ctx->clip = (rect){x0, y0, x1 - x0, y1 - y0};
+
+  if (ctx->backend && ctx->backend->set_clip_rect) {
+    ctx->backend->set_clip_rect(ctx, ctx->clip);
+  }
 }
 
 void Render_ResetClipRect(render_context *ctx) {

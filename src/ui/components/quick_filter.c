@@ -256,3 +256,13 @@ b32 QuickFilter_IsActive(quick_filter_state *state) { return state->active; }
 const char *QuickFilter_GetQuery(quick_filter_state *state) {
   return state->buffer;
 }
+
+void QuickFilter_Focus(quick_filter_state *state) {
+  state->active = true;
+  state->fade_anim.target = 1.0f;
+  if (!Input_HasFocus(INPUT_TARGET_EXPLORER)) {
+    /* If explorer isn't focused, we should probably focus it so filter gets
+     * input */
+    Input_PushFocus(INPUT_TARGET_EXPLORER);
+  }
+}

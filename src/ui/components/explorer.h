@@ -134,5 +134,8 @@ void Explorer_Paste(explorer_state *state);
 
 /* Cancel current operation */
 void Explorer_Cancel(explorer_state *state);
+void Explorer_FocusFilter(explorer_state *state);
+void Explorer_Duplicate(explorer_state *state);
+void Explorer_OpenSelected(explorer_state *state);
 
 #endif /* EXPLORER_H */

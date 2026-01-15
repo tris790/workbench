@@ -1098,6 +1098,27 @@ static void GL_SetWindow(render_context *ctx, struct platform_window *window) {
 
 /* ===== Backend Creation ===== */
 
+static void GL_SetClipRect(render_context *ctx, rect r) {
+  gl_backend_state *state = (gl_backend_state *)ctx->backend->user_data;
+
+  /* Flush any pending geometry before changing scissor state */
+  FlushBatch(state);
+
+  /* Compute scissor rect (OpenGL uses bottom-left origin) */
+  /* Scissor is affected by viewport, but here we assume viewport matches window
+   * size */
+  /* and we are using window coordinates */
+
+  i32 y_bottom = ctx->height - (r.y + r.h);
+
+  /* Clamp to 0 if negative (though r.y + r.h should be <= height if caller
+   * clamped) */
+  if (y_bottom < 0)
+    y_bottom = 0;
+
+  glScissor(r.x, y_bottom, r.w, r.h);
+}
+
 static gl_backend_state g_gl_state = {0};
 
 static renderer_backend g_opengl_backend = {.name = "OpenGL",
@@ -1109,6 +1130,7 @@ static renderer_backend g_opengl_backend = {.name = "OpenGL",
                                             .draw_rect = GL_DrawRect,
                                             .draw_rect_rounded =
                                                 GL_DrawRectRounded,
+                                            .set_clip_rect = GL_SetClipRect,
                                             .draw_text = GL_DrawText,
                                             .set_window = GL_SetWindow,
                                             .presents_frame = true,

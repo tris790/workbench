@@ -62,6 +62,7 @@ struct platform_window {
   b32 should_close;
   b32 configured;
   b32 resizable;
+  b32 fullscreen;
 
   /* Event queue */
   platform_event events[64];

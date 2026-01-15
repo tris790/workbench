@@ -30,7 +30,8 @@ i32 CreateShmBuffer(platform_window *window, i32 index) {
   char name[64];
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
-  snprintf(name, sizeof(name), "/wb-shm-%d-%d-%ld", getpid(), index, ts.tv_nsec);
+  snprintf(name, sizeof(name), "/wb-shm-%d-%d-%ld", getpid(), index,
+           ts.tv_nsec);
 
   i32 fd = shm_open(name, O_RDWR | O_CREAT | O_EXCL, 0600);
   if (fd < 0)
@@ -78,15 +79,25 @@ static void XdgToplevelConfigure(void *data, struct xdg_toplevel *toplevel,
   (void)states;
   platform_window *window = (platform_window *)data;
 
+  /* Update states */
+  bool is_fullscreen = false;
+  uint32_t *pstate;
+  wl_array_for_each(pstate, states) {
+    if (*pstate == XDG_TOPLEVEL_STATE_FULLSCREEN) {
+      is_fullscreen = true;
+    }
+  }
+  window->fullscreen = is_fullscreen;
+
   if (width > 0 && height > 0) {
     if (window->width != width || window->height != height) {
-      
+
       /* Resize buffers */
       DestroyShmBuffers(window);
-      
+
       window->width = width;
       window->height = height;
-      
+
       CreateShmBuffer(window, 0);
       CreateShmBuffer(window, 1);
 
@@ -112,12 +123,17 @@ static void XdgToplevelClose(void *data, struct xdg_toplevel *toplevel) {
 static void XdgToplevelConfigureBounds(void *data,
                                        struct xdg_toplevel *toplevel, i32 width,
                                        i32 height) {
-  (void)data; (void)toplevel; (void)width; (void)height;
+  (void)data;
+  (void)toplevel;
+  (void)width;
+  (void)height;
 }
 
 static void XdgToplevelWmCapabilities(void *data, struct xdg_toplevel *toplevel,
                                       struct wl_array *capabilities) {
-  (void)data; (void)toplevel; (void)capabilities;
+  (void)data;
+  (void)toplevel;
+  (void)capabilities;
 }
 
 static const struct xdg_toplevel_listener xdg_toplevel_listener = {
@@ -195,10 +211,10 @@ platform_window *Platform_CreateWindow(window_config *config) {
   for (i32 b = 0; b < 2; b++) {
     u32 *pixels = (u32 *)window->shm_data[b];
     for (i32 i = 0; i < window->width * window->height; i++) {
-        /* Check if shm_data is valid before writing */
-        if (pixels) {
-            pixels[i] = 0xFF1E1E2E; /* Dark theme background */
-        }
+      /* Check if shm_data is valid before writing */
+      if (pixels) {
+        pixels[i] = 0xFF1E1E2E; /* Dark theme background */
+      }
     }
   }
 
@@ -256,6 +272,31 @@ void Platform_GetWindowSize(platform_window *window, i32 *width, i32 *height) {
 
 b32 Platform_WindowShouldClose(platform_window *window) {
   return window ? window->should_close : true;
+}
+
+void Platform_RequestQuit(platform_window *window) {
+  if (window) {
+    window->should_close = true;
+
+    platform_event event = {0};
+    event.type = EVENT_QUIT;
+    PushEvent(window, &event);
+  }
+}
+
+void Platform_SetFullscreen(platform_window *window, b32 fullscreen) {
+  if (window && window->xdg_toplevel) {
+    if (fullscreen) {
+      xdg_toplevel_set_fullscreen(window->xdg_toplevel, NULL);
+    } else {
+      xdg_toplevel_unset_fullscreen(window->xdg_toplevel);
+    }
+    window->fullscreen = fullscreen;
+  }
+}
+
+b32 Platform_IsFullscreen(platform_window *window) {
+  return window ? window->fullscreen : false;
 }
 
 void *Platform_GetFramebuffer(platform_window *window) {

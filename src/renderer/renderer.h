@@ -43,6 +43,7 @@ typedef void (*PFN_BackendClear)(render_context *ctx, color c);
 typedef void (*PFN_BackendDrawRect)(render_context *ctx, rect r, color c);
 typedef void (*PFN_BackendDrawRectRounded)(render_context *ctx, rect r,
                                            f32 radius, color c);
+typedef void (*PFN_BackendSetClipRect)(render_context *ctx, rect r);
 typedef void (*PFN_BackendDrawText)(render_context *ctx, v2i pos,
                                     const char *text, font *f, color c);
 typedef void (*PFN_BackendSetWindow)(render_context *ctx,
@@ -58,6 +59,7 @@ struct renderer_backend {
   PFN_BackendClear clear;
   PFN_BackendDrawRect draw_rect;
   PFN_BackendDrawRectRounded draw_rect_rounded;
+  PFN_BackendSetClipRect set_clip_rect;
   PFN_BackendDrawText draw_text;
   PFN_BackendSetWindow set_window;
 
@@ -83,6 +85,8 @@ struct render_context {
 
   /* Default font */
   font *default_font;
+
+  struct platform_window *window;
 };
 
 /* ===== Backend Registration ===== */

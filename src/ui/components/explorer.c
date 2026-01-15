@@ -382,6 +382,45 @@ void Explorer_Cancel(explorer_state *state) {
   state->mode = EXPLORER_MODE_NORMAL;
 }
 
+void Explorer_FocusFilter(explorer_state *state) {
+  QuickFilter_Focus(&state->filter);
+}
+
+void Explorer_Duplicate(explorer_state *state) {
+  fs_entry *entry = FS_GetSelectedEntry(&state->fs);
+  if (entry && strcmp(entry->name, "..") != 0) {
+    const char *ext = FS_GetExtension(entry->name);
+    i32 name_len = (i32)strlen(entry->name);
+    i32 ext_len = (i32)strlen(ext);
+    i32 base_len = name_len - ext_len;
+
+    char dest[FS_MAX_PATH];
+    char copy_name[FS_MAX_NAME];
+    snprintf(copy_name, sizeof(copy_name), "%.*s_copy%s", base_len, entry->name,
+             ext);
+    FS_JoinPath(dest, sizeof(dest), state->fs.current_path, copy_name);
+
+    if (FS_Copy(entry->path, dest)) {
+      Explorer_Refresh(state);
+    }
+  }
+}
+
+void Explorer_OpenSelected(explorer_state *state) {
+  fs_entry *entry = FS_GetSelectedEntry(&state->fs);
+  if (entry) {
+    if (entry->is_directory) {
+      char target_path[FS_MAX_PATH];
+      strncpy(target_path, entry->path, FS_MAX_PATH - 1);
+      target_path[FS_MAX_PATH - 1] = '\0';
+      Explorer_NavigateTo(state, target_path,
+                          QuickFilter_IsActive(&state->filter));
+    } else {
+      Platform_OpenFile(entry->path);
+    }
+  }
+}
+
 /* ===== Input Handling ===== */
 
 static void HandleNormalInput(explorer_state *state, ui_context *ui) {
@@ -951,6 +990,12 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
   /* Set clip rect for list */
   Render_SetClipRect(ctx, list_area);
 
+  /* Check focus state to disable hover when modals are active */
+  input_target focus = Input_GetFocus();
+  b32 modal_active =
+      (focus == INPUT_TARGET_COMMAND_PALETTE || focus == INPUT_TARGET_DIALOG ||
+       focus == INPUT_TARGET_CONTEXT_MENU);
+
   /* Draw visible items - iterate through all entries but track visible position
    */
   i32 visible_index = 0;
@@ -980,7 +1025,7 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
                           state->item_height};
 
       b32 is_selected = ((i32)i == state->fs.selected_index);
-      b32 is_hovered = (ui->active == UI_ID_NONE) &&
+      b32 is_hovered = !modal_active && (ui->active == UI_ID_NONE) &&
                        UI_PointInRect(ui->input.mouse_pos, item_bounds);
       file_item_config item_config = {.icon_size = EXPLORER_ICON_SIZE,
                                       .icon_padding = EXPLORER_ICON_PADDING,
