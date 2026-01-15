@@ -227,6 +227,10 @@ b32 Explorer_NavigateTo(explorer_state *state, const char *path,
     FSWatcher_WatchDirectory(&state->watcher, path);
 
     /* Push to history */
+    state->scroll.scroll_v.current = 0;
+    state->scroll.scroll_v.target = 0;
+    state->scroll.target_offset.y = 0;
+
     if (state->history_index < EXPLORER_MAX_HISTORY - 1) {
       state->history_index++;
     } else {
@@ -246,14 +250,22 @@ b32 Explorer_NavigateTo(explorer_state *state, const char *path,
 void Explorer_GoBack(explorer_state *state) {
   if (state->history_index > 0) {
     state->history_index--;
-    FS_LoadDirectory(&state->fs, state->history[state->history_index]);
+    if (FS_LoadDirectory(&state->fs, state->history[state->history_index])) {
+      state->scroll.scroll_v.current = 0;
+      state->scroll.scroll_v.target = 0;
+      state->scroll.target_offset.y = 0;
+    }
   }
 }
 
 void Explorer_GoForward(explorer_state *state) {
   if (state->history_index < state->history_count - 1) {
     state->history_index++;
-    FS_LoadDirectory(&state->fs, state->history[state->history_index]);
+    if (FS_LoadDirectory(&state->fs, state->history[state->history_index])) {
+      state->scroll.scroll_v.current = 0;
+      state->scroll.scroll_v.target = 0;
+      state->scroll.target_offset.y = 0;
+    }
   }
 }
 
@@ -798,7 +810,9 @@ void Explorer_Update(explorer_state *state, ui_context *ui) {
           /* Use FS_LoadDirectory directly to avoid history push and filter
            * clear */
           if (FS_LoadDirectory(&state->fs, target_path)) {
-            /* Stay here */
+            state->scroll.scroll_v.current = 0;
+            state->scroll.scroll_v.target = 0;
+            state->scroll.target_offset.y = 0;
           }
         }
       }
