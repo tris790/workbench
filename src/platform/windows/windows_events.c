@@ -335,8 +335,17 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (window && wParam >= 32) { /* Ignore control characters */
       platform_event event = {0};
       event.type = EVENT_KEY_DOWN;
-      /* Use the VK from the preceding WM_KEYDOWN to get the correct key code */
-      event.data.keyboard.key = VirtualKeyToKeyCode(window->last_vk);
+      /* Extract scan code from lParam and convert to virtual key.
+       * This is more reliable than using last_vk when typing fast,
+       * because last_vk can be overwritten by subsequent WM_KEYDOWN
+       * messages before their corresponding WM_CHAR is processed. */
+      UINT scan_code = (lParam >> 16) & 0xFF;
+      UINT vk = MapVirtualKeyW(scan_code, MAPVK_VSC_TO_VK);
+      if (vk == 0) {
+        /* Fallback to last_vk if MapVirtualKey fails */
+        vk = (UINT)window->last_vk;
+      }
+      event.data.keyboard.key = VirtualKeyToKeyCode(vk);
       event.data.keyboard.modifiers = GetModifierState();
       event.data.keyboard.character = (u32)wParam;
       PushEvent(window, &event);
