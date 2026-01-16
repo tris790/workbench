@@ -342,7 +342,7 @@ void Explorer_ConfirmDelete(explorer_state *state, ui_context *ui) {
     snprintf(msg, sizeof(msg), "Are you sure you want to delete \"%s\"?",
              entry->name);
 
-    state->dialog_text = Text_Wrap(state->fs.arena, msg, ui->font, max_text_w);
+    state->dialog_text = Text_Wrap(state->fs.arena, msg, ui->main_font, max_text_w);
   }
 }
 

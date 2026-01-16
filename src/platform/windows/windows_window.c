@@ -216,4 +216,46 @@ void Platform_PresentFrame(platform_window *window) {
   BitBlt(window->hdc, 0, 0, window->width, window->height, window->mem_dc, 0, 0,
          SRCCOPY);
 }
+
+b32 Platform_IsFullscreen(platform_window *window) {
+  if (!window)
+    return false;
+  return window->is_fullscreen;
+}
+
+void Platform_SetFullscreen(platform_window *window, b32 fullscreen) {
+  if (!window || !window->hwnd)
+    return;
+
+  if (fullscreen == window->is_fullscreen)
+    return;
+
+  DWORD style = GetWindowLongPtr(window->hwnd, GWL_STYLE);
+
+  if (fullscreen) {
+    MONITORINFO mi = {sizeof(mi)};
+    if (GetWindowPlacement(window->hwnd, &window->prev_placement) &&
+        GetMonitorInfo(
+            MonitorFromWindow(window->hwnd, MONITOR_DEFAULTTOPRIMARY), &mi)) {
+      SetWindowLongPtr(window->hwnd, GWL_STYLE, style & ~WS_OVERLAPPEDWINDOW);
+      SetWindowPos(window->hwnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top,
+                   mi.rcMonitor.right - mi.rcMonitor.left,
+                   mi.rcMonitor.bottom - mi.rcMonitor.top,
+                   SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+      window->is_fullscreen = true;
+    }
+  } else {
+    SetWindowLongPtr(window->hwnd, GWL_STYLE, style | WS_OVERLAPPEDWINDOW);
+    SetWindowPlacement(window->hwnd, &window->prev_placement);
+    SetWindowPos(window->hwnd, NULL, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER |
+                     SWP_FRAMECHANGED);
+    window->is_fullscreen = false;
+  }
+}
+
+void Platform_RequestQuit(platform_window *window) {
+  if (window)
+    window->should_close = true;
+}
 #endif /* _WIN32 */

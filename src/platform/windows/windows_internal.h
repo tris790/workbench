@@ -46,6 +46,8 @@ struct platform_window {
   i32 height;
   b32 should_close;
   b32 resizable;
+  b32 is_fullscreen;
+  WINDOWPLACEMENT prev_placement;
 
   /* Event queue */
   /* Event queue */

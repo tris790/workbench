@@ -282,4 +282,16 @@ b32 Platform_GetRealPath(const char *path, char *out_path, usize out_size) {
 
   return true;
 }
+
+b32 Platform_GetExecutablePath(char *out_path, usize out_size) {
+  wchar_t wide_path[FS_MAX_PATH] = {0};
+  DWORD result = GetModuleFileNameW(NULL, wide_path, FS_MAX_PATH);
+  if (result == 0 || result == FS_MAX_PATH)
+    return false;
+
+  if (WideToUtf8(wide_path, out_path, (int)out_size) == 0)
+    return false;
+
+  return true;
+}
 #endif /* _WIN32 */

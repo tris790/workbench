@@ -66,8 +66,22 @@ SOURCES="
     src/terminal/suggestion.c
 "
 
+# WSH (Workbench Shell) sources
+WSH_SOURCES="
+    src/shell/wsh_main.c
+    src/shell/wsh_state.c
+    src/shell/wsh_pal.c
+    src/shell/wsh_repl.c
+    src/shell/wsh_history.c
+    src/shell/wsh_tokenizer.c
+    src/shell/wsh_parser.c
+    src/shell/wsh_highlight.c
+    src/shell/wsh_completion.c
+    src/shell/wsh_abbr.c
+"
+
 # Include paths for all source directories
-INCLUDES="-Isrc -Isrc/core -Isrc/platform -Isrc/platform/protocols -Isrc/renderer -Isrc/ui -Isrc/ui/components -Isrc/terminal"
+INCLUDES="-Isrc -Isrc/core -Isrc/platform -Isrc/platform/protocols -Isrc/renderer -Isrc/ui -Isrc/ui/components -Isrc/terminal -Isrc/shell"
 
 # Compiler and flags
 CC="gcc"
@@ -94,8 +108,14 @@ if [ ! -f "$PROTO_DIR/xdg-shell-client-protocol.h" ] || [ "$XDG_SHELL_XML" -nt "
     wayland-scanner private-code "$XDG_SHELL_XML" "$PROTO_DIR/xdg-shell-protocol.c"
 fi
 
-# Compile
-echo "Compiling..."
+# Compile Main App
+echo "Compiling Workbench..."
 $CC $CFLAGS $SOURCES -o $OUTPUT $LDFLAGS
 
-echo "Build complete: ./$OUTPUT"
+# Compile WSH (Workbench Shell)
+echo "Compiling WSH..."
+WSH_OUTPUT="build/wsh"
+# WSH doesn't need all the GUI libraries but should use the same core flags
+$CC $CFLAGS $WSH_SOURCES -o $WSH_OUTPUT -lm -lutil
+
+echo "Build complete: ./$OUTPUT and ./$WSH_OUTPUT"

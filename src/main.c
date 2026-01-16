@@ -112,7 +112,7 @@ int main(int argc, char **argv) {
 
   /* Initialize UI context */
   ui_context ui = {0};
-  UI_Init(&ui, &renderer, th, main_font);
+  UI_Init(&ui, &renderer, th, main_font, mono_font);
 
   /* Initialize memory arena for file system */
   void *arena_memory = malloc(Megabytes(64));
@@ -155,7 +155,6 @@ int main(int argc, char **argv) {
   /* Main loop */
   i32 win_width = config.width;
   i32 win_height = config.height;
-  i32 frame_count = 0;
 
   while (!Platform_WindowShouldClose(window)) {
     platform_event event;
@@ -375,8 +374,6 @@ int main(int argc, char **argv) {
         Platform_PresentFrame(window);
       }
     }
-
-    frame_count++;
 
     /* Small sleep to avoid busy-looping when no events */
     Platform_SleepMs(16); /* ~60fps target */

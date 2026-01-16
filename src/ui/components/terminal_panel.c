@@ -77,14 +77,8 @@ void TerminalPanel_Init(terminal_panel_state *state) {
   state->cursor_blink.target = 1.0f;
   state->cursor_blink.speed = 4.0f;
 
-  /* Initialize suggestion engine */
-#ifdef _WIN32
-  state->shell_mode =
-      SHELL_EMULATED; /* Enable fish emulation on Windows by default */
-#else
-  state->shell_mode =
-      SHELL_FISH; /* Default to fish shell on Linux per user request */
-#endif
+  /* Initialize shell mode - default to native WSH */
+  state->shell_mode = SHELL_WSH;
   state->suggestions = Suggestion_Create(NULL); /* Default history path */
   state->selection_scroll_accumulator = 0.0f;
 }
@@ -124,8 +118,49 @@ void TerminalPanel_Toggle(terminal_panel_state *state, const char *cwd) {
         const char *shell = NULL;
         if (state->shell_mode == SHELL_FISH) {
           shell = "fish";
+        } else if (state->shell_mode == SHELL_WSH) {
+          /* Resolve WSH path relative to the current executable */
+          static char wsh_path[FS_MAX_PATH];
+          if (Platform_GetExecutablePath(wsh_path, sizeof(wsh_path))) {
+            /* Replace executable name with 'wsh' or 'wsh.exe' */
+            char *last_slash = strrchr(wsh_path, '/');
+#ifdef _WIN32
+            char *last_backslash = strrchr(wsh_path, '\\');
+            if (last_backslash > last_slash)
+              last_slash = last_backslash;
+#endif
+            if (last_slash) {
+#ifdef _WIN32
+              strcpy(last_slash + 1, "wsh.exe");
+#else
+              strcpy(last_slash + 1, "wsh");
+#endif
+              shell = wsh_path;
+            } else {
+              /* Fallback to local build path if everything else fails */
+#ifdef _WIN32
+              shell = ".\\build\\wsh.exe";
+#else
+              shell = "./build/wsh";
+#endif
+            }
+          } else {
+#ifdef _WIN32
+            shell = ".\\build\\wsh.exe";
+#else
+            shell = "./build/wsh";
+#endif
+          }
         }
-        Terminal_Spawn(state->terminal, shell, cwd);
+
+        if (!Terminal_Spawn(state->terminal, shell, cwd)) {
+          /* Fallback mechanism: if WSH fails to launch (e.g. invalid path),
+           * fall back to system default (cmd.exe on Windows, $SHELL on Linux).
+           */
+          if (state->shell_mode == SHELL_WSH) {
+            Terminal_Spawn(state->terminal, NULL, cwd);
+          }
+        }
         if (cwd) {
           strncpy(state->last_cwd, cwd, sizeof(state->last_cwd) - 1);
         }
@@ -243,7 +278,7 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
            Let's use the same logic as in Render. */
         i32 cell_w = 8;
         i32 cell_h = 16;
-        font *mono_font = ui->font;
+        font *mono_font = ui->mono_font;
         if (mono_font) {
           cell_w = Font_MeasureWidth(mono_font, "M");
           if (cell_w <= 0)
@@ -276,7 +311,7 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
 
       i32 cell_w = 8;
       i32 cell_h = 16;
-      font *mono_font = ui->font;
+      font *mono_font = ui->mono_font;
       if (mono_font) {
         cell_w = Font_MeasureWidth(mono_font, "M");
         if (cell_w <= 0)
@@ -656,15 +691,15 @@ void TerminalPanel_Render(terminal_panel_state *state, ui_context *ui,
     /* No terminal yet */
     color text_color = {128, 128, 128, 255};
     v2i pos = {content.x, content.y};
-    /* Use ui->font directly as we haven't defined mono_font yet */
-    Render_DrawText(r, pos, "Terminal not started", ui->font, text_color);
+    /* Use ui->mono_font directly as we haven't defined mono_font yet */
+    Render_DrawText(r, pos, "Terminal not started", ui->mono_font, text_color);
     return;
   }
 
   /* Calculate cell size based on font */
-  font *mono_font = ui->font; /* TODO: Use dedicated mono font */
-  i32 cell_width = 8;         /* Approximate monospace width */
-  i32 cell_height = 16;       /* Line height */
+  font *mono_font = ui->mono_font; /* TODO: Use dedicated mono font */
+  i32 cell_width = 8;              /* Approximate monospace width */
+  i32 cell_height = 16;            /* Line height */
 
   if (mono_font) {
     cell_width = Font_MeasureWidth(mono_font, "M");

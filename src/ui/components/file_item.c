@@ -37,7 +37,7 @@ void FileItem_Render(ui_context *ui, fs_entry *entry, rect bounds,
 
   /* Filename */
   color text_color = is_selected ? th->background : th->text;
-  v2i text_pos = {x, y + (bounds.h - Font_GetLineHeight(ui->font)) / 2};
+  v2i text_pos = {x, y + (bounds.h - Font_GetLineHeight(ui->main_font)) / 2};
 
   /* Check if file is hidden */
   b32 is_hidden = entry->name[0] == '.' && strcmp(entry->name, "..") != 0;
@@ -45,17 +45,17 @@ void FileItem_Render(ui_context *ui, fs_entry *entry, rect bounds,
     text_color = th->text_muted;
   }
 
-  Render_DrawText(ctx, text_pos, entry->name, ui->font, text_color);
+  Render_DrawText(ctx, text_pos, entry->name, ui->main_font, text_color);
 
   /* Size column */
   if (config->show_size && !entry->is_directory) {
     char size_str[32];
     FS_FormatSize(entry->size, size_str, sizeof(size_str));
 
-    i32 size_width = Font_MeasureWidth(ui->font, size_str);
+    i32 size_width = Font_MeasureWidth(ui->main_font, size_str);
     v2i size_pos = {bounds.x + bounds.w - size_width - 8,
-                    y + (bounds.h - Font_GetLineHeight(ui->font)) / 2};
-    Render_DrawText(ctx, size_pos, size_str, ui->font,
+                    y + (bounds.h - Font_GetLineHeight(ui->main_font)) / 2};
+    Render_DrawText(ctx, size_pos, size_str, ui->main_font,
                     is_selected ? th->background : th->text_muted);
   }
 }

@@ -18,7 +18,8 @@
 typedef enum {
   SHELL_FISH = 0, /* Use 'fish' shell (no emulation) */
   SHELL_SYSTEM,   /* Use system default shell (no emulation) */
-  SHELL_EMULATED  /* Use system default shell + Workbench emulation */
+  SHELL_EMULATED, /* Use system default shell + Workbench emulation */
+  SHELL_WSH       /* Use native WSH (Workbench Shell) */
 } ShellMode;
 
 /* Terminal panel state (one per explorer panel as per user request) */

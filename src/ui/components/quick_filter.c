@@ -106,7 +106,7 @@ void QuickFilter_Render(quick_filter_state *state, ui_context *ui,
 
   render_context *renderer = ui->renderer;
   const theme *th = ui->theme;
-  font *f = ui->font;
+  font *f = ui->main_font;
   f32 fade = state->fade_anim.current;
 
   /* Calculate filter bar position (bottom of bounds, with margin) */

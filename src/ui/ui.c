@@ -348,11 +348,12 @@ void UI_EndScroll(void) {
 /* ===== Core API ===== */
 
 void UI_Init(ui_context *ctx, render_context *renderer, const theme *th,
-             font *f) {
+             font *main_font, font *mono_font) {
   memset(ctx, 0, sizeof(*ctx));
   ctx->renderer = renderer;
   ctx->theme = th;
-  ctx->font = f;
+  ctx->main_font = main_font;
+  ctx->mono_font = mono_font;
 
   /* Initialize default styles from theme */
   ctx->style_defaults[UI_STYLE_TEXT_COLOR].c = th->text;
@@ -564,7 +565,7 @@ b32 UI_Button(const char *label) {
 
   /* Calculate size */
   i32 padding = UI_GetStyleInt(UI_STYLE_PADDING);
-  v2i text_size = UI_MeasureText(label, ctx->font);
+  v2i text_size = UI_MeasureText(label, ctx->main_font);
   i32 width = text_size.x + padding * 2;
   i32 height = text_size.y + padding * 2;
 
@@ -611,7 +612,7 @@ b32 UI_Button(const char *label) {
   /* Text centered */
   v2i text_pos = {bounds.x + (bounds.w - text_size.x) / 2,
                   bounds.y + (bounds.h - text_size.y) / 2};
-  Render_DrawText(ctx->renderer, text_pos, label, ctx->font, text_color);
+  Render_DrawText(ctx->renderer, text_pos, label, ctx->main_font, text_color);
 
   /* Advance layout */
   UI_AdvanceLayout(width, height);
@@ -622,12 +623,12 @@ b32 UI_Button(const char *label) {
 void UI_Label(const char *text) {
   ui_context *ctx = g_ui_ctx;
 
-  v2i text_size = UI_MeasureText(text, ctx->font);
+  v2i text_size = UI_MeasureText(text, ctx->main_font);
   rect avail = UI_GetAvailableRect();
   v2i pos = {avail.x, avail.y};
 
   color text_color = UI_GetStyleColor(UI_STYLE_TEXT_COLOR);
-  Render_DrawText(ctx->renderer, pos, text, ctx->font, text_color);
+  Render_DrawText(ctx->renderer, pos, text, ctx->main_font, text_color);
 
   UI_AdvanceLayout(text_size.x, text_size.y);
 }
@@ -641,7 +642,7 @@ b32 UI_Selectable(const char *label, b32 selected) {
 
   /* Calculate size */
   i32 padding = UI_GetStyleInt(UI_STYLE_PADDING);
-  v2i text_size = UI_MeasureText(label, ctx->font);
+  v2i text_size = UI_MeasureText(label, ctx->main_font);
   rect avail = UI_GetAvailableRect();
 
   i32 height = text_size.y + padding * 2;
@@ -669,7 +670,7 @@ b32 UI_Selectable(const char *label, b32 selected) {
 
   /* Text */
   v2i text_pos = {bounds.x + padding, bounds.y + padding};
-  Render_DrawText(ctx->renderer, text_pos, label, ctx->font, text_color);
+  Render_DrawText(ctx->renderer, text_pos, label, ctx->main_font, text_color);
 
   /* Advance layout */
   UI_AdvanceLayout(bounds.w, height);
@@ -1114,7 +1115,7 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
   RegisterFocusable(id);
 
   i32 padding = UI_GetStyleInt(UI_STYLE_PADDING);
-  i32 font_height = Font_GetLineHeight(ctx->font);
+  i32 font_height = Font_GetLineHeight(ctx->main_font);
   i32 height = font_height + padding * 2;
 
   rect avail = UI_GetAvailableRect();
@@ -1138,7 +1139,7 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
       char temp[UI_MAX_TEXT_INPUT_SIZE];
       strncpy(temp, buffer, (size_t)Text_UTF8ByteOffset(buffer, i));
       temp[Text_UTF8ByteOffset(buffer, i)] = '\0';
-      i32 w = Font_MeasureWidth(ctx->font, temp);
+      i32 w = Font_MeasureWidth(ctx->main_font, temp);
       i32 dist = click_x > w ? click_x - w : w - click_x;
       if (dist < best_dist) {
         best_dist = dist;
@@ -1209,7 +1210,7 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
 
   if (show_placeholder && placeholder) {
     color placeholder_color = ctx->theme->text_muted;
-    Render_DrawText(ctx->renderer, text_pos, placeholder, ctx->font,
+    Render_DrawText(ctx->renderer, text_pos, placeholder, ctx->main_font,
                     placeholder_color);
   } else {
     /* Draw selection highlight */
@@ -1224,11 +1225,11 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
       char temp[UI_MAX_TEXT_INPUT_SIZE];
       strncpy(temp, buffer, (size_t)Text_UTF8ByteOffset(buffer, start));
       temp[Text_UTF8ByteOffset(buffer, start)] = '\0';
-      i32 start_x = text_pos.x + Font_MeasureWidth(ctx->font, temp);
+      i32 start_x = text_pos.x + Font_MeasureWidth(ctx->main_font, temp);
 
       strncpy(temp, buffer, (size_t)Text_UTF8ByteOffset(buffer, end));
       temp[Text_UTF8ByteOffset(buffer, end)] = '\0';
-      i32 end_x = text_pos.x + Font_MeasureWidth(ctx->font, temp);
+      i32 end_x = text_pos.x + Font_MeasureWidth(ctx->main_font, temp);
 
       rect sel_rect = {start_x, bounds.y + 2, end_x - start_x, bounds.h - 4};
       color sel_color = UI_GetStyleColor(UI_STYLE_ACCENT_COLOR);
@@ -1237,7 +1238,8 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
     }
 
     /* Draw text */
-    Render_DrawText(ctx->renderer, text_pos, buffer, ctx->font, text_color);
+    Render_DrawText(ctx->renderer, text_pos, buffer, ctx->main_font,
+                    text_color);
 
     /* Draw cursor */
     if (ctx->focused == id && state->cursor_blink < 1.0f) {
@@ -1245,7 +1247,7 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
       strncpy(temp, buffer,
               (size_t)Text_UTF8ByteOffset(buffer, state->cursor_pos));
       temp[Text_UTF8ByteOffset(buffer, state->cursor_pos)] = '\0';
-      i32 cursor_x = text_pos.x + Font_MeasureWidth(ctx->font, temp);
+      i32 cursor_x = text_pos.x + Font_MeasureWidth(ctx->main_font, temp);
 
       rect cursor_rect = {cursor_x, bounds.y + 3, 2, bounds.h - 6};
       Render_DrawRect(ctx->renderer, cursor_rect, text_color);

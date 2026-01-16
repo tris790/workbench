@@ -2,9 +2,13 @@
  * linux_filesystem.c - Linux file system operations
  */
 
-#include "linux_internal.h"
+#include "../platform.h"
 #include <dirent.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 /* ===== File System API ===== */
 
@@ -187,6 +191,15 @@ b32 Platform_Copy(const char *src, const char *dst) {
 b32 Platform_GetRealPath(const char *path, char *out_path, usize out_size) {
   (void)out_size;
   if (realpath(path, out_path)) {
+    return true;
+  }
+  return false;
+}
+
+b32 Platform_GetExecutablePath(char *out_path, usize out_size) {
+  ssize_t len = readlink("/proc/self/exe", out_path, out_size - 1);
+  if (len != -1) {
+    out_path[len] = '\0';
     return true;
   }
   return false;

@@ -50,12 +50,12 @@ static void ProbeConPTY(void) {
   /* kernel32.dll is always loaded in every Win32 process */
   HMODULE hKernel32 = GetModuleHandleA("kernel32.dll");
   if (hKernel32) {
-    s_fnCreate = (PFN_CreatePseudoConsole)GetProcAddress(hKernel32,
-                                                         "CreatePseudoConsole");
-    s_fnResize = (PFN_ResizePseudoConsole)GetProcAddress(hKernel32,
-                                                         "ResizePseudoConsole");
-    s_fnClose =
-        (PFN_ClosePseudoConsole)GetProcAddress(hKernel32, "ClosePseudoConsole");
+    s_fnCreate = (PFN_CreatePseudoConsole)(void *)GetProcAddress(
+        hKernel32, "CreatePseudoConsole");
+    s_fnResize = (PFN_ResizePseudoConsole)(void *)GetProcAddress(
+        hKernel32, "ResizePseudoConsole");
+    s_fnClose = (PFN_ClosePseudoConsole)(void *)GetProcAddress(
+        hKernel32, "ClosePseudoConsole");
   }
 
   s_conpty_probed = true;
@@ -80,16 +80,26 @@ PTY *PTY_Create(const char *shell, const char *cwd) {
   HANDLE hPipePTYInSide, hPipePTYOutSide;
   HANDLE hPipeInSide, hPipeOutSide;
 
-  if (!CreatePipe(&hPipePTYInSide, &hPipeInSide, NULL, 0)) {
+  /* Pipes must be inheritable for CreatePseudoConsole */
+  SECURITY_ATTRIBUTES sa;
+  sa.nLength = sizeof(sa);
+  sa.bInheritHandle = TRUE;
+  sa.lpSecurityDescriptor = NULL;
+
+  if (!CreatePipe(&hPipePTYInSide, &hPipeInSide, &sa, 0)) {
     free(pty);
     return NULL;
   }
-  if (!CreatePipe(&hPipeOutSide, &hPipePTYOutSide, NULL, 0)) {
+  if (!CreatePipe(&hPipeOutSide, &hPipePTYOutSide, &sa, 0)) {
     CloseHandle(hPipePTYInSide);
     CloseHandle(hPipeInSide);
     free(pty);
     return NULL;
   }
+
+  /* Ensure the parent-side handles are NOT inherited by the child process */
+  SetHandleInformation(hPipeInSide, HANDLE_FLAG_INHERIT, 0);
+  SetHandleInformation(hPipeOutSide, HANDLE_FLAG_INHERIT, 0);
 
   /* Create ConPTY */
   COORD size = {80, 25};

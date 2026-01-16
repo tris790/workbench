@@ -255,7 +255,7 @@ void CommandPalette_Render(command_palette_state *state, ui_context *ui,
 
   render_context *renderer = ui->renderer;
   const theme *th = ui->theme;
-  font *f = ui->font;
+  font *f = ui->main_font;
   ui_input *input = &ui->input;
 
   f32 fade = state->fade_anim.current;

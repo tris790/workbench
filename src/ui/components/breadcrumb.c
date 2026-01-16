@@ -24,7 +24,7 @@ void Breadcrumb_Render(ui_context *ui, rect bounds, const char *path) {
 
   /* Truncate path if too long */
   i32 max_width = bounds.w - padding * 2;
-  i32 path_width = Font_MeasureWidth(ui->font, path);
+  i32 path_width = Font_MeasureWidth(ui->main_font, path);
 
   if (path_width > max_width) {
     /* Show "..." prefix */
@@ -36,17 +36,17 @@ void Breadcrumb_Render(ui_context *ui, rect bounds, const char *path) {
       if (*start == '/') {
         char temp[FS_MAX_PATH];
         snprintf(temp, sizeof(temp), "...%s", start);
-        if (Font_MeasureWidth(ui->font, temp) <= max_width) {
+        if (Font_MeasureWidth(ui->main_font, temp) <= max_width) {
           snprintf(display, sizeof(display), "...%s", start);
-          Render_DrawText(ctx, pos, display, ui->font, th->text);
+          Render_DrawText(ctx, pos, display, ui->main_font, th->text);
           goto done_breadcrumb;
         }
       }
     }
     /* Fallback - just show what fits */
-    Render_DrawText(ctx, pos, "...", ui->font, th->text);
+    Render_DrawText(ctx, pos, "...", ui->main_font, th->text);
   } else {
-    Render_DrawText(ctx, pos, path, ui->font, th->text);
+    Render_DrawText(ctx, pos, path, ui->main_font, th->text);
   }
 
 done_breadcrumb:;

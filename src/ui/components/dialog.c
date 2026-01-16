@@ -23,7 +23,7 @@ dialog_result Dialog_Render(ui_context *ui, rect bounds,
 
   if (config->type == DIALOG_TYPE_CONFIRM) {
     if (config->message.lines) {
-      text_h = Text_GetWrappedHeight(config->message.count, ui->font) + 20;
+      text_h = Text_GetWrappedHeight(config->message.count, ui->main_font) + 20;
     } else {
       text_h = 40;
     }
@@ -50,9 +50,9 @@ dialog_result Dialog_Render(ui_context *ui, rect bounds,
   rect header_rect = {dialog.x, dialog.y, dialog.w, header_h};
   v2i title_pos = {header_rect.x + th->spacing_lg,
                    header_rect.y +
-                       (header_h - Font_GetLineHeight(ui->font)) / 2};
+                       (header_h - Font_GetLineHeight(ui->main_font)) / 2};
   Render_DrawText(ctx, title_pos, config->title ? config->title : "Dialog",
-                  ui->font, title_color);
+                  ui->main_font, title_color);
 
   rect sep = {dialog.x, dialog.y + header_h, dialog.w, 1};
   Render_DrawRect(ctx, sep, Color_WithAlpha(th->border, 100));
@@ -70,23 +70,23 @@ dialog_result Dialog_Render(ui_context *ui, rect bounds,
 
     i32 text_x = icon_rect.x + icon_size + th->spacing_md;
     v2i msg_pos = {text_x,
-                   content_y + (icon_size - Font_GetLineHeight(ui->font)) / 2};
+                   content_y + (icon_size - Font_GetLineHeight(ui->main_font)) / 2};
 
     /* Render wrapped text */
     if (config->message.lines) {
       for (i32 i = 0; i < config->message.count; i++) {
-        Render_DrawText(ctx, msg_pos, config->message.lines[i], ui->font,
+        Render_DrawText(ctx, msg_pos, config->message.lines[i], ui->main_font,
                         th->text);
-        msg_pos.y += Font_GetLineHeight(ui->font);
+        msg_pos.y += Font_GetLineHeight(ui->main_font);
       }
     } else {
-      Render_DrawText(ctx, msg_pos, "Are you sure?", ui->font, th->text);
-      msg_pos.y += Font_GetLineHeight(ui->font);
+      Render_DrawText(ctx, msg_pos, "Are you sure?", ui->main_font, th->text);
+      msg_pos.y += Font_GetLineHeight(ui->main_font);
     }
 
     if (config->hint) {
       v2i hint_pos = {text_x, msg_pos.y + 12};
-      Render_DrawText(ctx, hint_pos, config->hint, ui->font, th->text_muted);
+      Render_DrawText(ctx, hint_pos, config->hint, ui->main_font, th->text_muted);
     }
   } else {
     /* Text input area */

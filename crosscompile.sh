@@ -55,17 +55,37 @@ src/ui/components/terminal_panel.c
 src/platform/windows/workbench.rc
 "
 
+# WSH (Workbench Shell) sources
+WSH_SOURCES="
+    src/shell/wsh_main.c
+    src/shell/wsh_state.c
+    src/shell/wsh_pal.c
+    src/shell/wsh_repl.c
+    src/shell/wsh_history.c
+    src/shell/wsh_tokenizer.c
+    src/shell/wsh_parser.c
+    src/shell/wsh_highlight.c
+    src/shell/wsh_completion.c
+    src/shell/wsh_abbr.c
+"
+
 # Includes
-INCLUDES="-Isrc -Isrc/core -Isrc/platform -Isrc/renderer -Isrc/ui -Isrc/ui/components -Isrc/terminal"
+INCLUDES="-Isrc -Isrc/core -Isrc/platform -Isrc/renderer -Isrc/ui -Isrc/ui/components -Isrc/terminal -Isrc/shell"
 
 # Flags
 # -static to avoid dependency on libgcc/libstdc++ dlls if using mingw
-CFLAGS="-target x86_64-windows-gnu -std=c99 -g -gcodeview -DUNICODE -D_UNICODE -D_CRT_SECURE_NO_WARNINGS -DWB_DEBUG"
+CFLAGS="-target x86_64-windows-gnu -std=c99 -g -gcodeview -DUNICODE -D_UNICODE -D_CRT_SECURE_NO_WARNINGS -DWB_DEBUG -Wall -Wextra"
 LIBS="-luser32 -lgdi32 -lshell32 -lshlwapi -ldwrite -luuid -lopengl32"
 
-# Compile
-# We use zig cc as a drop-in replacement for gcc/clang
+# Compile Workbench
+echo "Compiling Workbench for Windows..."
 zig cc $CFLAGS $INCLUDES $SOURCES $LIBS -o build/wb.exe
 
-echo "Build complete: build/wb.exe"
+# Compile WSH (Workbench Shell)
+echo "Compiling WSH for Windows..."
+WSH_OUTPUT="build/wsh.exe"
+# wsh needs fewer libs, mainly basic system ones
+zig cc $CFLAGS $INCLUDES $WSH_SOURCES -luser32 -o $WSH_OUTPUT
+
+echo "Build complete: build/wb.exe and build/wsh.exe"
 echo "To run with wine: wine build/wb.exe"

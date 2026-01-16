@@ -140,11 +140,11 @@ void ContextMenu_Show(context_menu_state *state, v2i position,
 
   for (i32 i = 0; i < state->item_count; i++) {
     menu_item *item = &state->items[i];
-    v2i label_size = UI_MeasureText(item->label, ui->font);
+    v2i label_size = UI_MeasureText(item->label, ui->main_font);
     v2i shortcut_size = {0, 0};
 
     if (item->shortcut[0] != '\0') {
-      shortcut_size = UI_MeasureText(item->shortcut, ui->font);
+      shortcut_size = UI_MeasureText(item->shortcut, ui->main_font);
     }
 
     /* Padding (8) + Label + Spacing (32) + Shortcut + Padding (8) */
@@ -295,7 +295,7 @@ void ContextMenu_Render(context_menu_state *state, ui_context *ui,
 
   render_context *renderer = ui->renderer;
   const theme *th = ui->theme;
-  font *f = ui->font;
+  font *f = ui->main_font;
   ui_input *input = &ui->input;
 
   f32 fade = state->fade_anim.current;
