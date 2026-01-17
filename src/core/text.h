@@ -44,4 +44,8 @@ i32 Text_GetWrappedHeight(i32 line_count, font *f);
 i32 Text_UTF8Length(const char *str);
 i32 Text_UTF8ByteOffset(const char *str, i32 char_index);
 
+/* Word boundary helpers (treats ' ' and '/' as separators) */
+i32 Text_FindWordBoundaryLeft(const char *text, i32 start_pos);
+i32 Text_FindWordBoundaryRight(const char *text, i32 start_pos);
+
 #endif /* TEXT_H */

@@ -158,3 +158,46 @@ i32 Text_UTF8ByteOffset(const char *str, i32 char_index) {
   }
   return byte;
 }
+
+static b32 IsSeparator(char c) { return c == ' ' || c == '/'; }
+
+i32 Text_FindWordBoundaryLeft(const char *text, i32 start_pos) {
+  if (start_pos <= 0)
+    return 0;
+
+  i32 cursor = start_pos - 1;
+
+  /* Skip separators if we started on one */
+  while (cursor >= 0 && IsSeparator(text[Text_UTF8ByteOffset(text, cursor)])) {
+    cursor--;
+  }
+
+  /* Skip non-separators */
+  while (cursor >= 0 && !IsSeparator(text[Text_UTF8ByteOffset(text, cursor)])) {
+    cursor--;
+  }
+
+  return cursor + 1;
+}
+
+i32 Text_FindWordBoundaryRight(const char *text, i32 start_pos) {
+  i32 char_count = Text_UTF8Length(text);
+  if (start_pos >= char_count)
+    return char_count;
+
+  i32 cursor = start_pos;
+
+  /* Skip non-separators forward */
+  while (cursor < char_count &&
+         !IsSeparator(text[Text_UTF8ByteOffset(text, cursor)])) {
+    cursor++;
+  }
+
+  /* Skip separators forward */
+  while (cursor < char_count &&
+         IsSeparator(text[Text_UTF8ByteOffset(text, cursor)])) {
+    cursor++;
+  }
+
+  return cursor;
+}
