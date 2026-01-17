@@ -5,6 +5,7 @@
  */
 
 #include "explorer.h"
+#include "../../config/config.h"
 #include "../../core/fuzzy_match.h"
 #include "../../core/input.h"
 #include "../../core/text.h"
@@ -148,13 +149,12 @@ void Explorer_Init(explorer_state *state, memory_arena *arena) {
   FS_Init(&state->fs, arena);
 
   state->item_height = EXPLORER_ITEM_HEIGHT;
-  state->show_hidden = false;
+  state->show_hidden = Config_GetBool("explorer.show_hidden", false);
   state->show_size_column = true;
   state->show_date_column = false;
 
-  /* Smooth scroll settings - use high speed for responsive feel */
-  state->scroll.scroll_v.speed = 1500.0f;
-  state->scroll.scroll_h.speed = 1500.0f;
+  /* Initialize scroll container */
+  ScrollContainer_Init(&state->scroll);
 
   /* Selection animation */
   state->selection_anim.speed = 600.0f;
@@ -281,6 +281,8 @@ fs_entry *Explorer_GetSelected(explorer_state *state) {
 
 void Explorer_ToggleHidden(explorer_state *state) {
   state->show_hidden = !state->show_hidden;
+  Config_SetBool("explorer.show_hidden", state->show_hidden);
+  Config_Save();
   Explorer_Refresh(state);
 
   /* If current selection is now hidden, move to a visible entry */
@@ -654,31 +656,19 @@ void Explorer_PollWatcher(explorer_state *state) {
 void Explorer_Update(explorer_state *state, ui_context *ui) {
   ui_input *input = &ui->input;
 
-  /* Update animations */
+  /* Update selection animation */
   SmoothValue_Update(&state->selection_anim, ui->dt);
-  SmoothValue_Update(&state->scroll.scroll_v, ui->dt);
-  state->scroll.offset.y = state->scroll.scroll_v.current;
 
-  /* Handle mouse scroll when hovering over list */
+  /* Update scroll container - handles mouse wheel and scrollbar drag */
+  if (state->list_bounds.w > 0 && state->list_bounds.h > 0) {
+    ScrollContainer_Update(&state->scroll, ui, state->list_bounds);
+  }
+
+  /* Handle mouse input when hovering over list */
   if (state->list_bounds.w > 0 && state->list_bounds.h > 0 &&
-      ui->active == UI_ID_NONE) {
+      ui->active == UI_ID_NONE && !state->scroll.is_dragging &&
+      ui->active_modal == UI_ID_NONE) {
     if (UI_PointInRect(input->mouse_pos, state->list_bounds)) {
-      if (input->scroll_delta != 0) {
-        state->scroll.target_offset.y -= input->scroll_delta * 80.0f;
-
-        /* Clamp scroll */
-        f32 max_scroll =
-            state->scroll.content_size.y - state->scroll.view_size.y;
-        if (max_scroll < 0)
-          max_scroll = 0;
-        if (state->scroll.target_offset.y < 0)
-          state->scroll.target_offset.y = 0;
-        if (state->scroll.target_offset.y > max_scroll)
-          state->scroll.target_offset.y = max_scroll;
-
-        SmoothValue_SetTarget(&state->scroll.scroll_v,
-                              state->scroll.target_offset.y);
-      }
 
       /* Handle mouse click to select items - but not if context menu is open */
       b32 context_menu_open =
@@ -954,12 +944,12 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
   /* Store bounds for mouse input handling */
   state->list_bounds = list_area;
 
-  /* Setup scroll container */
-  state->scroll.view_size = (v2f){(f32)list_area.w, (f32)list_area.h};
   /* Count visible items first for proper calculations */
   i32 visible_item_count = Explorer_CountVisible(state);
-  state->scroll.content_size =
-      (v2f){(f32)list_area.w, (f32)(visible_item_count * state->item_height)};
+  f32 content_height = (f32)(visible_item_count * state->item_height);
+
+  /* Update scroll container content size */
+  ScrollContainer_SetContentSize(&state->scroll, content_height);
 
   /* Ensure selection is visible - only when navigation triggered it */
   if (state->scroll_to_selection) {
@@ -971,35 +961,10 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
       }
     }
 
-    i32 sel_y = visible_sel_index * state->item_height;
-    f32 view_top = state->scroll.offset.y;
-    f32 view_bottom = view_top + state->scroll.view_size.y - state->item_height;
-    f32 max_scroll = state->scroll.content_size.y - state->scroll.view_size.y;
-
-    /* Only scroll if content exceeds viewport */
-    if (max_scroll > 0) {
-      if ((f32)sel_y < view_top) {
-        state->scroll.target_offset.y = (f32)sel_y;
-        SmoothValue_SetTarget(&state->scroll.scroll_v,
-                              state->scroll.target_offset.y);
-      } else if ((f32)sel_y > view_bottom) {
-        state->scroll.target_offset.y =
-            (f32)sel_y - state->scroll.view_size.y + state->item_height;
-        SmoothValue_SetTarget(&state->scroll.scroll_v,
-                              state->scroll.target_offset.y);
-      }
-    }
+    f32 sel_y = (f32)(visible_sel_index * state->item_height);
+    ScrollContainer_ScrollToY(&state->scroll, sel_y, (f32)state->item_height);
     state->scroll_to_selection = false;
   }
-
-  /* Clamp scroll */
-  f32 max_scroll = state->scroll.content_size.y - state->scroll.view_size.y;
-  if (max_scroll < 0)
-    max_scroll = 0;
-  if (state->scroll.target_offset.y < 0)
-    state->scroll.target_offset.y = 0;
-  if (state->scroll.target_offset.y > max_scroll)
-    state->scroll.target_offset.y = max_scroll;
 
   /* Set clip rect for list */
   Render_SetClipRect(ctx, list_area);
@@ -1054,22 +1019,8 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
   /* Reset clip */
   Render_ResetClipRect(ctx);
 
-  /* Draw scrollbar if needed */
-  if (state->scroll.content_size.y > state->scroll.view_size.y) {
-    f32 ratio = state->scroll.view_size.y / state->scroll.content_size.y;
-    i32 bar_height = (i32)(list_area.h * ratio);
-    if (bar_height < 20)
-      bar_height = 20;
-
-    f32 scroll_ratio = max_scroll > 0 ? state->scroll.offset.y / max_scroll : 0;
-    i32 bar_y = list_area.y + (i32)((list_area.h - bar_height) * scroll_ratio);
-
-    rect scrollbar = {list_area.x + list_area.w - EXPLORER_SCROLLBAR_OFFSET,
-                      bar_y, EXPLORER_SCROLLBAR_WIDTH, bar_height};
-    color bar_color = th->text_muted;
-    bar_color.a = 100;
-    Render_DrawRectRounded(ctx, scrollbar, 3.0f, bar_color);
-  }
+  /* Draw scrollbar */
+  ScrollContainer_RenderScrollbar(&state->scroll, ui);
 
   /* Draw quick filter overlay (positioned at bottom of list area) */
   QuickFilter_Render(&state->filter, ui, list_area);

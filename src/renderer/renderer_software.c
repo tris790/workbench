@@ -311,7 +311,7 @@ void Render_SetClipRect(render_context *ctx, rect r) {
 }
 
 void Render_ResetClipRect(render_context *ctx) {
-  ctx->clip = (rect){0, 0, ctx->width, ctx->height};
+  Render_SetClipRect(ctx, (rect){0, 0, ctx->width, ctx->height});
 }
 
 void Render_DrawRect(render_context *ctx, rect r, color c) {

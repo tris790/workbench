@@ -13,6 +13,7 @@
 #include "../../core/text.h"
 #include "../ui.h"
 #include "quick_filter.h"
+#include "scroll_container.h"
 
 /* ===== Explorer State ===== */
 
@@ -40,7 +41,7 @@ typedef struct explorer_state_s {
   i32 history_count; /* Total valid items in history */
 
   /* UI state */
-  ui_scroll_state scroll;
+  scroll_container_state scroll;
   i32 item_height;
   b32 show_hidden;
   b32 show_size_column;

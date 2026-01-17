@@ -243,7 +243,7 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
            Let's use the same logic as in Render. */
         i32 cell_w = 8;
         i32 cell_h = 16;
-        font *mono_font = ui->font;
+        font *mono_font = ui->mono_font;
         if (mono_font) {
           cell_w = Font_MeasureWidth(mono_font, "M");
           if (cell_w <= 0)
@@ -276,7 +276,7 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
 
       i32 cell_w = 8;
       i32 cell_h = 16;
-      font *mono_font = ui->font;
+      font *mono_font = ui->mono_font;
       if (mono_font) {
         cell_w = Font_MeasureWidth(mono_font, "M");
         if (cell_w <= 0)
@@ -662,9 +662,9 @@ void TerminalPanel_Render(terminal_panel_state *state, ui_context *ui,
   }
 
   /* Calculate cell size based on font */
-  font *mono_font = ui->font; /* TODO: Use dedicated mono font */
-  i32 cell_width = 8;         /* Approximate monospace width */
-  i32 cell_height = 16;       /* Line height */
+  font *mono_font = ui->mono_font;
+  i32 cell_width = 8;   /* Approximate monospace width */
+  i32 cell_height = 16; /* Line height */
 
   if (mono_font) {
     cell_width = Font_MeasureWidth(mono_font, "M");

@@ -189,6 +189,7 @@ typedef struct {
   render_context *renderer;
   const theme *theme;
   font *font;
+  font *mono_font;
 
   /* Input */
   ui_input input;
@@ -247,7 +248,7 @@ typedef struct {
 
 /* Initialize UI context */
 void UI_Init(ui_context *ctx, render_context *renderer, const theme *th,
-             font *f);
+             font *f, font *mono_font);
 
 /* Shutdown UI context */
 void UI_Shutdown(ui_context *ctx);

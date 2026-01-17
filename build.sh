@@ -55,6 +55,8 @@ SOURCES="
     src/ui/components/terminal_panel.c
     src/ui/components/quick_filter.c
     src/ui/components/context_menu.c
+    src/ui/components/config_diagnostics.c
+    src/ui/components/scroll_container.c
     src/core/fuzzy_match.c
     src/core/args.c
     src/app_args.c
@@ -64,10 +66,12 @@ SOURCES="
     src/terminal/ansi_parser.c
     src/terminal/command_history.c
     src/terminal/suggestion.c
+    src/config/config.c
+    src/config/config_parser.c
 "
 
 # Include paths for all source directories
-INCLUDES="-Isrc -Isrc/core -Isrc/platform -Isrc/platform/protocols -Isrc/renderer -Isrc/ui -Isrc/ui/components -Isrc/terminal"
+INCLUDES="-Isrc -Isrc/core -Isrc/platform -Isrc/platform/protocols -Isrc/renderer -Isrc/ui -Isrc/ui/components -Isrc/terminal -Isrc/config"
 
 # Compiler and flags
 CC="gcc"

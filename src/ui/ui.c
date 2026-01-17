@@ -348,11 +348,12 @@ void UI_EndScroll(void) {
 /* ===== Core API ===== */
 
 void UI_Init(ui_context *ctx, render_context *renderer, const theme *th,
-             font *f) {
+             font *f, font *mono_font) {
   memset(ctx, 0, sizeof(*ctx));
   ctx->renderer = renderer;
   ctx->theme = th;
   ctx->font = f;
+  ctx->mono_font = mono_font;
 
   /* Initialize default styles from theme */
   ctx->style_defaults[UI_STYLE_TEXT_COLOR].c = th->text;
