@@ -50,6 +50,11 @@ typedef struct layout_state_s {
   /* Drag and Drop */
   drag_drop_state drag_drop;
 
+  /* Shared Clipboard (for cross-panel copy/paste) */
+  char clipboard_paths[EXPLORER_MAX_CLIPBOARD][FS_MAX_PATH];
+  i32 clipboard_count;
+  b32 clipboard_is_cut;
+
   /* Context menu reference (managed by main.c) */
   struct context_menu_state_s *context_menu;
 } layout_state;

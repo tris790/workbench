@@ -18,10 +18,12 @@
 /* ===== Explorer State ===== */
 
 #define EXPLORER_MAX_HISTORY 32
+#define EXPLORER_MAX_CLIPBOARD 64 /* Max items for multi-file clipboard */
 #define EXPLORER_DIALOG_WIDTH 420
 
 /* Forward declaration */
 struct context_menu_state_s;
+struct layout_state_s;
 
 typedef enum {
   EXPLORER_MODE_NORMAL,
@@ -59,9 +61,8 @@ typedef struct explorer_state_s {
   /* For smooth selection animation */
   smooth_value selection_anim;
 
-  /* Clipboard for copy/paste */
-  char clipboard_path[FS_MAX_PATH];
-  b32 clipboard_is_cut;
+  /* Pointer to layout for shared clipboard access */
+  struct layout_state_s *layout;
 
   /* Cached bounds for mouse input */
   rect list_bounds;
@@ -128,6 +129,12 @@ fs_entry *Explorer_GetSelected(explorer_state *state);
 /* Toggle hidden files visibility */
 void Explorer_ToggleHidden(explorer_state *state);
 
+typedef struct {
+  i32 success_count;
+  i32 failure_count;
+  char last_error[256];
+} paste_result;
+
 /* Start file operations */
 void Explorer_StartRename(explorer_state *state);
 void Explorer_StartCreateFile(explorer_state *state);
@@ -135,12 +142,16 @@ void Explorer_StartCreateDir(explorer_state *state);
 void Explorer_ConfirmDelete(explorer_state *state, ui_context *ui);
 void Explorer_Copy(explorer_state *state);
 void Explorer_Cut(explorer_state *state);
-void Explorer_Paste(explorer_state *state);
+paste_result Explorer_Paste(explorer_state *state);
 
 /* Cancel current operation */
 void Explorer_Cancel(explorer_state *state);
 void Explorer_FocusFilter(explorer_state *state);
 void Explorer_Duplicate(explorer_state *state);
 void Explorer_OpenSelected(explorer_state *state);
+
+/* Selection operations */
+void Explorer_InvertSelection(explorer_state *state);
+void Explorer_ResetToSingleSelection(explorer_state *state);
 
 #endif /* EXPLORER_H */

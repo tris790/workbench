@@ -32,6 +32,10 @@ void Layout_Init(layout_state *layout, memory_arena *arena) {
   Explorer_Init(&layout->panels[0].explorer, arena);
   Explorer_Init(&layout->panels[1].explorer, arena);
 
+  /* Set layout pointer for shared clipboard access */
+  layout->panels[0].explorer.layout = layout;
+  layout->panels[1].explorer.layout = layout;
+
   /* Initialize terminal panels (one per split as requested) */
   TerminalPanel_Init(&layout->panels[0].terminal);
   layout->panels[0].terminal.resizer_id = UI_GenID("TerminalResizer0");

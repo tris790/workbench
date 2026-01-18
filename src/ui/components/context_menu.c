@@ -46,23 +46,53 @@ static void AddMenuItem(context_menu_state *state, const char *label,
   state->item_count++;
 }
 
+typedef struct {
+  char copy[64];
+  char cut[64];
+  char delete_item[64]; /* 'delete' is reserved keyword in C++ */
+} multi_select_labels;
+
+static void GetMultiSelectLabels(context_menu_state *state,
+                                 multi_select_labels *labels) {
+  i32 count = state->explorer ? FS_GetSelectionCount(&state->explorer->fs) : 1;
+
+  if (count > 1) {
+    snprintf(labels->copy, sizeof(labels->copy), "Copy (%d items)", count);
+    snprintf(labels->cut, sizeof(labels->cut), "Cut (%d items)", count);
+    snprintf(labels->delete_item, sizeof(labels->delete_item),
+             "Delete (%d items)", count);
+  } else {
+    snprintf(labels->copy, sizeof(labels->copy), "Copy");
+    snprintf(labels->cut, sizeof(labels->cut), "Cut");
+    snprintf(labels->delete_item, sizeof(labels->delete_item), "Delete");
+  }
+}
+
 static void PopulateFileMenu(context_menu_state *state) {
   state->item_count = 0;
-  AddMenuItem(state, "Copy", "Ctrl+C", Action_Copy, state, false);
-  AddMenuItem(state, "Cut", "Ctrl+X", Action_Cut, state, false);
+
+  multi_select_labels labels;
+  GetMultiSelectLabels(state, &labels);
+
+  AddMenuItem(state, labels.copy, "Ctrl+C", Action_Copy, state, false);
+  AddMenuItem(state, labels.cut, "Ctrl+X", Action_Cut, state, false);
   AddMenuItem(state, "Rename", "F2", Action_Rename, state, false);
-  AddMenuItem(state, "Delete", "Del", Action_Delete, state, true);
+  AddMenuItem(state, labels.delete_item, "Del", Action_Delete, state, true);
   AddMenuItem(state, "Copy Path", "", Action_CopyPath, state, false);
 }
 
 static void PopulateDirectoryMenu(context_menu_state *state) {
   state->item_count = 0;
+
+  multi_select_labels labels;
+  GetMultiSelectLabels(state, &labels);
+
   AddMenuItem(state, "New File", "Ctrl+N", Action_NewFile, state, false);
   AddMenuItem(state, "New Directory", "Ctrl+Shift+N", Action_NewDir, state,
               true);
-  AddMenuItem(state, "Copy", "Ctrl+C", Action_Copy, state, false);
-  AddMenuItem(state, "Cut", "Ctrl+X", Action_Cut, state, false);
-  AddMenuItem(state, "Delete", "Del", Action_Delete, state, true);
+  AddMenuItem(state, labels.copy, "Ctrl+C", Action_Copy, state, false);
+  AddMenuItem(state, labels.cut, "Ctrl+X", Action_Cut, state, false);
+  AddMenuItem(state, labels.delete_item, "Del", Action_Delete, state, true);
   AddMenuItem(state, "Copy Path", "", Action_CopyPath, state, false);
 }
 

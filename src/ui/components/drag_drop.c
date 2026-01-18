@@ -90,11 +90,6 @@ void DragDrop_BeginPotential(drag_drop_state *state, fs_state *fs,
   state->item_count = 0;
   state->primary_index = 0;
 
-  /* If clicked item is not selected, select only it */
-  if (!FS_IsSelected(fs, clicked_idx)) {
-    FS_SelectSingle(fs, clicked_idx);
-  }
-
   /* Collect all selected items */
   i32 idx = FS_GetFirstSelected(fs);
   while (idx >= 0 && state->item_count < DRAG_MAX_ITEMS) {

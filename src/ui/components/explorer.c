@@ -10,6 +10,7 @@
 #include "../../core/input.h"
 #include "../../core/text.h"
 #include "../../core/theme.h"
+#include "../layout.h"
 #include "breadcrumb.h"
 #include "context_menu.h"
 #include "dialog.h"
@@ -329,60 +330,133 @@ void Explorer_StartCreateDir(explorer_state *state) {
 }
 
 void Explorer_ConfirmDelete(explorer_state *state, ui_context *ui) {
-  fs_entry *entry = FS_GetSelectedEntry(&state->fs);
-  if (entry && strcmp(entry->name, "..") != 0) {
-    state->mode = EXPLORER_MODE_CONFIRM_DELETE;
-    Input_PushFocus(INPUT_TARGET_DIALOG);
+  /* Count valid deletable items (exclude "..") */
+  i32 delete_count = 0;
+  for (i32 idx = FS_GetFirstSelected(&state->fs); idx >= 0;
+       idx = FS_GetNextSelected(&state->fs, idx)) {
+    fs_entry *entry = FS_GetEntry(&state->fs, idx);
+    if (entry && strcmp(entry->name, "..") != 0) {
+      delete_count++;
+    }
+  }
 
-    /* Pre-wrap text using arena */
-    const theme *th = ui->theme;
+  if (delete_count == 0)
+    return;
 
-    i32 icon_size = 20;
-    i32 text_x = th->spacing_lg + icon_size + th->spacing_md;
-    i32 max_text_w = EXPLORER_DIALOG_WIDTH - text_x - th->spacing_lg;
+  state->mode = EXPLORER_MODE_CONFIRM_DELETE;
+  Input_PushFocus(INPUT_TARGET_DIALOG);
 
-    char msg[512];
+  /* Pre-wrap text using arena */
+  const theme *th = ui->theme;
+
+  i32 icon_size = 20;
+  i32 text_x = th->spacing_lg + icon_size + th->spacing_md;
+  i32 max_text_w = EXPLORER_DIALOG_WIDTH - text_x - th->spacing_lg;
+
+  char msg[512];
+  if (delete_count == 1) {
+    fs_entry *entry = FS_GetSelectedEntry(&state->fs);
+    if (entry && strcmp(entry->name, "..") == 0) {
+      /* Find the first non-".." selected item */
+      for (i32 idx = FS_GetFirstSelected(&state->fs); idx >= 0;
+           idx = FS_GetNextSelected(&state->fs, idx)) {
+        fs_entry *e = FS_GetEntry(&state->fs, idx);
+        if (e && strcmp(e->name, "..") != 0) {
+          entry = e;
+          break;
+        }
+      }
+    }
     snprintf(msg, sizeof(msg), "Are you sure you want to delete \"%s\"?",
-             entry->name);
+             entry ? entry->name : "item");
+  } else {
+    snprintf(msg, sizeof(msg), "Are you sure you want to delete %d items?",
+             delete_count);
+  }
 
-    state->dialog_text = Text_Wrap(state->fs.arena, msg, ui->font, max_text_w);
+  state->dialog_text = Text_Wrap(state->fs.arena, msg, ui->font, max_text_w);
+}
+
+/* Helper to copy selected items to shared clipboard */
+static void Explorer_CopyToClipboard(explorer_state *state, b32 is_cut) {
+  if (!state->layout)
+    return;
+  layout_state *layout = state->layout;
+
+  layout->clipboard_count = 0;
+  layout->clipboard_is_cut = is_cut;
+
+  /* Iterate through all selected items */
+  for (i32 idx = FS_GetFirstSelected(&state->fs);
+       idx >= 0 && layout->clipboard_count < EXPLORER_MAX_CLIPBOARD;
+       idx = FS_GetNextSelected(&state->fs, idx)) {
+    fs_entry *entry = FS_GetEntry(&state->fs, idx);
+    if (entry && strcmp(entry->name, "..") != 0) {
+      strncpy(layout->clipboard_paths[layout->clipboard_count], entry->path,
+              FS_MAX_PATH - 1);
+      layout->clipboard_paths[layout->clipboard_count][FS_MAX_PATH - 1] = '\0';
+      layout->clipboard_count++;
+    }
   }
 }
 
 void Explorer_Copy(explorer_state *state) {
-  fs_entry *entry = FS_GetSelectedEntry(&state->fs);
-  if (entry && strcmp(entry->name, "..") != 0) {
-    strncpy(state->clipboard_path, entry->path, FS_MAX_PATH - 1);
-    state->clipboard_is_cut = false;
-  }
+  Explorer_CopyToClipboard(state, false);
 }
 
 void Explorer_Cut(explorer_state *state) {
-  fs_entry *entry = FS_GetSelectedEntry(&state->fs);
-  if (entry && strcmp(entry->name, "..") != 0) {
-    strncpy(state->clipboard_path, entry->path, FS_MAX_PATH - 1);
-    state->clipboard_is_cut = true;
-  }
+  Explorer_CopyToClipboard(state, true);
 }
 
-void Explorer_Paste(explorer_state *state) {
-  if (state->clipboard_path[0] == '\0')
-    return;
+paste_result Explorer_Paste(explorer_state *state) {
+  paste_result result = {0};
 
-  const char *filename = FS_GetFilename(state->clipboard_path);
-  char dest[FS_MAX_PATH];
-  FS_JoinPath(dest, FS_MAX_PATH, state->fs.current_path, filename);
+  if (!state->layout)
+    return result;
+  layout_state *layout = state->layout;
 
-  if (state->clipboard_is_cut) {
-    if (FS_Rename(state->clipboard_path, dest)) {
-      state->clipboard_path[0] = '\0';
-      Explorer_Refresh(state);
+  if (layout->clipboard_count == 0)
+    return result;
+
+  for (i32 i = 0; i < layout->clipboard_count; i++) {
+    const char *src = layout->clipboard_paths[i];
+    if (src[0] == '\0')
+      continue;
+
+    const char *filename = FS_GetFilename(src);
+    char dest[FS_MAX_PATH];
+    FS_JoinPath(dest, FS_MAX_PATH, state->fs.current_path, filename);
+
+    b32 success;
+    if (layout->clipboard_is_cut) {
+      success = FS_Rename(src, dest);
+    } else {
+      success = FS_Copy(src, dest);
     }
-  } else {
-    if (FS_Copy(state->clipboard_path, dest)) {
-      Explorer_Refresh(state);
+
+    if (success) {
+      result.success_count++;
+    } else {
+      result.failure_count++;
+      snprintf(result.last_error, sizeof(result.last_error), "Failed to %s: %s",
+               layout->clipboard_is_cut ? "move" : "copy", filename);
     }
   }
+
+  /* Show toast/status error if any failures */
+  if (result.failure_count > 0) {
+    /* TODO: StatusBar_ShowError(result.last_error); */
+  }
+
+  if (layout->clipboard_is_cut && result.success_count > 0) {
+    layout->clipboard_count = 0; /* Clear clipboard after move */
+  }
+
+  if (result.success_count > 0) {
+    Explorer_Refresh(state);
+  }
+
+  return result;
 }
 
 void Explorer_Cancel(explorer_state *state) {
@@ -433,6 +507,30 @@ void Explorer_OpenSelected(explorer_state *state) {
     } else {
       Platform_OpenFile(entry->path);
     }
+  }
+}
+
+void Explorer_InvertSelection(explorer_state *state) {
+  for (u32 i = 0; i < state->fs.entry_count; i++) {
+    /* Skip ".." - never toggle it */
+    if (strcmp(state->fs.entries[i].name, "..") == 0)
+      continue;
+    /* Only toggle visible entries */
+    if (Explorer_IsEntryVisible(state, (i32)i)) {
+      FS_SelectToggle(&state->fs, (i32)i);
+    }
+  }
+}
+
+void Explorer_ResetToSingleSelection(explorer_state *state) {
+  FS_ClearSelection(&state->fs);
+  /* Keep cursor position but only that item selected */
+  if (state->fs.entry_count > 0) {
+    i32 cursor = state->fs.selected_index;
+    if (cursor < 0 || cursor >= (i32)state->fs.entry_count) {
+      cursor = 0;
+    }
+    FS_SelectSingle(&state->fs, cursor);
   }
 }
 
@@ -614,12 +712,15 @@ static void Explorer_OnConfirm(explorer_state *state) {
   } break;
 
   case EXPLORER_MODE_CONFIRM_DELETE: {
-    fs_entry *entry = FS_GetSelectedEntry(&state->fs);
-    if (entry) {
-      if (FS_Delete(entry->path)) {
-        Explorer_Refresh(state);
+    /* Delete all selected items (skip "..") */
+    for (i32 idx = FS_GetFirstSelected(&state->fs); idx >= 0;
+         idx = FS_GetNextSelected(&state->fs, idx)) {
+      fs_entry *entry = FS_GetEntry(&state->fs, idx);
+      if (entry && strcmp(entry->name, "..") != 0) {
+        FS_Delete(entry->path);
       }
     }
+    Explorer_Refresh(state);
 
     /* Arena-allocated dialog_text is automatically reclaimed */
     state->dialog_text.lines = NULL;
@@ -750,6 +851,9 @@ void Explorer_Update(explorer_state *state, ui_context *ui,
             state->last_click_time = 0;
           } else {
             /* Single click - select with multi-select support */
+            /* Check if item is already selected BEFORE modifying selection */
+            b32 was_already_selected = FS_IsSelected(&state->fs, actual_index);
+
             if (input->modifiers & MOD_CTRL) {
               FS_SelectToggle(&state->fs, actual_index);
             } else if (input->modifiers & MOD_SHIFT) {
@@ -759,7 +863,10 @@ void Explorer_Update(explorer_state *state, ui_context *ui,
               if (anchor < 0)
                 anchor = 0;
               FS_SelectRange(&state->fs, anchor, actual_index);
-            } else {
+            } else if (!was_already_selected) {
+              /* Only reset selection if clicking on unselected item.
+               * If clicking on already-selected item, preserve multi-selection
+               * to allow dragging multiple items. */
               FS_SetSelection(&state->fs, actual_index);
             }
             state->last_click_time = now;
@@ -768,7 +875,8 @@ void Explorer_Update(explorer_state *state, ui_context *ui,
             /* Start potential drag - only on single clicks, not double-clicks
              */
             fs_entry *entry = FS_GetEntry(&state->fs, actual_index);
-            if (entry && strcmp(entry->name, "..") != 0) {
+            if (entry && strcmp(entry->name, "..") != 0 &&
+                FS_IsSelected(&state->fs, actual_index)) {
               DragDrop_BeginPotential(drag, &state->fs, actual_index, panel_idx,
                                       input->mouse_pos, now);
             }
@@ -787,11 +895,13 @@ void Explorer_Update(explorer_state *state, ui_context *ui,
             Explorer_VisibleToActualIndex(state, clicked_visible_index);
 
         if (actual_index >= 0) {
-          /* Select the item */
-          FS_SetSelection(&state->fs, actual_index);
+          /* Only change selection if clicking on unselected item */
+          if (!FS_IsSelected(&state->fs, actual_index)) {
+            FS_SetSelection(&state->fs, actual_index);
+          }
 
           /* Determine context type and show menu */
-          fs_entry *entry = FS_GetSelectedEntry(&state->fs);
+          fs_entry *entry = FS_GetEntry(&state->fs, actual_index);
           if (entry) {
             context_type type =
                 entry->is_directory ? CONTEXT_DIRECTORY : CONTEXT_FILE;
