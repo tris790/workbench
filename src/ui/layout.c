@@ -43,6 +43,9 @@ void Layout_Init(layout_state *layout, memory_arena *arena) {
 
   /* Cache splitter ID once */
   g_splitter_id = UI_GenID("LayoutSplitter");
+
+  /* Initialize drag and drop */
+  DragDrop_Init(&layout->drag_drop);
 }
 
 void Layout_RefreshConfig(layout_state *layout) {
@@ -58,6 +61,9 @@ void Layout_RefreshConfig(layout_state *layout) {
 }
 
 void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
+  /* Update drag and drop system */
+  DragDrop_Update(&layout->drag_drop, ui, layout, Platform_GetTimeMs(), ui->dt);
+
   /* Animate split ratio towards target */
   f32 diff = layout->target_split_ratio - layout->split_ratio;
   if (!g_animations_enabled) {
@@ -181,7 +187,8 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
   if (!config_modal_open &&
       (focus == INPUT_TARGET_EXPLORER || focus == INPUT_TARGET_DIALOG ||
        focus == INPUT_TARGET_CONTEXT_MENU)) {
-    Explorer_Update(&layout->panels[layout->active_panel_idx].explorer, ui);
+    Explorer_Update(&layout->panels[layout->active_panel_idx].explorer, ui,
+                    &layout->drag_drop, layout->active_panel_idx);
   }
 
   /* Handle global config diagnostic modal */
@@ -224,7 +231,8 @@ static void RenderPanelWithTerminal(layout_state *layout, ui_context *ui,
 
   /* Render explorer */
   Explorer_Render(&p->explorer, ui, explorer_bounds,
-                  has_focus && !TerminalPanel_HasFocus(&p->terminal));
+                  has_focus && !TerminalPanel_HasFocus(&p->terminal),
+                  &layout->drag_drop, panel_idx);
 
   /* Render terminal if visible */
   if (terminal_height > 0) {
@@ -254,6 +262,9 @@ void Layout_Render(layout_state *layout, ui_context *ui, rect bounds) {
 
   /* Render config diagnostic modal if active */
   ConfigDiagnostics_Render(ui, bounds, layout);
+
+  /* Render drag and drop preview on top of everything */
+  DragDrop_RenderPreview(&layout->drag_drop, ui);
 }
 
 void Layout_SetMode(layout_state *layout, layout_mode mode) {

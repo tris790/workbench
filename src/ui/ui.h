@@ -184,12 +184,12 @@ typedef struct {
 
 /* ===== UI Context ===== */
 
-typedef struct {
+typedef struct ui_context_s {
   /* Renderer */
   render_context *renderer;
   const theme *theme;
-  font *font;
-  font *mono_font;
+  struct font *font;
+  struct font *mono_font;
 
   /* Input */
   ui_input input;
@@ -242,6 +242,9 @@ typedef struct {
   /* Hover animations */
   ui_id hover_anim_id;
   smooth_value hover_anim;
+
+  /* Global window state */
+  b32 window_focused;
 } ui_context;
 
 /* ===== Core API ===== */

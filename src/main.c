@@ -125,6 +125,7 @@ int main(int argc, char **argv) {
   /* Initialize UI context */
   ui_context ui = {0};
   UI_Init(&ui, &renderer, th, main_font, mono_font);
+  ui.window_focused = true; /* Assume focused on start */
 
   /* Initialize memory arena for file system */
   void *arena_memory = malloc(Megabytes(64));
@@ -291,6 +292,7 @@ int main(int argc, char **argv) {
         }
         input.mouse_pos.x = event.data.mouse.x;
         input.mouse_pos.y = event.data.mouse.y;
+        input.modifiers = event.data.mouse.modifiers;
         break;
 
       case EVENT_MOUSE_BUTTON_UP:
@@ -300,6 +302,7 @@ int main(int argc, char **argv) {
         }
         input.mouse_pos.x = event.data.mouse.x;
         input.mouse_pos.y = event.data.mouse.y;
+        input.modifiers = event.data.mouse.modifiers;
         break;
 
       case EVENT_MOUSE_MOVE:
@@ -314,6 +317,14 @@ int main(int argc, char **argv) {
       case EVENT_WINDOW_RESIZE:
         win_width = event.data.resize.width;
         win_height = event.data.resize.height;
+        break;
+
+      case EVENT_WINDOW_FOCUS:
+        ui.window_focused = true;
+        break;
+
+      case EVENT_WINDOW_UNFOCUS:
+        ui.window_focused = false;
         break;
 
       default:

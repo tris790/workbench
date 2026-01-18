@@ -143,6 +143,13 @@ static void Platform_SelfInstall(void) {
   }
 }
 
+/* ===== Cursor API ===== */
+
+void Platform_SetCursor(cursor_type cursor) {
+  (void)cursor;
+  /* TODO: Implement Wayland cursor setting */
+}
+
 /* ===== Platform Init/Shutdown ===== */
 
 b32 Platform_Init(void) {

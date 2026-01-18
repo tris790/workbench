@@ -57,6 +57,7 @@ SOURCES="
     src/ui/components/context_menu.c
     src/ui/components/config_diagnostics.c
     src/ui/components/scroll_container.c
+    src/ui/components/drag_drop.c
     src/core/fuzzy_match.c
     src/core/args.c
     src/app_args.c

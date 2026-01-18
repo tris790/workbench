@@ -13,6 +13,7 @@
 #include "breadcrumb.h"
 #include "context_menu.h"
 #include "dialog.h"
+#include "drag_drop.h"
 #include "file_item.h"
 #include "quick_filter.h"
 
@@ -517,6 +518,11 @@ static void HandleNormalInput(explorer_state *state, ui_context *ui) {
     Explorer_NavigateTo(state, FS_GetHomePath(), false);
   }
 
+  /* Select all */
+  if (Input_KeyPressed(KEY_A) && (input->modifiers & MOD_CTRL)) {
+    FS_SelectAll(&state->fs);
+  }
+
   /* History Navigation */
   if ((Input_KeyPressed(KEY_LEFT) && (input->modifiers & MOD_ALT)) ||
       Input_KeyPressed(KEY_BROWSER_BACK) || input->mouse_pressed[MOUSE_X1]) {
@@ -653,8 +659,44 @@ void Explorer_PollWatcher(explorer_state *state) {
   }
 }
 
-void Explorer_Update(explorer_state *state, ui_context *ui) {
+void Explorer_Update(explorer_state *state, ui_context *ui,
+                     drag_drop_state *drag, u32 panel_idx) {
   ui_input *input = &ui->input;
+
+  /* If actively dragging, handle auto-scroll and skip normal input.
+   * Note: We only skip when DRAGGING, not when PENDING. PENDING is a transition
+   * state where we're waiting to see if the user drags or just clicks.
+   * Blocking clicks in PENDING state would break trackpad double-taps. */
+  if (DragDrop_IsDragging(drag)) {
+    if (input->key_pressed[KEY_ESCAPE]) {
+      DragDrop_Cancel(drag);
+    }
+
+    /* Auto-scroll when dragging near edges */
+    v2i mouse = input->mouse_pos;
+    rect bounds = state->list_bounds;
+    if (UI_PointInRect(mouse, bounds)) {
+      i32 scroll_margin = 35;
+      f32 scroll_speed = 500.0f * ui->dt;
+
+      if (mouse.y < bounds.y + scroll_margin) {
+        state->scroll.target_offset.y -= scroll_speed;
+      } else if (mouse.y > bounds.y + bounds.h - scroll_margin) {
+        state->scroll.target_offset.y += scroll_speed;
+      }
+
+      /* Clamp target and apply */
+      f32 max_scroll = ScrollContainer_GetMaxScroll(&state->scroll);
+      if (state->scroll.target_offset.y < 0)
+        state->scroll.target_offset.y = 0;
+      if (state->scroll.target_offset.y > max_scroll)
+        state->scroll.target_offset.y = max_scroll;
+
+      SmoothValue_SetTarget(&state->scroll.scroll_v,
+                            state->scroll.target_offset.y);
+    }
+    return;
+  }
 
   /* Update selection animation */
   SmoothValue_Update(&state->selection_anim, ui->dt);
@@ -707,10 +749,29 @@ void Explorer_Update(explorer_state *state, ui_context *ui) {
             }
             state->last_click_time = 0;
           } else {
-            /* Single click - select */
-            FS_SetSelection(&state->fs, actual_index);
+            /* Single click - select with multi-select support */
+            if (input->modifiers & MOD_CTRL) {
+              FS_SelectToggle(&state->fs, actual_index);
+            } else if (input->modifiers & MOD_SHIFT) {
+              i32 anchor = state->fs.selection_anchor;
+              if (anchor < 0)
+                anchor = state->fs.selected_index;
+              if (anchor < 0)
+                anchor = 0;
+              FS_SelectRange(&state->fs, anchor, actual_index);
+            } else {
+              FS_SetSelection(&state->fs, actual_index);
+            }
             state->last_click_time = now;
             state->last_click_index = actual_index;
+
+            /* Start potential drag - only on single clicks, not double-clicks
+             */
+            fs_entry *entry = FS_GetEntry(&state->fs, actual_index);
+            if (entry && strcmp(entry->name, "..") != 0) {
+              DragDrop_BeginPotential(drag, &state->fs, actual_index, panel_idx,
+                                      input->mouse_pos, now);
+            }
           }
         }
       }
@@ -910,7 +971,7 @@ static void RenderDialog(explorer_state *state, ui_context *ui, rect bounds) {
 }
 
 void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
-                     b32 has_focus) {
+                     b32 has_focus, drag_drop_state *drag, u32 panel_idx) {
   render_context *ctx = ui->renderer;
   const theme *th = ui->theme;
 
@@ -1003,7 +1064,20 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
       rect item_bounds = {list_area.x, item_y, actual_width,
                           state->item_height};
 
-      b32 is_selected = ((i32)i == state->fs.selected_index);
+      /* Check if this folder is a drop target */
+      if (DragDrop_IsDragging(drag) && entry->is_directory) {
+        DragDrop_CheckTarget(drag, entry, item_bounds, panel_idx);
+
+        /* Render highlight if this is the current target */
+        if (drag->target_type != DROP_TARGET_NONE &&
+            drag->target_panel_idx == panel_idx &&
+            drag->target_bounds.x == item_bounds.x &&
+            drag->target_bounds.y == item_bounds.y) {
+          DragDrop_RenderTargetHighlight(drag, ui, item_bounds);
+        }
+      }
+
+      b32 is_selected = FS_IsSelected(&state->fs, (i32)i);
       b32 is_hovered = !modal_active && (ui->active == UI_ID_NONE) &&
                        UI_PointInRect(ui->input.mouse_pos, item_bounds);
       file_item_config item_config = {.icon_size = EXPLORER_ICON_SIZE,
@@ -1014,6 +1088,13 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
     }
 
     visible_index++;
+  }
+
+  /* Check panel itself as drop target (empty area) */
+  DragDrop_CheckPanelTarget(drag, state->fs.current_path, list_area, panel_idx);
+  if (drag->target_type == DROP_TARGET_PANEL &&
+      drag->target_panel_idx == panel_idx) {
+    DragDrop_RenderTargetHighlight(drag, ui, list_area);
   }
 
   /* Reset clip */

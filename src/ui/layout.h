@@ -10,6 +10,7 @@
 
 #include "../core/types.h"
 #include "../renderer/renderer.h"
+#include "components/drag_drop.h"
 #include "components/explorer.h"
 #include "components/scroll_container.h"
 #include "components/terminal_panel.h"
@@ -29,7 +30,7 @@ typedef struct {
   bool active;
 } panel;
 
-typedef struct {
+typedef struct layout_state_s {
   memory_arena *arena;
   layout_mode mode;
   panel panels[2];
@@ -45,6 +46,9 @@ typedef struct {
   /* Global Modals */
   bool show_config_diagnostics;
   scroll_container_state diagnostic_scroll;
+
+  /* Drag and Drop */
+  drag_drop_state drag_drop;
 
   /* Context menu reference (managed by main.c) */
   struct context_menu_state_s *context_menu;

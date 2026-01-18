@@ -55,7 +55,12 @@ typedef struct {
   fs_entry *entries;
   u32 entry_count;
   u32 entry_capacity;
-  i32 selected_index;
+  i32 selected_index; /* Primary selection (for single-click nav) */
+
+  /* === NEW: Multi-selection support === */
+  u8 selected[FS_MAX_ENTRIES / 8]; /* Bitmask: 1 bit per entry */
+  i32 selection_count;             /* Number of selected items */
+  i32 selection_anchor;            /* Anchor for shift-click range select */
 
   /* For arena allocation */
   memory_arena *arena;
@@ -87,6 +92,35 @@ void FS_SetSelection(fs_state *state, i32 index);
 /* Move selection up/down */
 void FS_MoveSelection(fs_state *state, i32 delta);
 
+/* ===== Multi-Selection API ===== */
+
+/* Clear all selections and select single item at index */
+void FS_SelectSingle(fs_state *state, i32 index);
+
+/* Toggle selection at index without affecting others (Ctrl+Click) */
+void FS_SelectToggle(fs_state *state, i32 index);
+
+/* Select range from 'from' to 'to' inclusive (Shift+Click) */
+void FS_SelectRange(fs_state *state, i32 from, i32 to);
+
+/* Select all entries */
+void FS_SelectAll(fs_state *state);
+
+/* Clear all selections */
+void FS_ClearSelection(fs_state *state);
+
+/* Check if entry at index is selected */
+b32 FS_IsSelected(fs_state *state, i32 index);
+
+/* Get count of selected items */
+i32 FS_GetSelectionCount(fs_state *state);
+
+/* Get index of first selected item (-1 if none) */
+i32 FS_GetFirstSelected(fs_state *state);
+
+/* Get next selected index after 'after' (-1 if no more) - for iteration */
+i32 FS_GetNextSelected(fs_state *state, i32 after);
+
 /* Get icon type for file based on extension */
 file_icon_type FS_GetIconType(const char *filename, b32 is_directory);
 
@@ -115,6 +149,9 @@ b32 FS_CreateFile(const char *path);
 
 /* Copy file to destination */
 b32 FS_Copy(const char *src, const char *dst);
+
+/* Check if file or directory exists */
+b32 FS_Exists(const char *path);
 
 /* ===== Utility ===== */
 

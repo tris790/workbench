@@ -60,7 +60,8 @@ set UI_SRC=src\ui\ui.c src\ui\layout.c src\ui\components\explorer.c ^
     src\ui\components\quick_filter.c ^
     src\ui\components\context_menu.c ^
     src\ui\components\config_diagnostics.c ^
-    src\ui\components\scroll_container.c
+    src\ui\components\scroll_container.c ^
+    src\ui\components\drag_drop.c
 
 REM Source files - Terminal
 set TERMINAL_SRC=src\terminal\terminal.c ^

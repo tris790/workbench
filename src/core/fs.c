@@ -251,6 +251,29 @@ static int CompareEntries(const void *a, const void *b) {
   return strcasecmp(ea->name, eb->name);
 }
 
+/* ===== Selection Helpers ===== */
+
+/* Set bit in selection bitmask */
+static void SetSelectionBit(fs_state *state, i32 index, b32 value) {
+  if (index < 0 || index >= (i32)state->entry_count)
+    return;
+  i32 byte_idx = index / 8;
+  i32 bit_idx = index % 8;
+  if (value) {
+    state->selected[byte_idx] |= (1 << bit_idx);
+  } else {
+    state->selected[byte_idx] &= ~(1 << bit_idx);
+  }
+}
+
+static b32 GetSelectionBit(fs_state *state, i32 index) {
+  if (index < 0 || index >= (i32)state->entry_count)
+    return 0;
+  i32 byte_idx = index / 8;
+  i32 bit_idx = index % 8;
+  return (state->selected[byte_idx] >> bit_idx) & 1;
+}
+
 /* ===== Core API ===== */
 
 void FS_Init(fs_state *state, memory_arena *arena) {
@@ -259,6 +282,10 @@ void FS_Init(fs_state *state, memory_arena *arena) {
   state->entry_capacity = FS_MAX_ENTRIES;
   state->entries = ArenaPushArray(arena, fs_entry, FS_MAX_ENTRIES);
   state->selected_index = 0;
+
+  memset(state->selected, 0, sizeof(state->selected));
+  state->selection_count = 0;
+  state->selection_anchor = -1;
 }
 
 b32 FS_LoadDirectory(fs_state *state, const char *path) {
@@ -328,6 +355,16 @@ b32 FS_LoadDirectory(fs_state *state, const char *path) {
     state->selected_index = 1;
   }
 
+  /* Clear multi-selection when loading new directory */
+  FS_ClearSelection(state);
+  state->selection_anchor = -1;
+
+  /* Sync single selection with multi-selection */
+  if (state->entry_count > 0) {
+    SetSelectionBit(state, state->selected_index, 1);
+    state->selection_count = 1;
+  }
+
   Platform_FreeDirectoryListing(&listing);
   EndTemporaryMemory(temp);
   return true;
@@ -390,17 +427,109 @@ fs_entry *FS_GetEntry(fs_state *state, i32 index) {
 void FS_SetSelection(fs_state *state, i32 index) {
   if (state->entry_count == 0) {
     state->selected_index = 0;
+    FS_ClearSelection(state);
     return;
   }
-  if (index < 0)
-    index = 0;
-  if ((u32)index >= state->entry_count)
-    index = (i32)state->entry_count - 1;
-  state->selected_index = index;
+  state->selected_index = Clamp(index, 0, (i32)state->entry_count - 1);
+
+  /* Also update multi-selection to single item */
+  FS_SelectSingle(state, state->selected_index);
 }
 
 void FS_MoveSelection(fs_state *state, i32 delta) {
   FS_SetSelection(state, state->selected_index + delta);
+}
+
+/* ===== Multi-Selection API Implementation ===== */
+
+void FS_SelectSingle(fs_state *state, i32 index) {
+  FS_ClearSelection(state);
+  if (index >= 0 && index < (i32)state->entry_count) {
+    SetSelectionBit(state, index, 1);
+    state->selection_count = 1;
+    state->selection_anchor = index;
+    state->selected_index = index;
+  }
+}
+
+void FS_SelectToggle(fs_state *state, i32 index) {
+  if (index < 0 || index >= (i32)state->entry_count)
+    return;
+
+  b32 was_selected = GetSelectionBit(state, index);
+  SetSelectionBit(state, index, !was_selected);
+
+  if (was_selected) {
+    state->selection_count--;
+  } else {
+    state->selection_count++;
+    state->selection_anchor = index;
+  }
+
+  /* Update selected_index to last toggled on, or first selected if toggled off
+   */
+  if (!was_selected) {
+    state->selected_index = index;
+  } else if (state->selection_count > 0) {
+    state->selected_index = FS_GetFirstSelected(state);
+  } else {
+    state->selected_index = -1;
+  }
+}
+
+void FS_SelectRange(fs_state *state, i32 from, i32 to) {
+  if (from > to) {
+    i32 temp = from;
+    from = to;
+    to = temp;
+  }
+
+  /* Clear existing and select range */
+  FS_ClearSelection(state);
+
+  from = Max(0, from);
+  to = Min(to, (i32)state->entry_count - 1);
+
+  for (i32 i = from; i <= to; i++) {
+    SetSelectionBit(state, i, 1);
+  }
+
+  state->selection_count = to - from + 1;
+  state->selected_index = to;
+}
+
+void FS_SelectAll(fs_state *state) {
+  for (u32 i = 0; i < state->entry_count; i++) {
+    SetSelectionBit(state, i, 1);
+  }
+  state->selection_count = (i32)state->entry_count;
+}
+
+void FS_ClearSelection(fs_state *state) {
+  memset(state->selected, 0, sizeof(state->selected));
+  state->selection_count = 0;
+}
+
+b32 FS_IsSelected(fs_state *state, i32 index) {
+  return GetSelectionBit(state, index);
+}
+
+i32 FS_GetSelectionCount(fs_state *state) { return state->selection_count; }
+
+i32 FS_GetFirstSelected(fs_state *state) {
+  for (u32 i = 0; i < state->entry_count; i++) {
+    if (GetSelectionBit(state, i))
+      return (i32)i;
+  }
+  return -1;
+}
+
+i32 FS_GetNextSelected(fs_state *state, i32 after) {
+  for (i32 i = after + 1; i < (i32)state->entry_count; i++) {
+    if (GetSelectionBit(state, i))
+      return i;
+  }
+  return -1;
 }
 
 const char *FS_GetHomePath(void) {
@@ -436,6 +565,8 @@ b32 FS_CreateFile(const char *path) { return Platform_CreateFile(path); }
 b32 FS_Copy(const char *src, const char *dst) {
   return Platform_Copy(src, dst);
 }
+
+b32 FS_Exists(const char *path) { return Platform_FileExists(path); }
 
 b32 FS_ResolvePath(const char *path, char *out_path, usize out_size) {
   if (!path || path[0] == '\0')
