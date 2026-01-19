@@ -83,4 +83,7 @@ void TerminalPanel_Focus(terminal_panel_state *state);
 /* Check if terminal has focus */
 b32 TerminalPanel_HasFocus(terminal_panel_state *state);
 
+/* Update settings from configuration */
+void TerminalPanel_RefreshConfig(terminal_panel_state *state);
+
 #endif /* TERMINAL_PANEL_H */

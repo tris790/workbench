@@ -10,7 +10,9 @@
 
 #include "../core/types.h"
 #include "../renderer/renderer.h"
+#include "components/drag_drop.h"
 #include "components/explorer.h"
+#include "components/scroll_container.h"
 #include "components/terminal_panel.h"
 #include "ui.h"
 
@@ -28,7 +30,8 @@ typedef struct {
   bool active;
 } panel;
 
-typedef struct {
+typedef struct layout_state_s {
+  memory_arena *arena;
   layout_mode mode;
   panel panels[2];
   u32 active_panel_idx;
@@ -39,6 +42,13 @@ typedef struct {
   bool dragging;          /* Is the splitter being dragged? */
   f32 drag_start_x;       /* Mouse X when drag started */
   f32 drag_start_ratio;   /* Split ratio when drag started */
+
+  /* Global Modals */
+  bool show_config_diagnostics;
+  scroll_container_state diagnostic_scroll;
+
+  /* Drag and Drop */
+  drag_drop_state drag_drop;
 
   /* Context menu reference (managed by main.c) */
   struct context_menu_state_s *context_menu;
@@ -51,6 +61,9 @@ void Layout_Init(layout_state *layout, memory_arena *arena);
 
 /* Update layout logic (input handling, animations) - call before render */
 void Layout_Update(layout_state *layout, ui_context *ui, rect bounds);
+
+/* Update settings from config */
+void Layout_RefreshConfig(layout_state *layout);
 
 /* Render the layout - pure rendering, no state changes */
 void Layout_Render(layout_state *layout, ui_context *ui, rect bounds);

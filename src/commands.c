@@ -3,10 +3,16 @@
  */
 
 #include "commands.h"
+#include "config/config.h"
+#include "core/input.h"
+#include "core/text.h"
 #include "platform/platform.h"
+#include "ui/components/dialog.h"
 #include "ui/components/explorer.h"
+#include "ui/components/scroll_container.h"
 #include "ui/layout.h"
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 
 /* Global context for callbacks */
@@ -212,6 +218,35 @@ static void Cmd_ToggleAnimations(void *u) {
   g_animations_enabled = !g_animations_enabled;
 }
 
+/* ===== Configuration ===== */
+
+static void Cmd_ConfigReload(void *u) {
+  (void)u;
+  if (Config_NeedsUpgrade()) {
+    Config_Upgrade();
+  } else {
+    Config_Reload();
+  }
+}
+
+static void Cmd_ConfigDiagnostics(void *u) {
+  (void)u;
+  if (!g_layout)
+    return;
+
+  g_layout->show_config_diagnostics = true;
+  ScrollContainer_Init(&g_layout->diagnostic_scroll);
+  Input_PushFocus(INPUT_TARGET_DIALOG);
+}
+
+static void Cmd_ConfigOpenFile(void *u) {
+  (void)u;
+  const char *path = Config_GetPath();
+  if (path) {
+    Platform_OpenFile(path);
+  }
+}
+
 /* ===== Registration ===== */
 
 typedef struct {
@@ -252,6 +287,9 @@ static const CommandDef g_commands[] = {
     {"View: Toggle Split", "Ctrl + \\", "Layout", Cmd_ViewToggleSplit},
 
     {"Window: Quit", "Ctrl + Q", "Window", Cmd_WindowQuit},
+    {"Config: Reload", "palette", "Config", Cmd_ConfigReload},
+    {"Config: Show Diagnostics", "palette", "Config", Cmd_ConfigDiagnostics},
+    {"Config: Open File", "palette", "Config", Cmd_ConfigOpenFile},
 };
 
 void Commands_Register(command_palette_state *palette) {

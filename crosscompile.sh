@@ -52,6 +52,11 @@ src/ui/components/explorer.c
 src/ui/components/file_item.c
 src/ui/components/quick_filter.c
 src/ui/components/terminal_panel.c
+src/ui/components/config_diagnostics.c
+src/ui/components/scroll_container.c
+src/ui/components/drag_drop.c
+src/config/config.c
+src/config/config_parser.c
 src/platform/windows/workbench.rc
 "
 
@@ -70,7 +75,7 @@ WSH_SOURCES="
 "
 
 # Includes
-INCLUDES="-Isrc -Isrc/core -Isrc/platform -Isrc/renderer -Isrc/ui -Isrc/ui/components -Isrc/terminal -Isrc/shell"
+INCLUDES="-Isrc -Isrc/core -Isrc/platform -Isrc/renderer -Isrc/ui -Isrc/ui/components -Isrc/terminal -Isrc/shell -Isrc/config"
 
 # Flags
 # -static to avoid dependency on libgcc/libstdc++ dlls if using mingw

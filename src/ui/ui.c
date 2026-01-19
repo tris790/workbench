@@ -860,26 +860,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
 
     if (ctrl) {
       /* Word jump left */
-      if (state->cursor_pos > 0) {
-        i32 cursor = state->cursor_pos - 1;
-        /* Skip whitespace backwards */
-        while (cursor > 0 &&
-               buffer[Text_UTF8ByteOffset(buffer, cursor)] == ' ') {
-          cursor--;
-        }
-        /* Skip non-whitespace backwards */
-        while (cursor > 0 &&
-               buffer[Text_UTF8ByteOffset(buffer, cursor)] != ' ') {
-          cursor--;
-        }
-        /* If we stopped on space (and not at start), move forward one to be at
-         * start of word */
-        if (cursor > 0 || buffer[Text_UTF8ByteOffset(buffer, cursor)] == ' ') {
-          if (buffer[Text_UTF8ByteOffset(buffer, cursor)] == ' ')
-            cursor++;
-        }
-        state->cursor_pos = cursor;
-      }
+      state->cursor_pos = Text_FindWordBoundaryLeft(buffer, state->cursor_pos);
     } else {
       if (state->cursor_pos > 0) {
         state->cursor_pos--;
@@ -900,21 +881,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
 
     if (ctrl) {
       /* Word jump right */
-      i32 char_count = Text_UTF8Length(buffer);
-      if (state->cursor_pos < char_count) {
-        i32 cursor = state->cursor_pos;
-        /* Skip non-whitespace forward */
-        while (cursor < char_count &&
-               buffer[Text_UTF8ByteOffset(buffer, cursor)] != ' ') {
-          cursor++;
-        }
-        /* Skip whitespace forward */
-        while (cursor < char_count &&
-               buffer[Text_UTF8ByteOffset(buffer, cursor)] == ' ') {
-          cursor++;
-        }
-        state->cursor_pos = cursor;
-      }
+      state->cursor_pos = Text_FindWordBoundaryRight(buffer, state->cursor_pos);
     } else {
       if (state->cursor_pos < Text_UTF8Length(buffer)) {
         state->cursor_pos++;
@@ -981,23 +948,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
 
       if (ctrl) {
         /* Word delete backward */
-        i32 cursor = state->cursor_pos - 1;
-        /* Skip whitespace backwards */
-        while (cursor > 0 &&
-               buffer[Text_UTF8ByteOffset(buffer, cursor)] == ' ') {
-          cursor--;
-        }
-        /* Skip non-whitespace backwards */
-        while (cursor > 0 &&
-               buffer[Text_UTF8ByteOffset(buffer, cursor)] != ' ') {
-          cursor--;
-        }
-        /* Adjust to delete from start of word */
-        if (cursor > 0 || buffer[Text_UTF8ByteOffset(buffer, cursor)] == ' ') {
-          if (buffer[Text_UTF8ByteOffset(buffer, cursor)] == ' ')
-            cursor++;
-        }
-        target_pos = cursor;
+        target_pos = Text_FindWordBoundaryLeft(buffer, state->cursor_pos);
       }
 
       i32 byte_pos = Text_UTF8ByteOffset(buffer, state->cursor_pos);
@@ -1040,19 +991,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
 
       if (ctrl) {
         /* Word delete forward */
-        i32 char_count = Text_UTF8Length(buffer);
-        i32 cursor = state->cursor_pos;
-        /* Skip non-whitespace forward */
-        while (cursor < char_count &&
-               buffer[Text_UTF8ByteOffset(buffer, cursor)] != ' ') {
-          cursor++;
-        }
-        /* Skip whitespace forward */
-        while (cursor < char_count &&
-               buffer[Text_UTF8ByteOffset(buffer, cursor)] == ' ') {
-          cursor++;
-        }
-        target_pos = cursor;
+        target_pos = Text_FindWordBoundaryRight(buffer, state->cursor_pos);
       }
 
       i32 byte_pos = Text_UTF8ByteOffset(buffer, state->cursor_pos);

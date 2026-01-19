@@ -3,7 +3,9 @@
  */
 
 #include "layout.h"
+#include "../config/config.h"
 #include "../core/input.h"
+#include "components/config_diagnostics.h"
 
 #include <string.h>
 
@@ -14,6 +16,7 @@
 static ui_id g_splitter_id = 0;
 
 void Layout_Init(layout_state *layout, memory_arena *arena) {
+  layout->arena = arena;
   layout->mode = LAYOUT_MODE_SINGLE;
   layout->active_panel_idx = 0;
   layout->split_ratio = 0.5f;
@@ -21,6 +24,8 @@ void Layout_Init(layout_state *layout, memory_arena *arena) {
   layout->dragging = false;
   layout->context_menu =
       NULL; /* Will be set by main.c after ContextMenu_Init */
+  layout->show_config_diagnostics = false;
+  ScrollContainer_Init(&layout->diagnostic_scroll);
 
   /* Initialize panels */
   Explorer_Init(&layout->panels[0].explorer, arena);
@@ -37,9 +42,30 @@ void Layout_Init(layout_state *layout, memory_arena *arena) {
 
   /* Cache splitter ID once */
   g_splitter_id = UI_GenID("LayoutSplitter");
+
+  /* Initialize drag and drop */
+  DragDrop_Init(&layout->drag_drop);
+}
+
+void Layout_RefreshConfig(layout_state *layout) {
+  b32 show_hidden = Config_GetBool("explorer.show_hidden", false);
+
+  for (int i = 0; i < 2; i++) {
+    layout->panels[i].explorer.show_hidden = show_hidden;
+
+    /* Refresh terminal config */
+    TerminalPanel_RefreshConfig(&layout->panels[i].terminal);
+
+    /* Config_Poll happens before update/render, so checking directory again
+       to handle new file visibility */
+    Explorer_Refresh(&layout->panels[i].explorer);
+  }
 }
 
 void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
+  /* Update drag and drop system */
+  DragDrop_Update(&layout->drag_drop, ui, layout, Platform_GetTimeMs(), ui->dt);
+
   /* Animate split ratio towards target */
   f32 diff = layout->target_split_ratio - layout->split_ratio;
   if (!g_animations_enabled) {
@@ -154,11 +180,27 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
                          (u32)i == layout->active_panel_idx, bounds.h);
   }
 
-  /* Update explorer only if it has focus (keys not consumed by terminal) */
+  /* Update explorer only if it has focus (keys not consumed by terminal or
+   * modal) */
+  /* Note: INPUT_TARGET_DIALOG means explorer dialogs (rename, delete), not
+   * global modals */
   input_target focus = Input_GetFocus();
-  if (focus == INPUT_TARGET_EXPLORER || focus == INPUT_TARGET_DIALOG ||
-      focus == INPUT_TARGET_CONTEXT_MENU) {
-    Explorer_Update(&layout->panels[layout->active_panel_idx].explorer, ui);
+  b32 config_modal_open = layout->show_config_diagnostics;
+  if (!config_modal_open &&
+      (focus == INPUT_TARGET_EXPLORER || focus == INPUT_TARGET_DIALOG ||
+       focus == INPUT_TARGET_CONTEXT_MENU)) {
+    Explorer_Update(&layout->panels[layout->active_panel_idx].explorer, ui,
+                    &layout->drag_drop, layout->active_panel_idx);
+  }
+
+  /* Handle global config diagnostic modal */
+  if (layout->show_config_diagnostics) {
+    if (ui->input.key_pressed[KEY_ESCAPE] ||
+        ui->input.key_pressed[KEY_RETURN]) {
+      layout->show_config_diagnostics = false;
+      UI_EndModal();
+      Input_PopFocus();
+    }
   }
 }
 
@@ -191,7 +233,8 @@ static void RenderPanelWithTerminal(layout_state *layout, ui_context *ui,
 
   /* Render explorer */
   Explorer_Render(&p->explorer, ui, explorer_bounds,
-                  has_focus && !TerminalPanel_HasFocus(&p->terminal));
+                  has_focus && !TerminalPanel_HasFocus(&p->terminal),
+                  &layout->drag_drop, panel_idx);
 
   /* Render terminal if visible */
   if (terminal_height > 0) {
@@ -218,6 +261,12 @@ void Layout_Render(layout_state *layout, ui_context *ui, rect bounds) {
     DrawSplitter(ui, splitter_bounds, hover, layout->dragging);
     RenderPanelWithTerminal(layout, ui, right_bounds, 1);
   }
+
+  /* Render config diagnostic modal if active */
+  ConfigDiagnostics_Render(ui, bounds, layout);
+
+  /* Render drag and drop preview on top of everything */
+  DragDrop_RenderPreview(&layout->drag_drop, ui);
 }
 
 void Layout_SetMode(layout_state *layout, layout_mode mode) {

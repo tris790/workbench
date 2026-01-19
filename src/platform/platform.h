@@ -251,6 +251,20 @@ void Platform_SleepMs(u32 ms);
 void *Platform_GetFramebuffer(platform_window *window);
 void Platform_PresentFrame(platform_window *window);
 
+/* ===== Cursor API ===== */
+
+typedef enum {
+  CURSOR_DEFAULT,
+  CURSOR_POINTER,
+  CURSOR_TEXT,
+  CURSOR_GRAB,     /* Open hand */
+  CURSOR_GRABBING, /* Closed hand / dragging */
+  CURSOR_NO_DROP,  /* Circle with line through it */
+  CURSOR_COPY,     /* Arrow with plus */
+} cursor_type;
+
+void Platform_SetCursor(cursor_type cursor);
+
 /* ===== Platform Initialization ===== */
 
 b32 Platform_Init(void);

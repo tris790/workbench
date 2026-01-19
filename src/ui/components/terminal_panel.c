@@ -6,6 +6,7 @@
  */
 
 #include "terminal_panel.h"
+#include "../../config/config.h"
 #include "../../core/input.h"
 #include "../../core/theme.h"
 #include "../../platform/platform.h"
@@ -77,10 +78,10 @@ void TerminalPanel_Init(terminal_panel_state *state) {
   state->cursor_blink.target = 1.0f;
   state->cursor_blink.speed = 4.0f;
 
-  /* Initialize shell mode - default to native WSH */
-  state->shell_mode = SHELL_WSH;
   state->suggestions = Suggestion_Create(NULL); /* Default history path */
   state->selection_scroll_accumulator = 0.0f;
+
+  TerminalPanel_RefreshConfig(state);
 }
 
 void TerminalPanel_Destroy(terminal_panel_state *state) {
@@ -115,41 +116,46 @@ void TerminalPanel_Toggle(terminal_panel_state *state, const char *cwd) {
       state->terminal =
           Terminal_Create(TERMINAL_DEFAULT_COLS, TERMINAL_DEFAULT_ROWS);
       if (state->terminal) {
-        const char *shell = NULL;
-        if (state->shell_mode == SHELL_FISH) {
-          shell = "fish";
-        } else if (state->shell_mode == SHELL_WSH) {
-          /* Resolve WSH path relative to the current executable */
-          static char wsh_path[FS_MAX_PATH];
-          if (Platform_GetExecutablePath(wsh_path, sizeof(wsh_path))) {
-            /* Replace executable name with 'wsh' or 'wsh.exe' */
-            char *last_slash = strrchr(wsh_path, '/');
+        const char *shell = Config_GetString("terminal.shell", "");
+        if (shell && shell[0] == '\0')
+          shell = NULL;
+
+        if (!shell) {
+          if (state->shell_mode == SHELL_FISH) {
+            shell = "fish";
+          } else if (state->shell_mode == SHELL_WSH) {
+            /* Resolve WSH path relative to the current executable */
+            static char wsh_path[FS_MAX_PATH];
+            if (Platform_GetExecutablePath(wsh_path, sizeof(wsh_path))) {
+              /* Replace executable name with 'wsh' or 'wsh.exe' */
+              char *last_slash = strrchr(wsh_path, '/');
 #ifdef _WIN32
-            char *last_backslash = strrchr(wsh_path, '\\');
-            if (last_backslash > last_slash)
-              last_slash = last_backslash;
+              char *last_backslash = strrchr(wsh_path, '\\');
+              if (last_backslash > last_slash)
+                last_slash = last_backslash;
 #endif
-            if (last_slash) {
+              if (last_slash) {
 #ifdef _WIN32
-              strcpy(last_slash + 1, "wsh.exe");
+                strcpy(last_slash + 1, "wsh.exe");
 #else
-              strcpy(last_slash + 1, "wsh");
+                strcpy(last_slash + 1, "wsh");
 #endif
-              shell = wsh_path;
+                shell = wsh_path;
+              } else {
+                /* Fallback to local build path if everything else fails */
+#ifdef _WIN32
+                shell = ".\\build\\wsh.exe";
+#else
+                shell = "./build/wsh";
+#endif
+              }
             } else {
-              /* Fallback to local build path if everything else fails */
 #ifdef _WIN32
               shell = ".\\build\\wsh.exe";
 #else
               shell = "./build/wsh";
 #endif
             }
-          } else {
-#ifdef _WIN32
-            shell = ".\\build\\wsh.exe";
-#else
-            shell = "./build/wsh";
-#endif
           }
         }
 
@@ -697,9 +703,9 @@ void TerminalPanel_Render(terminal_panel_state *state, ui_context *ui,
   }
 
   /* Calculate cell size based on font */
-  font *mono_font = ui->mono_font; /* TODO: Use dedicated mono font */
-  i32 cell_width = 8;              /* Approximate monospace width */
-  i32 cell_height = 16;            /* Line height */
+  font *mono_font = ui->mono_font;
+  i32 cell_width = 8;   /* Approximate monospace width */
+  i32 cell_height = 16; /* Line height */
 
   if (mono_font) {
     cell_width = Font_MeasureWidth(mono_font, "M");
@@ -912,4 +918,20 @@ b32 TerminalPanel_HasFocus(terminal_panel_state *state) {
   if (!state)
     return false;
   return state->has_focus && state->visible;
+}
+
+void TerminalPanel_RefreshConfig(terminal_panel_state *state) {
+  if (!state)
+    return;
+
+  const char *mode_str = Config_GetString("terminal.shell_mode", "native");
+  if (strcmp(mode_str, "fish") == 0) {
+    state->shell_mode = SHELL_FISH;
+  } else if (strcmp(mode_str, "system") == 0) {
+    state->shell_mode = SHELL_SYSTEM;
+  } else if (strcmp(mode_str, "emulated") == 0) {
+    state->shell_mode = SHELL_EMULATED;
+  } else {
+    state->shell_mode = SHELL_WSH; /* Default to native WSH */
+  }
 }

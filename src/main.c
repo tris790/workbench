@@ -7,6 +7,7 @@
 
 #include "app_args.h"
 #include "commands.h"
+#include "config/config.h"
 #include "core/args.h"
 #include "core/assets_embedded.h"
 #include "core/input.h"
@@ -34,17 +35,20 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  Config_Init();
+
   window_config config = {
       .title = "Workbench",
-      .width = 1280,
-      .height = 720,
+      .width = (i32)Config_GetI64("window.width", 1280),
+      .height = (i32)Config_GetI64("window.height", 720),
       .resizable = true,
-      .maximized = false,
+      .maximized = Config_GetBool("window.maximized", false),
   };
 
   platform_window *window = Platform_CreateWindow(&config);
   if (!window) {
     fprintf(stderr, "Failed to create window\n");
+    Config_Shutdown();
     Platform_Shutdown();
     return 1;
   }
@@ -53,6 +57,7 @@ int main(int argc, char **argv) {
   if (!Font_SystemInit()) {
     fprintf(stderr, "Failed to initialize font system\n");
     Platform_DestroyWindow(window);
+    Config_Shutdown();
     Platform_Shutdown();
     return 1;
   }
@@ -86,33 +91,41 @@ int main(int argc, char **argv) {
   Platform_SetWindowTitle(window, title_with_renderer);
 
   /* Load default font */
+  i32 ui_font_size = (i32)Config_GetI64("ui.font_size", 16);
   font *main_font =
-      Font_LoadFromFile("assets/fonts/JetBrainsMono-Regular.ttf", 16);
+      Font_LoadFromFile("assets/fonts/JetBrainsMono-Regular.ttf", ui_font_size);
   if (!main_font) {
     main_font = Font_LoadFromMemory(asset_font_regular_data,
-                                    asset_font_regular_size, 16);
+                                    asset_font_regular_size, ui_font_size);
   }
 
-  font *mono_font =
-      Font_LoadFromFile("assets/fonts/JetBrainsMono-Regular.ttf", 14);
+  i32 term_font_size = (i32)Config_GetI64("terminal.font_size", 14);
+  font *mono_font = Font_LoadFromFile("assets/fonts/JetBrainsMono-Regular.ttf",
+                                      term_font_size);
   if (!mono_font) {
     mono_font = Font_LoadFromMemory(asset_font_regular_data,
-                                    asset_font_regular_size, 14);
+                                    asset_font_regular_size, term_font_size);
   }
 
   renderer.default_font = main_font;
   if (!main_font) {
     fprintf(stderr,
             "Fatal: Could not load ui font (neither file nor embedded)\n");
+    Config_Shutdown();
+    Platform_DestroyWindow(window);
+    Font_SystemShutdown();
+    Platform_Shutdown();
     return 1;
   }
 
   /* Get theme */
+  Theme_InitFromConfig();
   const theme *th = Theme_GetDefault();
 
   /* Initialize UI context */
   ui_context ui = {0};
   UI_Init(&ui, &renderer, th, main_font, mono_font);
+  ui.window_focused = true; /* Assume focused on start */
 
   /* Initialize memory arena for file system */
   void *arena_memory = malloc(Megabytes(64));
@@ -147,6 +160,11 @@ int main(int argc, char **argv) {
 
   /* Initialize Input System */
   Input_Init();
+
+  if (Config_HasErrors()) {
+    layout.show_config_diagnostics = true;
+    Input_PushFocus(INPUT_TARGET_DIALOG);
+  }
 
   KeyRepeat_Init();
 
@@ -273,6 +291,7 @@ int main(int argc, char **argv) {
         }
         input.mouse_pos.x = event.data.mouse.x;
         input.mouse_pos.y = event.data.mouse.y;
+        input.modifiers = event.data.mouse.modifiers;
         break;
 
       case EVENT_MOUSE_BUTTON_UP:
@@ -282,6 +301,7 @@ int main(int argc, char **argv) {
         }
         input.mouse_pos.x = event.data.mouse.x;
         input.mouse_pos.y = event.data.mouse.y;
+        input.modifiers = event.data.mouse.modifiers;
         break;
 
       case EVENT_MOUSE_MOVE:
@@ -298,8 +318,63 @@ int main(int argc, char **argv) {
         win_height = event.data.resize.height;
         break;
 
+      case EVENT_WINDOW_FOCUS:
+        ui.window_focused = true;
+        break;
+
+      case EVENT_WINDOW_UNFOCUS:
+        ui.window_focused = false;
+        break;
+
       default:
         break;
+      }
+    }
+
+    /* Poll for configuration changes */
+    if (Config_Poll()) {
+      printf("Configuration reloaded due to file change\n");
+      Theme_InitFromConfig();
+      /* Update explorer settings */
+      Layout_RefreshConfig(&layout);
+
+      /* Reload fonts */
+      i32 ui_font_size = (i32)Config_GetI64("ui.font_size", 16);
+      i32 term_font_size = (i32)Config_GetI64("terminal.font_size", 14);
+
+      font *new_main = Font_LoadFromFile(
+          "assets/fonts/JetBrainsMono-Regular.ttf", ui_font_size);
+      if (!new_main) {
+        new_main = Font_LoadFromMemory(asset_font_regular_data,
+                                       asset_font_regular_size, ui_font_size);
+      }
+
+      font *new_mono = Font_LoadFromFile(
+          "assets/fonts/JetBrainsMono-Regular.ttf", term_font_size);
+      if (!new_mono) {
+        new_mono = Font_LoadFromMemory(asset_font_regular_data,
+                                       asset_font_regular_size, term_font_size);
+      }
+
+      if (new_main && new_mono) {
+        if (main_font)
+          Font_Free(main_font);
+        if (mono_font)
+          Font_Free(mono_font);
+
+        main_font = new_main;
+        mono_font = new_mono;
+
+        ui.main_font = main_font;
+        ui.mono_font = mono_font;
+        renderer.default_font = main_font;
+      } else {
+        /* If loading failed, cleanup whatever succeeded to avoid leaks/partial
+         * state */
+        if (new_main)
+          Font_Free(new_main);
+        if (new_mono)
+          Font_Free(new_mono);
       }
     }
 
@@ -390,6 +465,7 @@ int main(int argc, char **argv) {
   Platform_Shutdown();
   free(arena_memory);
 
+  Config_Shutdown();
   printf("Workbench shutdown complete\n");
   return 0;
 }

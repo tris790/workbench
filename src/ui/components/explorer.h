@@ -13,6 +13,7 @@
 #include "../../core/text.h"
 #include "../ui.h"
 #include "quick_filter.h"
+#include "scroll_container.h"
 
 /* ===== Explorer State ===== */
 
@@ -40,7 +41,7 @@ typedef struct explorer_state_s {
   i32 history_count; /* Total valid items in history */
 
   /* UI state */
-  ui_scroll_state scroll;
+  scroll_container_state scroll;
   i32 item_height;
   b32 show_hidden;
   b32 show_size_column;
@@ -97,12 +98,16 @@ void Explorer_Shutdown(explorer_state *state);
 /* Poll file watcher for external changes (call for ALL panels each frame) */
 void Explorer_PollWatcher(explorer_state *state);
 
+struct drag_drop_state_s;
+
 /* Update explorer (call each frame, handles input) */
-void Explorer_Update(explorer_state *state, ui_context *ui);
+void Explorer_Update(explorer_state *state, ui_context *ui,
+                     struct drag_drop_state_s *drag, u32 panel_idx);
 
 /* Render explorer panel in given bounds */
 void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
-                     b32 has_focus);
+                     b32 has_focus, struct drag_drop_state_s *drag,
+                     u32 panel_idx);
 
 /* Navigate to specific path */
 /* Navigate to specific path. If keep_filter is true, clears filter buffer but

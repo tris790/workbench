@@ -9,7 +9,7 @@
 /* ===== Default Dark Theme ===== */
 
 /* Catppuccin Mocha inspired */
-static const theme g_dark_theme = {
+static theme g_dark_theme = {
     /* Background colors */
     .background = {30, 30, 46, 255}, /* #1E1E2E */
     .panel = {36, 36, 54, 255},      /* #24243E */
@@ -56,6 +56,71 @@ static const theme g_dark_theme = {
 /* ===== Current Theme State ===== */
 
 static const theme *g_current_theme = &g_dark_theme;
+
+/* ===== Theme config integration ===== */
+#include "../config/config.h"
+#include <string.h>
+
+static int HexDigit(char c) {
+  if (c >= '0' && c <= '9')
+    return c - '0';
+  if (c >= 'a' && c <= 'f')
+    return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F')
+    return c - 'A' + 10;
+  return -1;
+}
+
+static b32 ParseColor(const char *hex, color *out) {
+  if (!hex || hex[0] != '#')
+    return false;
+  hex++;
+  size_t len = strlen(hex);
+  if (len != 6 && len != 8)
+    return false;
+
+  int r1 = HexDigit(hex[0]);
+  int r2 = HexDigit(hex[1]);
+  int g1 = HexDigit(hex[2]);
+  int g2 = HexDigit(hex[3]);
+  int b1 = HexDigit(hex[4]);
+  int b2 = HexDigit(hex[5]);
+
+  if (r1 < 0 || r2 < 0 || g1 < 0 || g2 < 0 || b1 < 0 || b2 < 0)
+    return false;
+
+  out->r = (u8)(r1 * 16 + r2);
+  out->g = (u8)(g1 * 16 + g2);
+  out->b = (u8)(b1 * 16 + b2);
+  out->a = 255;
+
+  if (len == 8) {
+    int a1 = HexDigit(hex[6]);
+    int a2 = HexDigit(hex[7]);
+    if (a1 < 0 || a2 < 0)
+      return false;
+    out->a = (u8)(a1 * 16 + a2);
+  }
+  return true;
+}
+
+void Theme_InitFromConfig(void) {
+  const char *val;
+  color c;
+
+  if ((val = Config_GetString("theme.background", NULL)) && ParseColor(val, &c))
+    g_dark_theme.background = c;
+  if ((val = Config_GetString("theme.panel", NULL)) && ParseColor(val, &c))
+    g_dark_theme.panel = c;
+  if ((val = Config_GetString("theme.text", NULL)) && ParseColor(val, &c))
+    g_dark_theme.text = c;
+  if ((val = Config_GetString("theme.accent", NULL)) && ParseColor(val, &c)) {
+    g_dark_theme.accent = c;
+    /* Auto-generate hover/active states for accent */
+    g_dark_theme.accent_hover = Color_Lighten(c, 0.2f);
+    g_dark_theme.accent_active = Color_Darken(c, 0.2f);
+  }
+}
 
 /* ===== Theme API ===== */
 

@@ -62,6 +62,9 @@ typedef struct {
 /* Get default dark theme */
 const theme *Theme_GetDefault(void);
 
+/* Initialize theme from config */
+void Theme_InitFromConfig(void);
+
 /* Get current active theme */
 const theme *Theme_GetCurrent(void);
 

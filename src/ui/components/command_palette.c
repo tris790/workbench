@@ -6,6 +6,7 @@
  */
 
 #include "command_palette.h"
+#include "../../config/config.h"
 #include "../../core/fuzzy_match.h"
 #include "../../core/input.h"
 #include "../../core/text.h"
@@ -58,14 +59,22 @@ static void PopulateCommandItems(command_palette_state *state) {
        i < state->command_count && state->item_count < PALETTE_MAX_ITEMS; i++) {
     palette_command *cmd = &state->commands[i];
 
-    /* Filter by query */
-    if (query[0] != '\0' && !FuzzyMatch(query, cmd->name)) {
+    char display_name[256];
+    snprintf(display_name, sizeof(display_name), "%s", cmd->name);
+
+    /* Contextual rename: Config: Reload -> Config: Upgrade */
+    if (strcmp(cmd->name, "Config: Reload") == 0 && Config_NeedsUpgrade()) {
+      snprintf(display_name, sizeof(display_name), "Config: Upgrade");
+    }
+
+    /* Filter by query using the display name (so searching "Upgrade" works) */
+    if (query[0] != '\0' && !FuzzyMatch(query, display_name)) {
       continue;
     }
 
     palette_item *item = &state->items[state->item_count];
     memset(item, 0, sizeof(*item));
-    snprintf(item->label, sizeof(item->label), "%s", cmd->name);
+    snprintf(item->label, sizeof(item->label), "%s", display_name);
     snprintf(item->shortcut, sizeof(item->shortcut), "%s", cmd->shortcut);
     snprintf(item->category, sizeof(item->category), "%s", cmd->category);
     item->icon = FILE_ICON_UNKNOWN; /* Commands don't have file icons */
