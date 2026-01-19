@@ -725,6 +725,14 @@ void TerminalPanel_Render(terminal_panel_state *state, ui_context *ui,
       state->terminal->rows != visible_rows) {
     if (visible_cols > 10 && visible_rows > 2) {
       Terminal_Resize(state->terminal, visible_cols, visible_rows);
+
+      /* Send resize event to shell via escape sequence for Windows/WSH support
+       */
+      /* Format: ESC [ 8 ; {rows} ; {cols} t */
+      char resize_seq[64];
+      snprintf(resize_seq, sizeof(resize_seq), "\x1b[8;%u;%ut", visible_rows,
+               visible_cols);
+      Terminal_Write(state->terminal, resize_seq, (u32)strlen(resize_seq));
     }
   }
 

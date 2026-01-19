@@ -380,7 +380,12 @@ void WSH_REPL_Run(wsh_state_t *state) {
 
   b32 needs_refresh = true;
   EscState esc_state = ESC_STATE_NORMAL;
-  char csi_param = 0;
+
+/* CSI Parser State */
+#define MAX_CSI_PARAMS 4
+  int csi_params[MAX_CSI_PARAMS] = {0};
+  int csi_param_count = 0;
+  int csi_current_param = 0;
 
   while (state->running) {
     if (needs_refresh) {
@@ -406,7 +411,10 @@ void WSH_REPL_Run(wsh_state_t *state) {
     if (esc_state == ESC_STATE_ESC) {
       if (c == '[') {
         esc_state = ESC_STATE_CSI;
-        csi_param = 0;
+        /* Reset params */
+        memset(csi_params, 0, sizeof(csi_params));
+        csi_param_count = 0;
+        csi_current_param = 0;
         continue;
       } else if (c == '\r' || c == '\n') { /* Alt+Enter */
         buffer_insert(&ib, '\n');
@@ -426,8 +434,19 @@ void WSH_REPL_Run(wsh_state_t *state) {
       }
     } else if (esc_state == ESC_STATE_CSI) {
       if (isdigit((unsigned char)c)) {
-        csi_param = c;
+        csi_current_param = csi_current_param * 10 + (c - '0');
         continue;
+      } else if (c == ';') {
+        if (csi_param_count < MAX_CSI_PARAMS) {
+          csi_params[csi_param_count++] = csi_current_param;
+        }
+        csi_current_param = 0;
+        continue;
+      }
+
+      /* Finalize last param */
+      if (csi_param_count < MAX_CSI_PARAMS) {
+        csi_params[csi_param_count++] = csi_current_param;
       }
 
       switch (c) {
@@ -473,11 +492,21 @@ void WSH_REPL_Run(wsh_state_t *state) {
         }
         break;
       case '~':
-        if (csi_param == '3') { /* Delete */
+        if (csi_params[0] == 3) { /* Delete */
           buffer_delete_at(&ib);
           if (state->pager.active)
             WSH_Pager_Clear(&state->pager);
           history_idx = -1;
+        }
+        break;
+      case 't':                   /* Window manipulation */
+        if (csi_params[0] == 8) { /* Resize: 8;rows;cols */
+          if (csi_param_count >= 3) {
+            state->rows = (u32)csi_params[1];
+            state->cols = (u32)csi_params[2];
+            /* We could force a refresh or similar here if we wanted */
+            /* printf("Resized to %dx%d\n", state->rows, state->cols); */
+          }
         }
         break;
       }

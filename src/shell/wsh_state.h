@@ -21,6 +21,8 @@ typedef struct {
   char cwd[4096];
   b32 running;
   i32 last_exit_code;
+  u32 rows;
+  u32 cols;
 
   /* History */
   wsh_history_t history;

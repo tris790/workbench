@@ -233,9 +233,16 @@ int main(int argc, char **argv) {
         }
 
         /* Toggle Terminal with ` (backtick) */
-        if (event.data.keyboard.key == KEY_GRAVE &&
-            !(event.data.keyboard.modifiers &
-              (MOD_CTRL | MOD_ALT | MOD_SHIFT))) {
+        /* Check either physical key (for Linux forced US mapping) or produced
+         * character (for Windows international) */
+        bool is_grave = (event.data.keyboard.key == KEY_GRAVE &&
+                         !(event.data.keyboard.modifiers &
+                           (MOD_CTRL | MOD_ALT | MOD_SHIFT)));
+        bool is_backtick_char =
+            (event.data.keyboard.character == '`' &&
+             !(event.data.keyboard.modifiers & (MOD_CTRL | MOD_ALT)));
+
+        if (is_grave || is_backtick_char) {
           Layout_ToggleTerminal(&layout);
           consumed = true;
         }

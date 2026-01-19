@@ -14,6 +14,8 @@ wsh_state_t *WSH_State_Create(int argc, char **argv, char **envp) {
 
   memset(state, 0, sizeof(wsh_state_t));
   state->running = true;
+  state->rows = 24;
+  state->cols = 80;
 
   /* Initialize environment */
   state->env_capacity = 64;
