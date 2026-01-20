@@ -249,43 +249,65 @@ typedef struct {
   const char *name;
   const char *shortcut;
   const char *category;
+  const char *tags;
   void (*callback)(void *);
 } CommandDef;
 
 static const CommandDef g_commands[] = {
-    {"File: Copy Name", "palette", "File", Cmd_FileCopyName},
-    {"File: Copy Path", "palette", "File", Cmd_FileCopyPath},
-    {"File: Copy Relative Path", "palette", "File", Cmd_FileCopyRelativePath},
-    {"File: Delete", "Delete", "File", Cmd_FileDelete},
-    {"File: Duplicate", "palette", "File", Cmd_FileDuplicate},
-    {"File: New File", "palette", "File", Cmd_FileNewFile},
-    {"File: New Folder", "palette", "File", Cmd_FileNewFolder},
-    {"File: Refresh", "palette", "File", Cmd_FileRefresh},
-    {"File: Rename", "F2", "File", Cmd_FileRename},
-    {"File: Toggle Hidden Files", "Ctrl + .", "File", Cmd_ToggleHiddenFiles},
+    {"File: Copy Name", "palette", "File", "name", Cmd_FileCopyName},
+    {"File: Copy Path", "palette", "File", "path location", Cmd_FileCopyPath},
+    {"File: Copy Relative Path", "palette", "File", "path relative",
+     Cmd_FileCopyRelativePath},
+    {"File: Delete", "Delete", "File", "remove trash delete erase",
+     Cmd_FileDelete},
+    {"File: Duplicate", "palette", "File", "copy clone duplicate",
+     Cmd_FileDuplicate},
+    {"File: New File", "palette", "File", "add create new file",
+     Cmd_FileNewFile},
+    {"File: New Folder", "palette", "File", "add create directory mkdir folder",
+     Cmd_FileNewFolder},
+    {"File: Refresh", "palette", "File", "reload update refresh",
+     Cmd_FileRefresh},
+    {"File: Rename", "F2", "File", "move rename", Cmd_FileRename},
+    {"File: Toggle Hidden Files", "Ctrl + .", "File", "dot hide visible hidden",
+     Cmd_ToggleHiddenFiles},
 
-    {"Nav: Focus Path", "palette", "Navigation", Cmd_NavFocusPath},
-    {"Nav: Go Back", "Alt + Left", "Navigation", Cmd_NavBack},
-    {"Nav: Go Forward", "Alt + Right", "Navigation", Cmd_NavForward},
-    {"Nav: Go Home", "palette", "Navigation", Cmd_NavHome},
-    {"Nav: Go to Parent", "Alt + Up", "Navigation", Cmd_NavParent},
-    {"Nav: Go to Root", "palette", "Navigation", Cmd_NavRoot},
+    {"Nav: Focus Path", "palette", "Navigation", "filter search focus path",
+     Cmd_NavFocusPath},
+    {"Nav: Go Back", "Alt + Left", "Navigation", "history back", Cmd_NavBack},
+    {"Nav: Go Forward", "Alt + Right", "Navigation", "history forward",
+     Cmd_NavForward},
+    {"Nav: Go Home", "palette", "Navigation", "user desk home", Cmd_NavHome},
+    {"Nav: Go to Parent", "Alt + Up", "Navigation", "back up level parent",
+     Cmd_NavParent},
+    {"Nav: Go to Root", "palette", "Navigation", "slash base root",
+     Cmd_NavRoot},
 
-    {"System: Open Default", "Enter", "System", Cmd_SystemOpenDefault},
+    {"System: Open Default", "Enter", "System", "execute run open",
+     Cmd_SystemOpenDefault},
 
-    {"Terminal: Clear", "Ctrl + L", "Terminal", Cmd_TerminalClear},
-    {"Terminal: Toggle", "`", "Terminal", Cmd_TerminalToggle},
+    {"Terminal: Clear", "Ctrl + L", "Terminal", "reset console clear",
+     Cmd_TerminalClear},
+    {"Terminal: Toggle", "`", "Terminal", "show hide console terminal",
+     Cmd_TerminalToggle},
 
-    {"UI: Toggle Animations", "Ctrl + Alt + A", "UI", Cmd_ToggleAnimations},
+    {"UI: Toggle Animations", "Ctrl + Alt + A", "UI",
+     "motion graphics animation", Cmd_ToggleAnimations},
 
-    {"View: Focus Next Pane", "Ctrl + Tab", "Layout", Cmd_ViewFocusNextPane},
-    {"View: Toggle Fullscreen", "F11", "View", Cmd_ViewToggleFullscreen},
-    {"View: Toggle Split", "Ctrl + \\", "Layout", Cmd_ViewToggleSplit},
+    {"View: Focus Next Pane", "Ctrl + Tab", "Layout", "switch panel tab pane",
+     Cmd_ViewFocusNextPane},
+    {"View: Toggle Fullscreen", "F11", "View", "maximize fullscreen",
+     Cmd_ViewToggleFullscreen},
+    {"View: Toggle Split", "Ctrl + \\", "Layout", "divide panel dual split",
+     Cmd_ViewToggleSplit},
 
-    {"Window: Quit", "Ctrl + Q", "Window", Cmd_WindowQuit},
-    {"Config: Reload", "palette", "Config", Cmd_ConfigReload},
-    {"Config: Show Diagnostics", "palette", "Config", Cmd_ConfigDiagnostics},
-    {"Config: Open File", "palette", "Config", Cmd_ConfigOpenFile},
+    {"Window: Quit", "Ctrl + Q", "Window", "exit close quit", Cmd_WindowQuit},
+    {"Config: Reload", "palette", "Config",
+     "settings preferences reload config", Cmd_ConfigReload},
+    {"Config: Show Diagnostics", "palette", "Config",
+     "settings health errors diagnostics", Cmd_ConfigDiagnostics},
+    {"Config: Open File", "palette", "Config",
+     "settings edit workbench.ini configuration", Cmd_ConfigOpenFile},
 };
 
 void Commands_Register(command_palette_state *palette) {
@@ -295,6 +317,6 @@ void Commands_Register(command_palette_state *palette) {
     const char *shortcut =
         strcmp(cmd->shortcut, "palette") == 0 ? "" : cmd->shortcut;
     CommandPalette_RegisterCommand(palette, cmd->name, shortcut, cmd->category,
-                                   cmd->callback, NULL);
+                                   cmd->tags, cmd->callback, NULL);
   }
 }

@@ -59,7 +59,17 @@ static void PopulateCommandItems(command_palette_state *state) {
     palette_command *cmd = &state->commands[i];
 
     /* Filter by query */
-    if (query[0] != '\0' && !FuzzyMatch(query, cmd->name)) {
+    b32 match = false;
+    if (query[0] == '\0') {
+      match = true;
+    } else {
+      /* Match name OR tags */
+      if (FuzzyMatch(query, cmd->name) || FuzzyMatch(query, cmd->tags)) {
+        match = true;
+      }
+    }
+
+    if (!match) {
       continue;
     }
 
@@ -68,6 +78,7 @@ static void PopulateCommandItems(command_palette_state *state) {
     snprintf(item->label, sizeof(item->label), "%s", cmd->name);
     snprintf(item->shortcut, sizeof(item->shortcut), "%s", cmd->shortcut);
     snprintf(item->category, sizeof(item->category), "%s", cmd->category);
+    snprintf(item->tags, sizeof(item->tags), "%s", cmd->tags);
     item->icon = FILE_ICON_UNKNOWN; /* Commands don't have file icons */
     item->is_file = false;
     item->callback = cmd->callback;
@@ -120,7 +131,7 @@ void CommandPalette_Init(command_palette_state *state, fs_state *fs) {
 
 void CommandPalette_RegisterCommand(command_palette_state *state,
                                     const char *name, const char *shortcut,
-                                    const char *category,
+                                    const char *category, const char *tags,
                                     command_callback callback,
                                     void *user_data) {
   if (state->command_count >= PALETTE_MAX_COMMANDS)
@@ -132,6 +143,7 @@ void CommandPalette_RegisterCommand(command_palette_state *state,
            shortcut ? shortcut : "");
   snprintf(cmd->category, sizeof(cmd->category), "%s",
            category ? category : "");
+  snprintf(cmd->tags, sizeof(cmd->tags), "%s", tags ? tags : "");
   cmd->callback = callback;
   cmd->user_data = user_data;
 

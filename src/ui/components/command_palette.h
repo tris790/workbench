@@ -35,6 +35,7 @@ typedef struct {
   char label[256];
   char shortcut[PALETTE_MAX_SHORTCUT]; /* e.g. "Ctrl + H" */
   char category[64];                   /* e.g. "commonly used" */
+  char tags[256];                      /* e.g. "settings config options" */
   file_icon_type icon;
   command_callback callback;
   void *user_data;
@@ -46,6 +47,7 @@ typedef struct {
   char name[256];
   char shortcut[PALETTE_MAX_SHORTCUT];
   char category[64];
+  char tags[256];
   command_callback callback;
   void *user_data;
 } palette_command;
@@ -92,7 +94,7 @@ void CommandPalette_Init(command_palette_state *state, fs_state *fs);
 /* Register a command */
 void CommandPalette_RegisterCommand(command_palette_state *state,
                                     const char *name, const char *shortcut,
-                                    const char *category,
+                                    const char *category, const char *tags,
                                     command_callback callback, void *user_data);
 
 /* Open palette in specified mode */
