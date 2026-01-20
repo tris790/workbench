@@ -107,7 +107,13 @@ static const char *DEFAULT_CONFIG_CONTENT =
     "terminal.scrollback_lines = 10000\n"
     "\n"
     "# Theme overrides (hex colors use 0x prefix)\n"
-    "# theme.accent_color = 0x4A9EFF\n";
+    "# theme.accent_color = 0x4A9EFF\n"
+    "\n"
+    "# Custom Context Menu Items (Key is label, value is command)\n"
+    "# %filepath will be replaced with the path of the right-clicked item\n"
+    "# context_menu.custom.Open in Code = code %filepath\n"
+    "# context_menu.custom.Open Terminal Here = ghostty "
+    "--working-directory=%filepath\n";
 
 b32 ConfigParser_Load(void) {
   const char *path = ConfigParser_GetPath();

@@ -3,13 +3,6 @@
 
 #include "config.h"
 
-typedef enum {
-  CONFIG_TYPE_BOOL,
-  CONFIG_TYPE_I64,
-  CONFIG_TYPE_F64,
-  CONFIG_TYPE_STRING
-} ConfigValueType;
-
 typedef struct {
   char key[256];
   ConfigValueType type;

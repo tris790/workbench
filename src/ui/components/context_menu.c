@@ -6,10 +6,12 @@
  */
 
 #include "context_menu.h"
+#include "../../config/config.h"
+#include "../../core/input.h"
+#include "../../platform/platform.h"
 #include "explorer.h"
-#include "input.h"
-#include "platform.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* ===== Forward Declarations for Actions ===== */
@@ -22,6 +24,8 @@ static void Action_Delete(void *user_data);
 static void Action_CopyPath(void *user_data);
 static void Action_NewFile(void *user_data);
 static void Action_NewDir(void *user_data);
+static void Action_CustomCommand(void *user_data);
+static void PopulateCustomItems(context_menu_state *state);
 
 /* Global reference to context menu for actions */
 static context_menu_state *g_menu = NULL;
@@ -78,7 +82,9 @@ static void PopulateFileMenu(context_menu_state *state) {
   AddMenuItem(state, labels.cut, "Ctrl+X", Action_Cut, state, false);
   AddMenuItem(state, "Rename", "F2", Action_Rename, state, false);
   AddMenuItem(state, labels.delete_item, "Del", Action_Delete, state, true);
-  AddMenuItem(state, "Copy Path", "", Action_CopyPath, state, false);
+  AddMenuItem(state, "Copy Path", "", Action_CopyPath, state, true);
+
+  PopulateCustomItems(state);
 }
 
 static void PopulateDirectoryMenu(context_menu_state *state) {
@@ -93,7 +99,9 @@ static void PopulateDirectoryMenu(context_menu_state *state) {
   AddMenuItem(state, labels.copy, "Ctrl+C", Action_Copy, state, false);
   AddMenuItem(state, labels.cut, "Ctrl+X", Action_Cut, state, false);
   AddMenuItem(state, labels.delete_item, "Del", Action_Delete, state, true);
-  AddMenuItem(state, "Copy Path", "", Action_CopyPath, state, false);
+  AddMenuItem(state, "Copy Path", "", Action_CopyPath, state, true);
+
+  PopulateCustomItems(state);
 }
 
 static void PopulateEmptyMenu(context_menu_state *state) {
@@ -101,7 +109,36 @@ static void PopulateEmptyMenu(context_menu_state *state) {
   AddMenuItem(state, "New File", "Ctrl+N", Action_NewFile, state, false);
   AddMenuItem(state, "New Directory", "Ctrl+Shift+N", Action_NewDir, state,
               true);
-  AddMenuItem(state, "Paste", "Ctrl+V", Action_Paste, state, false);
+  AddMenuItem(state, "Paste", "Ctrl+V", Action_Paste, state, true);
+
+  PopulateCustomItems(state);
+}
+
+static void PopulateCustomItems(context_menu_state *state) {
+  i32 entry_count = Config_GetEntryCount();
+  for (i32 i = 0; i < entry_count; i++) {
+    const char *key = Config_GetEntryKey(i);
+    if (key && strncmp(key, "context_menu.custom.", 20) == 0) {
+      if (Config_GetEntryType(i) != CONFIG_TYPE_STRING)
+        continue;
+
+      const char *label = key + 20;
+      const char *command = Config_GetString(key, "");
+
+      if (command[0] != '\0' && state->custom_command_count < 8) {
+        /* Store command template */
+        strncpy(state->custom_commands[state->custom_command_count], command,
+                sizeof(state->custom_commands[0]) - 1);
+        state->custom_commands[state->custom_command_count]
+                              [sizeof(state->custom_commands[0]) - 1] = '\0';
+
+        /* Add to menu */
+        AddMenuItem(state, label, "", Action_CustomCommand,
+                    state->custom_commands[state->custom_command_count], false);
+        state->custom_command_count++;
+      }
+    }
+  }
 }
 
 static void ContextMenu_ExecuteSelectedItem(context_menu_state *state) {
@@ -148,6 +185,8 @@ void ContextMenu_Show(context_menu_state *state, v2i position,
   } else {
     state->target_path[0] = '\0';
   }
+
+  state->custom_command_count = 0;
 
   /* Populate menu based on context type */
   switch (type) {
@@ -490,4 +529,51 @@ static void Action_NewDir(void *user_data) {
   if (state->explorer) {
     Explorer_StartCreateDir(state->explorer);
   }
+}
+
+static void Action_CustomCommand(void *user_data) {
+  context_menu_state *state = g_menu;
+  const char *command_template = (const char *)user_data;
+  if (!state || !command_template)
+    return;
+
+  char command[1024];
+
+  /* Substitution: %filepath -> target_path */
+  const char *placeholder = strstr(command_template, "%filepath");
+  if (placeholder) {
+    usize prefix_len = (usize)(placeholder - command_template);
+    if (prefix_len > sizeof(command) - 1)
+      prefix_len = sizeof(command) - 1;
+
+    memcpy(command, command_template, prefix_len);
+    command[prefix_len] = '\0';
+
+    strncat(command, state->target_path, sizeof(command) - strlen(command) - 1);
+    strncat(command, placeholder + 9, sizeof(command) - strlen(command) - 1);
+  } else {
+    strncpy(command, command_template, sizeof(command) - 1);
+    command[sizeof(command) - 1] = '\0';
+  }
+
+  /* Set working directory to the target path's directory or the path itself if
+   * it's a directory */
+  char working_dir[FS_MAX_PATH] = {0};
+  if (state->target_path[0] != '\0') {
+    strncpy(working_dir, state->target_path, sizeof(working_dir) - 1);
+    if (!Platform_IsDirectory(working_dir)) {
+      /* Strip filename to get directory */
+      char *last_sep = strrchr(working_dir, '/');
+#ifdef _WIN32
+      char *win_sep = strrchr(working_dir, '\\');
+      if (win_sep > last_sep)
+        last_sep = win_sep;
+#endif
+      if (last_sep) {
+        *last_sep = '\0';
+      }
+    }
+  }
+
+  Platform_SpawnProcess(command, working_dir[0] != '\0' ? working_dir : NULL);
 }

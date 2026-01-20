@@ -3,6 +3,13 @@
 
 #include "../core/types.h"
 
+typedef enum {
+  CONFIG_TYPE_BOOL,
+  CONFIG_TYPE_I64,
+  CONFIG_TYPE_F64,
+  CONFIG_TYPE_STRING
+} ConfigValueType;
+
 /* Lifecycle */
 b32 Config_Init(void); /* Load from disk */
 void Config_Shutdown(void);
@@ -20,6 +27,11 @@ void Config_SetBool(const char *key, b32 value);
 void Config_SetI64(const char *key, i64 value);
 void Config_SetF64(const char *key, f64 value);
 void Config_SetString(const char *key, const char *value);
+
+/* Entry access */
+i32 Config_GetEntryCount(void);
+const char *Config_GetEntryKey(i32 index);
+ConfigValueType Config_GetEntryType(i32 index);
 
 /* Diagnostics */
 b32 Config_HasErrors(void);

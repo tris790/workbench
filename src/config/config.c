@@ -263,3 +263,13 @@ ConfigEntry *Config_GetEntry(i32 index) {
   }
   return NULL;
 }
+
+const char *Config_GetEntryKey(i32 index) {
+  ConfigEntry *entry = Config_GetEntry(index);
+  return entry ? entry->key : NULL;
+}
+
+ConfigValueType Config_GetEntryType(i32 index) {
+  ConfigEntry *entry = Config_GetEntry(index);
+  return entry ? entry->type : CONFIG_TYPE_STRING;
+}

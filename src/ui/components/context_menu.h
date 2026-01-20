@@ -13,7 +13,7 @@
 
 /* ===== Configuration ===== */
 
-#define CONTEXT_MENU_MAX_ITEMS 16
+#define CONTEXT_MENU_MAX_ITEMS 32
 
 /* Forward declaration for explorer */
 struct explorer_state_s;
@@ -61,6 +61,10 @@ typedef struct context_menu_state_s {
   /* Cached dimensions */
   i32 item_height;
   i32 menu_width;
+
+  /* Custom commands storage */
+  char custom_commands[8][256]; /* Labels or command templates */
+  i32 custom_command_count;
 
   /* References for action callbacks (set when menu is shown) */
   struct explorer_state_s *explorer;
