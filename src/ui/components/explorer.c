@@ -155,6 +155,22 @@ void Explorer_Init(explorer_state *state, memory_arena *arena) {
   state->show_size_column = true;
   state->show_date_column = false;
 
+  /* Load sort settings */
+  const char *sort_type_str = Config_GetString("explorer.sort_type", "name");
+  if (strcmp(sort_type_str, "size") == 0)
+    state->fs.sort_by = SORT_BY_SIZE;
+  else if (strcmp(sort_type_str, "date") == 0)
+    state->fs.sort_by = SORT_BY_DATE;
+  else
+    state->fs.sort_by = SORT_BY_NAME;
+
+  const char *sort_order_str =
+      Config_GetString("explorer.sort_order", "ascending");
+  if (strcmp(sort_order_str, "descending") == 0)
+    state->fs.sort_dir = SORT_DESCENDING;
+  else
+    state->fs.sort_dir = SORT_ASCENDING;
+
   /* Initialize scroll container */
   ScrollContainer_Init(&state->scroll);
 

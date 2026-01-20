@@ -37,6 +37,12 @@ typedef enum {
   FILE_ICON_COUNT
 } file_icon_type;
 
+/* ===== Sort Options ===== */
+
+typedef enum { SORT_BY_NAME = 0, SORT_BY_SIZE, SORT_BY_DATE } sort_type;
+
+typedef enum { SORT_ASCENDING = 0, SORT_DESCENDING } sort_order;
+
 /* ===== File Entry ===== */
 
 typedef struct {
@@ -56,6 +62,9 @@ typedef struct {
   u32 entry_count;
   u32 entry_capacity;
   i32 selected_index; /* Primary selection (for single-click nav) */
+
+  sort_type sort_by;   /* Current sort field */
+  sort_order sort_dir; /* Current sort direction */
 
   /* === NEW: Multi-selection support === */
   u8 selected[FS_MAX_ENTRIES / 8]; /* Bitmask: 1 bit per entry */
@@ -79,6 +88,12 @@ b32 FS_NavigateUp(fs_state *state);
 
 /* Navigate into selected directory */
 b32 FS_NavigateInto(fs_state *state);
+
+/* Set sort options and re-sort the directory */
+void FS_SetSortOptions(fs_state *state, sort_type type, sort_order order);
+
+/* Re-sort the current entries using current state sort options */
+void FS_Resort(fs_state *state);
 
 /* Get currently selected entry (NULL if none) */
 fs_entry *FS_GetSelectedEntry(fs_state *state);

@@ -72,6 +72,8 @@ static void SetDefaults(void) {
   Config_SetF64("ui.scroll_speed", 3.0);
   Config_SetBool("explorer.show_hidden", (b32) false);
   Config_SetBool("explorer.confirm_delete", (b32) true);
+  Config_SetString("explorer.sort_type", "name");
+  Config_SetString("explorer.sort_order", "ascending");
   Config_SetI64("terminal.font_size", 14);
   Config_SetI64("terminal.scrollback_lines", 10000);
 }

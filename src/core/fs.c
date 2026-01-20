@@ -231,6 +231,9 @@ file_icon_type FS_GetIconType(const char *filename, b32 is_directory) {
 
 /* ===== Sorting ===== */
 
+static sort_type g_sort_type = SORT_BY_NAME;
+static sort_order g_sort_order = SORT_ASCENDING;
+
 static int CompareEntries(const void *a, const void *b) {
   const fs_entry *ea = (const fs_entry *)a;
   const fs_entry *eb = (const fs_entry *)b;
@@ -247,8 +250,34 @@ static int CompareEntries(const void *a, const void *b) {
   if (strcmp(eb->name, "..") == 0)
     return 1;
 
-  /* Then alphabetically (case-insensitive) */
-  return strcasecmp(ea->name, eb->name);
+  int result = 0;
+  switch (g_sort_type) {
+  case SORT_BY_NAME:
+    result = strcasecmp(ea->name, eb->name);
+    break;
+  case SORT_BY_SIZE:
+    if (ea->size < eb->size)
+      result = -1;
+    else if (ea->size > eb->size)
+      result = 1;
+    else
+      result = strcasecmp(ea->name, eb->name);
+    break;
+  case SORT_BY_DATE:
+    if (ea->modified_time < eb->modified_time)
+      result = -1;
+    else if (ea->modified_time > eb->modified_time)
+      result = 1;
+    else
+      result = strcasecmp(ea->name, eb->name);
+    break;
+  }
+
+  if (g_sort_order == SORT_DESCENDING) {
+    result = -result;
+  }
+
+  return result;
 }
 
 /* ===== Selection Helpers ===== */
@@ -286,6 +315,9 @@ void FS_Init(fs_state *state, memory_arena *arena) {
   memset(state->selected, 0, sizeof(state->selected));
   state->selection_count = 0;
   state->selection_anchor = -1;
+
+  state->sort_by = SORT_BY_NAME;
+  state->sort_dir = SORT_ASCENDING;
 }
 
 b32 FS_LoadDirectory(fs_state *state, const char *path) {
@@ -346,6 +378,8 @@ b32 FS_LoadDirectory(fs_state *state, const char *path) {
 
   /* Sort entries */
   if (state->entry_count > 0) {
+    g_sort_type = state->sort_by;
+    g_sort_order = state->sort_dir;
     qsort(state->entries, state->entry_count, sizeof(fs_entry), CompareEntries);
   }
 
@@ -407,6 +441,39 @@ b32 FS_NavigateInto(fs_state *state) {
   }
 
   return FS_LoadDirectory(state, entry->path);
+}
+
+void FS_SetSortOptions(fs_state *state, sort_type type, sort_order order) {
+  state->sort_by = type;
+  state->sort_dir = order;
+  FS_Resort(state);
+}
+
+void FS_Resort(fs_state *state) {
+  if (state->entry_count > 0) {
+    /* Remember currently selected entry name to restore selection after sort */
+    char selected_name[FS_MAX_NAME] = {0};
+    fs_entry *selected = FS_GetSelectedEntry(state);
+    if (selected) {
+      strncpy(selected_name, selected->name, sizeof(selected_name) - 1);
+    }
+
+    g_sort_type = state->sort_by;
+    g_sort_order = state->sort_dir;
+    qsort(state->entries, state->entry_count, sizeof(fs_entry), CompareEntries);
+
+    /* Restore selection */
+    if (selected_name[0]) {
+      for (u32 i = 0; i < state->entry_count; i++) {
+        if (strcmp(state->entries[i].name, selected_name) == 0) {
+          state->selected_index = i;
+          /* Sync multi-selection */
+          FS_SelectSingle(state, i);
+          break;
+        }
+      }
+    }
+  }
 }
 
 fs_entry *FS_GetSelectedEntry(fs_state *state) {

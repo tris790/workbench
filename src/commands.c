@@ -218,6 +218,58 @@ static void Cmd_ToggleAnimations(void *u) {
   g_animations_enabled = !g_animations_enabled;
 }
 
+/* ===== Sorting ===== */
+
+static void Cmd_SortByName(void *u) {
+  (void)u;
+  explorer_state *e = GET_ACTIVE_EXPLORER();
+  if (e) {
+    FS_SetSortOptions(&e->fs, SORT_BY_NAME, e->fs.sort_dir);
+    Config_SetString("explorer.sort_type", "name");
+    Config_Save();
+  }
+}
+
+static void Cmd_SortBySize(void *u) {
+  (void)u;
+  explorer_state *e = GET_ACTIVE_EXPLORER();
+  if (e) {
+    FS_SetSortOptions(&e->fs, SORT_BY_SIZE, e->fs.sort_dir);
+    Config_SetString("explorer.sort_type", "size");
+    Config_Save();
+  }
+}
+
+static void Cmd_SortByDate(void *u) {
+  (void)u;
+  explorer_state *e = GET_ACTIVE_EXPLORER();
+  if (e) {
+    FS_SetSortOptions(&e->fs, SORT_BY_DATE, e->fs.sort_dir);
+    Config_SetString("explorer.sort_type", "date");
+    Config_Save();
+  }
+}
+
+static void Cmd_SortAscending(void *u) {
+  (void)u;
+  explorer_state *e = GET_ACTIVE_EXPLORER();
+  if (e) {
+    FS_SetSortOptions(&e->fs, e->fs.sort_by, SORT_ASCENDING);
+    Config_SetString("explorer.sort_order", "ascending");
+    Config_Save();
+  }
+}
+
+static void Cmd_SortDescending(void *u) {
+  (void)u;
+  explorer_state *e = GET_ACTIVE_EXPLORER();
+  if (e) {
+    FS_SetSortOptions(&e->fs, e->fs.sort_by, SORT_DESCENDING);
+    Config_SetString("explorer.sort_order", "descending");
+    Config_Save();
+  }
+}
+
 /* ===== Configuration ===== */
 
 static void Cmd_ConfigReload(void *u) {
@@ -286,6 +338,13 @@ static const CommandDef g_commands[] = {
     {"System: Open Default", "Enter", "System", "execute run open",
      Cmd_SystemOpenDefault},
 
+    {"Sort: Ascending", "palette", "Sort", "asc up order", Cmd_SortAscending},
+    {"Sort: By Date", "palette", "Sort", "modified time sort", Cmd_SortByDate},
+    {"Sort: By Name", "palette", "Sort", "alphabetical name sort",
+     Cmd_SortByName},
+    {"Sort: By Size", "palette", "Sort", "filesize bytes sort", Cmd_SortBySize},
+    {"Sort: Descending", "palette", "Sort", "desc down order",
+     Cmd_SortDescending},
     {"Terminal: Clear", "Ctrl + L", "Terminal", "reset console clear",
      Cmd_TerminalClear},
     {"Terminal: Toggle", "`", "Terminal", "show hide console terminal",
