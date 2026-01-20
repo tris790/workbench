@@ -78,7 +78,7 @@ static void PopulateCommandItems(command_palette_state *state) {
 }
 
 /* Execute selected item */
-static void ExecuteSelectedItem(command_palette_state *state) {
+static void CommandPalette_ExecuteSelectedItem(command_palette_state *state) {
   if (state->selected_index < 0 || state->selected_index >= state->item_count)
     return;
 
@@ -205,7 +205,7 @@ b32 CommandPalette_Update(command_palette_state *state, ui_context *ui) {
 
   /* Handle enter to execute */
   if (input->key_pressed[KEY_RETURN]) {
-    ExecuteSelectedItem(state);
+    CommandPalette_ExecuteSelectedItem(state);
     return true;
   }
 
@@ -475,7 +475,7 @@ void CommandPalette_Render(command_palette_state *state, ui_context *ui,
       /* Click to select and execute */
       if (ui->input.mouse_pressed[MOUSE_LEFT]) {
         state->selected_index = i;
-        ExecuteSelectedItem(state);
+        CommandPalette_ExecuteSelectedItem(state);
       }
     }
 

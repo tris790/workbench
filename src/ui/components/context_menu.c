@@ -104,7 +104,7 @@ static void PopulateEmptyMenu(context_menu_state *state) {
   AddMenuItem(state, "Paste", "Ctrl+V", Action_Paste, state, false);
 }
 
-static void ExecuteSelectedItem(context_menu_state *state) {
+static void ContextMenu_ExecuteSelectedItem(context_menu_state *state) {
   if (state->selected_index < 0 || state->selected_index >= state->item_count)
     return;
 
@@ -247,7 +247,7 @@ b32 ContextMenu_Update(context_menu_state *state, ui_context *ui) {
 
   /* Handle enter to execute */
   if (input->key_pressed[KEY_RETURN] && state->selected_index >= 0) {
-    ExecuteSelectedItem(state);
+    ContextMenu_ExecuteSelectedItem(state);
     return true;
   }
 
@@ -293,7 +293,7 @@ b32 ContextMenu_Update(context_menu_state *state, ui_context *ui) {
                             state->menu_width - 8, state->item_height};
           if (UI_PointInRect(input->mouse_pos, item_rect)) {
             state->selected_index = i;
-            ExecuteSelectedItem(state);
+            ContextMenu_ExecuteSelectedItem(state);
             /* Consume the click */
             input->mouse_pressed[MOUSE_LEFT] = false;
             return true;

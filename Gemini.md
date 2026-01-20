@@ -7,8 +7,8 @@ This document serves as the coding style guide and project documentation for Wor
 Workbench is a developer tool that serves as a **file explorer on steroids** - a keyboard-focused, professional-grade file management application with integrated terminal, command palette, and extensibility. It is a desktop application.
 
 ### Target Platforms
-- **Primary**: Arch Linux + KDE Wayland (native, no XWayland)
-- **Future**: Windows (via platform abstraction, work item 11)
+- **Primary**: Arch Linux + KDE Wayland (native, no XWayland) ./build.sh
+- **Secondary**: Windows ./crossplatform.sh
 
 ### Core Philosophy
 - **Insanely fast and lightweight** - no bloat, portable single executable
@@ -26,6 +26,7 @@ Workbench is a developer tool that serves as a **file explorer on steroids** - a
 - **C99 only** (not C++ unless absolutely necessary)
 - **Handmade Hero style** - direct, low-level, performance-oriented
 - No external dependencies beyond platform APIs
+- Unity build (all source files in a single translation unit)
 
 ### Naming Conventions
 
@@ -88,7 +89,7 @@ file_info *files = ArenaPushArray(&arena, file_info, count);
 ```
 
 ### Rules
-1. No direct `malloc`/`free` in application code
+1. No direct `malloc`/`free` in application code, use arena allocator instead
 2. Long-lived allocations use persistent arena
 3. Frame/temporary allocations use scratch arena that's cleared each frame
 
@@ -145,21 +146,4 @@ Output: `build/wb`
 ### Keyboard Focus
 - All actions accessible via keyboard
 - Command palette for search and commands (prefix `>` for commands)
-- Vim-style navigation where appropriate
 
----
-
-## Feature Checklist
-
-- [x] Project foundation (types, platform, build)
-- [x] Rendering system
-- [X] UI framework
-- [X] File explorer
-- [X] Panel layout (1 or 2 panels)
-- [X] Command palette
-- [X] Built-in terminal
-- [ ] Preview panel
-- [ ] Context menu
-- [ ] Settings
-- [ ] Themes
-- [ ] Windows support

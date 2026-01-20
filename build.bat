@@ -30,50 +30,8 @@ set CFLAGS=%CFLAGS% /W4 /WX /DUNICODE /D_UNICODE /D_CRT_SECURE_NO_WARNINGS
 REM Include paths
 set INCLUDES=/I src /I src\core /I src\platform /I src\renderer /I src\ui /I src\ui\components /I src\terminal /I src\config
 
-REM Source files - Core
-set CORE_SRC=src\core\animation.c src\core\fs.c src\core\theme.c src\core\assets_embedded.c ^
-    src\core\input.c src\core\key_repeat.c src\core\text.c src\core\fuzzy_match.c src\core\args.c
-
-REM Source files - Platform (Windows)
-set PLATFORM_SRC=src\platform\windows\windows_platform.c ^
-    src\platform\windows\windows_window.c ^
-    src\platform\windows\windows_events.c ^
-    src\platform\windows\windows_filesystem.c ^
-    src\platform\windows\windows_clipboard.c ^
-    src\platform\windows\windows_process.c ^
-    src\platform\windows\windows_time.c ^
-    src\platform\windows\windows_fs_watcher.c ^
-    src\platform\windows\windows_font.c ^
-    src\platform\windows\windows_pty.c ^
-    src\platform\windows\workbench.rc
-
-REM Source files - Renderer
-set RENDERER_SRC=src\renderer\renderer_software.c src\renderer\renderer_opengl.c src\renderer\font.c src\renderer\icons.c
-
-REM Source files - UI
-set UI_SRC=src\ui\ui.c src\ui\layout.c src\ui\components\explorer.c ^
-    src\ui\components\dialog.c ^
-    src\ui\components\breadcrumb.c ^
-    src\ui\components\file_item.c ^
-    src\ui\components\command_palette.c ^
-    src\ui\components\terminal_panel.c ^
-    src\ui\components\quick_filter.c ^
-    src\ui\components\context_menu.c ^
-    src\ui\components\config_diagnostics.c ^
-    src\ui\components\scroll_container.c ^
-    src\ui\components\drag_drop.c
-
-REM Source files - Terminal
-set TERMINAL_SRC=src\terminal\terminal.c ^
-    src\terminal\ansi_parser.c ^
-    src\terminal\command_history.c ^
-    src\terminal\suggestion.c
-
-REM Source files - Config
-set CONFIG_SRC=src\config\config.c src\config\config_parser.c
-
-REM Main and App
-set APP_SRC=src\main.c src\app_args.c src\commands.c
+REM Source files (Unity Build)
+set SOURCES=src\unity_windows.c src\platform\windows\workbench.rc
 
 REM Libraries
 set LIBS=user32.lib gdi32.lib shell32.lib shlwapi.lib dwrite.lib uuid.lib opengl32.lib
@@ -90,9 +48,9 @@ if "%MODE%"=="release" (
 )
 
 REM Full command
-echo Compiling...
+echo Compiling (unity build)...
 cl.exe %CFLAGS% %INCLUDES% %OUTPUT% ^
-    %APP_SRC% %CORE_SRC% %PLATFORM_SRC% %RENDERER_SRC% %UI_SRC% %TERMINAL_SRC% %CONFIG_SRC% ^
+    %SOURCES% ^
     %LIBS% ^
     /link /SUBSYSTEM:%SUBSYSTEM%
 

@@ -21,55 +21,8 @@ mkdir -p build
 gcc -O2 scripts/embed.c -o build/embed
 ./build/embed
 
-# Source files (new structure)
-SOURCES="
-    src/main.c
-    src/platform/linux/linux_platform.c
-    src/platform/linux/linux_window.c
-    src/platform/linux/linux_events.c
-    src/platform/linux/linux_filesystem.c
-    src/platform/linux/linux_clipboard.c
-    src/platform/linux/linux_process.c
-    src/platform/linux/linux_time.c
-    src/platform/protocols/xdg-shell-protocol.c
-    src/platform/protocols/xdg-decoration-protocol.c
-    src/renderer/renderer_software.c
-    src/renderer/renderer_opengl.c
-    src/renderer/font.c
-    src/renderer/icons.c
-    src/core/theme.c
-    src/core/animation.c
-    src/core/assets_embedded.c
-    src/core/fs.c
-    src/core/input.c
-    src/core/key_repeat.c
-    src/core/text.c
-    src/platform/linux/linux_fs_watcher.c
-    src/ui/ui.c
-    src/ui/layout.c
-    src/ui/components/explorer.c
-    src/ui/components/dialog.c
-    src/ui/components/breadcrumb.c
-    src/ui/components/file_item.c
-    src/ui/components/command_palette.c
-    src/ui/components/terminal_panel.c
-    src/ui/components/quick_filter.c
-    src/ui/components/context_menu.c
-    src/ui/components/config_diagnostics.c
-    src/ui/components/scroll_container.c
-    src/ui/components/drag_drop.c
-    src/core/fuzzy_match.c
-    src/core/args.c
-    src/app_args.c
-    src/commands.c
-    src/platform/linux/linux_pty.c
-    src/terminal/terminal.c
-    src/terminal/ansi_parser.c
-    src/terminal/command_history.c
-    src/terminal/suggestion.c
-    src/config/config.c
-    src/config/config_parser.c
-"
+# Source files (Unity Build)
+SOURCES="src/unity_linux.c"
 
 # Include paths for all source directories
 INCLUDES="-Isrc -Isrc/core -Isrc/platform -Isrc/platform/protocols -Isrc/renderer -Isrc/ui -Isrc/ui/components -Isrc/terminal -Isrc/config"
@@ -100,7 +53,7 @@ if [ ! -f "$PROTO_DIR/xdg-shell-client-protocol.h" ] || [ "$XDG_SHELL_XML" -nt "
 fi
 
 # Compile
-echo "Compiling..."
+echo "Compiling (unity build)..."
 $CC $CFLAGS $SOURCES -o $OUTPUT $LDFLAGS
 
 echo "Build complete: ./$OUTPUT"
