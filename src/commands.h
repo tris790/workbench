@@ -17,4 +17,9 @@ void Commands_Init(layout_state *layout);
 /* Register all built-in commands to the palette */
 void Commands_Register(command_palette_state *palette);
 
+/* Command implementations that might be called directly */
+void Cmd_ViewToggleFullscreen(void *u);
+void Cmd_ViewFocusNextPane(void *u);
+void Cmd_ViewToggleSplit(void *u);
+
 #endif /* COMMANDS_H */

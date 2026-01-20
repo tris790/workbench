@@ -163,13 +163,13 @@ static void Cmd_TerminalClear(void *u) {
 
 /* ===== Window & Layout ===== */
 
-static void Cmd_ViewToggleSplit(void *u) {
+void Cmd_ViewToggleSplit(void *u) {
   (void)u;
   if (g_layout)
     Layout_ToggleMode(g_layout);
 }
 
-static void Cmd_ViewFocusNextPane(void *u) {
+void Cmd_ViewFocusNextPane(void *u) {
   (void)u;
   if (g_layout) {
     u32 next = (g_layout->active_panel_idx + 1) % 2;
@@ -177,7 +177,7 @@ static void Cmd_ViewFocusNextPane(void *u) {
   }
 }
 
-static void Cmd_ViewToggleFullscreen(void *u) {
+void Cmd_ViewToggleFullscreen(void *u) {
   (void)u;
   ui_context *ui = UI_GetContext();
   if (ui && ui->renderer && ui->renderer->window) {

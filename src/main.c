@@ -241,6 +241,12 @@ int main(int argc, char **argv) {
           consumed = true;
         }
 
+        /* Toggle Fullscreen with F11 */
+        if (event.data.keyboard.key == KEY_F11) {
+          Platform_SetFullscreen(window, !Platform_IsFullscreen(window));
+          consumed = true;
+        }
+
         /* Focus Split 1 (Alt + 1) */
         if (event.data.keyboard.key == KEY_1 &&
             (event.data.keyboard.modifiers & MOD_ALT)) {
