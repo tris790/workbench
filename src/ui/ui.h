@@ -23,6 +23,7 @@
 #define UI_MAX_SCROLL_STACK 16
 #define UI_MAX_TEXT_INPUT_SIZE 4096
 #define UI_MAX_UNDO_STATES 32
+#define UI_MAX_FOCUS_ORDER 256
 
 /* ===== Element ID ===== */
 
@@ -63,6 +64,7 @@ typedef enum {
   UI_STYLE_BORDER_WIDTH,
   UI_STYLE_BORDER_RADIUS,
   UI_STYLE_FONT_SIZE,
+  UI_STYLE_SCROLLBAR_WIDTH,
 
   /* Layout */
   UI_STYLE_MIN_WIDTH,
@@ -201,7 +203,7 @@ typedef struct ui_context_s {
   ui_id last_focused; /* Previous frame's focused element */
 
   /* Focus navigation */
-  ui_id focus_order[256]; /* Elements in focus order */
+  ui_id focus_order[UI_MAX_FOCUS_ORDER]; /* Elements in focus order */
   i32 focus_count;
   i32 focus_index;
 

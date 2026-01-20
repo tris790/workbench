@@ -16,10 +16,8 @@ static ui_context *g_ui_ctx = NULL;
 
 ui_context *UI_GetContext(void) { return g_ui_ctx; }
 
-/* ===== ID Generation ===== */
-
 /* FNV-1a hash for string to ID */
-static ui_id HashString(const char *str) {
+static ui_id UI_HashString(const char *str) {
   ui_id hash = 2166136261u;
   while (*str) {
     hash ^= (ui_id)*str++;
@@ -29,17 +27,17 @@ static ui_id HashString(const char *str) {
 }
 
 /* Combine ID with parent scope */
-static ui_id CombineID(ui_id parent, ui_id child) {
+static ui_id UI_CombineID(ui_id parent, ui_id child) {
   return parent ^ (child * 16777619u);
 }
 
 ui_id UI_GenID(const char *str) {
   ui_context *ctx = g_ui_ctx;
-  ui_id id = HashString(str);
+  ui_id id = UI_HashString(str);
 
   /* Combine with ID stack */
   for (i32 i = 0; i < ctx->id_depth; i++) {
-    id = CombineID(ctx->id_stack[i], id);
+    id = UI_CombineID(ctx->id_stack[i], id);
   }
   return id;
 }
@@ -47,7 +45,7 @@ ui_id UI_GenID(const char *str) {
 void UI_PushID(const char *str) {
   ui_context *ctx = g_ui_ctx;
   Assert(ctx->id_depth < UI_MAX_ID_STACK);
-  ctx->id_stack[ctx->id_depth++] = HashString(str);
+  ctx->id_stack[ctx->id_depth++] = UI_HashString(str);
 }
 
 void UI_PushIDInt(i32 n) {
@@ -101,7 +99,7 @@ void UI_PopStyleN(i32 n) {
 }
 
 /* Get style, searching stack from top to bottom */
-static ui_style_value GetStyleValue(ui_style_property prop) {
+static ui_style_value UI_GetStyleValue(ui_style_property prop) {
   ui_context *ctx = g_ui_ctx;
 
   /* Search stack in reverse order */
@@ -115,15 +113,19 @@ static ui_style_value GetStyleValue(ui_style_property prop) {
   return ctx->style_defaults[prop];
 }
 
-color UI_GetStyleColor(ui_style_property prop) { return GetStyleValue(prop).c; }
+color UI_GetStyleColor(ui_style_property prop) {
+  return UI_GetStyleValue(prop).c;
+}
 
-f32 UI_GetStyleFloat(ui_style_property prop) { return GetStyleValue(prop).f; }
+f32 UI_GetStyleFloat(ui_style_property prop) {
+  return UI_GetStyleValue(prop).f;
+}
 
-i32 UI_GetStyleInt(ui_style_property prop) { return GetStyleValue(prop).i; }
+i32 UI_GetStyleInt(ui_style_property prop) { return UI_GetStyleValue(prop).i; }
 
 /* ===== Layout System ===== */
 
-static ui_layout *GetCurrentLayout(void) {
+static ui_layout *UI_GetCurrentLayout(void) {
   ui_context *ctx = g_ui_ctx;
   if (ctx->layout_depth <= 0)
     return NULL;
@@ -156,7 +158,7 @@ void UI_BeginHorizontal(void) {
 
 void UI_EndHorizontal(void) {
   ui_context *ctx = g_ui_ctx;
-  ui_layout *layout = GetCurrentLayout();
+  ui_layout *layout = UI_GetCurrentLayout();
   if (layout) {
     i32 height = layout->max_cross > 0 ? layout->max_cross : 20;
     UI_EndLayout();
@@ -174,7 +176,7 @@ void UI_BeginVertical(void) {
 
 void UI_EndVertical(void) {
   ui_context *ctx = g_ui_ctx;
-  ui_layout *layout = GetCurrentLayout();
+  ui_layout *layout = UI_GetCurrentLayout();
   if (layout) {
     i32 width = layout->max_cross > 0 ? layout->max_cross : 20;
     UI_EndLayout();
@@ -186,7 +188,7 @@ void UI_EndVertical(void) {
 }
 
 void UI_Spacer(i32 size) {
-  ui_layout *layout = GetCurrentLayout();
+  ui_layout *layout = UI_GetCurrentLayout();
   if (!layout)
     return;
 
@@ -205,7 +207,7 @@ rect UI_GetAvailableRect(void) {
     return (rect){0, 0, ctx->renderer->width, ctx->renderer->height};
   }
 
-  ui_layout *layout = GetCurrentLayout();
+  ui_layout *layout = UI_GetCurrentLayout();
 
   if (layout->direction == UI_LAYOUT_HORIZONTAL) {
     return (rect){layout->cursor.x, layout->cursor.y,
@@ -218,7 +220,7 @@ rect UI_GetAvailableRect(void) {
 }
 
 void UI_AdvanceLayout(i32 width, i32 height) {
-  ui_layout *layout = GetCurrentLayout();
+  ui_layout *layout = UI_GetCurrentLayout();
   if (!layout)
     return;
 
@@ -243,8 +245,6 @@ void UI_AdvanceLayout(i32 width, i32 height) {
 }
 
 /* ===== Scroll Container ===== */
-
-#define SCROLLBAR_WIDTH 10
 
 void UI_BeginScroll(v2i size, ui_scroll_state *state) {
   ui_context *ctx = g_ui_ctx;
@@ -290,10 +290,10 @@ void UI_BeginScroll(v2i size, ui_scroll_state *state) {
   Render_SetClipRect(ctx->renderer, view);
 
   /* Start nested layout with scroll offset */
+  i32 scrollbar_w = UI_GetStyleInt(UI_STYLE_SCROLLBAR_WIDTH);
   rect content_bounds = {view.x, view.y - (i32)state->offset.y,
-                         view.w -
-                             SCROLLBAR_WIDTH, /* Leave space for scrollbar */
-                         view.h * 10};        /* Large height for content */
+                         view.w - scrollbar_w, /* Leave space for scrollbar */
+                         100000};              /* Large height for content */
   UI_BeginLayout(UI_LAYOUT_VERTICAL, content_bounds);
 }
 
@@ -302,7 +302,7 @@ void UI_EndScroll(void) {
   Assert(ctx->scroll_depth > 0);
 
   /* Get content size from layout */
-  ui_layout *layout = GetCurrentLayout();
+  ui_layout *layout = UI_GetCurrentLayout();
   ctx->scroll_depth--;
   ui_scroll_state *state = ctx->scroll_stack[ctx->scroll_depth].state;
   rect view = ctx->scroll_stack[ctx->scroll_depth].view_rect;
@@ -330,7 +330,8 @@ void UI_EndScroll(void) {
     f32 scroll_ratio = max_scroll > 0 ? state->offset.y / max_scroll : 0;
     i32 bar_y = view.y + (i32)((view.h - bar_height) * scroll_ratio);
 
-    rect scrollbar = {view.x + view.w - SCROLLBAR_WIDTH, bar_y, SCROLLBAR_WIDTH,
+    i32 scrollbar_w = UI_GetStyleInt(UI_STYLE_SCROLLBAR_WIDTH);
+    rect scrollbar = {view.x + view.w - scrollbar_w, bar_y, scrollbar_w,
                       bar_height};
 
     color bar_color = ctx->theme->text_muted;
@@ -369,6 +370,7 @@ void UI_Init(ui_context *ctx, render_context *renderer, const theme *th,
   ctx->style_defaults[UI_STYLE_BORDER_WIDTH].f = 1.0f;
   ctx->style_defaults[UI_STYLE_BORDER_RADIUS].f = th->radius_sm;
   ctx->style_defaults[UI_STYLE_FONT_SIZE].i = th->font_size_md;
+  ctx->style_defaults[UI_STYLE_SCROLLBAR_WIDTH].i = 10;
 
   ctx->style_defaults[UI_STYLE_MIN_WIDTH].i = 0;
   ctx->style_defaults[UI_STYLE_MIN_HEIGHT].i = 0;
@@ -382,7 +384,7 @@ void UI_Init(ui_context *ctx, render_context *renderer, const theme *th,
 }
 
 void UI_Shutdown(ui_context *ctx) {
-  if (g_ui_ctx == ctx) {
+  if (ctx && g_ui_ctx == ctx) {
     g_ui_ctx = NULL;
   }
 }
@@ -478,7 +480,7 @@ b32 UI_IsHot(ui_id id) { return g_ui_ctx->hot == id; }
 b32 UI_IsActive(ui_id id) { return g_ui_ctx->active == id; }
 
 /* Register element in focus order */
-static void RegisterFocusable(ui_id id) {
+static void UI_RegisterFocusable(ui_id id) {
   ui_context *ctx = g_ui_ctx;
   /* If modal is active, only register elements if we are in that modal */
   if (ctx->active_modal != UI_ID_NONE &&
@@ -486,13 +488,13 @@ static void RegisterFocusable(ui_id id) {
     return;
   }
 
-  if (ctx->focus_count < 256) {
+  if (ctx->focus_count < UI_MAX_FOCUS_ORDER) {
     ctx->focus_order[ctx->focus_count++] = id;
   }
 }
 
 /* Update hot/active state for an element */
-static b32 UpdateInteraction(ui_id id, rect bounds) {
+static b32 UI_UpdateInteraction(ui_id id, rect bounds) {
   ui_context *ctx = g_ui_ctx;
 
   /* Check modal blocking */
@@ -561,7 +563,7 @@ b32 UI_Button(const char *label) {
   ui_id id = UI_GenID(label);
 
   /* Register for focus navigation */
-  RegisterFocusable(id);
+  UI_RegisterFocusable(id);
 
   /* Calculate size */
   i32 padding = UI_GetStyleInt(UI_STYLE_PADDING);
@@ -581,7 +583,7 @@ b32 UI_Button(const char *label) {
   rect bounds = {avail.x, avail.y, width, height};
 
   /* Interaction */
-  b32 clicked = UpdateInteraction(id, bounds);
+  b32 clicked = UI_UpdateInteraction(id, bounds);
 
   /* Determine colors based on state */
   color bg = UI_GetStyleColor(UI_STYLE_BG_COLOR);
@@ -638,7 +640,7 @@ b32 UI_Selectable(const char *label, b32 selected) {
   ui_id id = UI_GenID(label);
 
   /* Register for focus navigation */
-  RegisterFocusable(id);
+  UI_RegisterFocusable(id);
 
   /* Calculate size */
   i32 padding = UI_GetStyleInt(UI_STYLE_PADDING);
@@ -649,7 +651,7 @@ b32 UI_Selectable(const char *label, b32 selected) {
   rect bounds = {avail.x, avail.y, avail.w, height};
 
   /* Interaction */
-  b32 clicked = UpdateInteraction(id, bounds);
+  b32 clicked = UI_UpdateInteraction(id, bounds);
 
   /* Determine colors */
   color bg = (color){0, 0, 0, 0}; /* Transparent by default */
@@ -694,10 +696,11 @@ void UI_Separator(void) {
 /* ===== Text Input ===== */
 
 /* Helper: push undo state */
-static void TextInputPushUndo(ui_text_state *state, const char *text) {
+static void UI_TextInputPushUndo(ui_text_state *state, const char *text) {
   if (state->undo_count < UI_MAX_UNDO_STATES) {
     i32 idx = state->undo_index;
     strncpy(state->undo_stack[idx].text, text, UI_MAX_TEXT_INPUT_SIZE - 1);
+    state->undo_stack[idx].text[UI_MAX_TEXT_INPUT_SIZE - 1] = '\0';
     state->undo_stack[idx].cursor_pos = state->cursor_pos;
     state->undo_index = (idx + 1) % UI_MAX_UNDO_STATES;
     state->undo_count++;
@@ -705,17 +708,48 @@ static void TextInputPushUndo(ui_text_state *state, const char *text) {
 }
 
 /* Helper: pop undo state */
-static b32 TextInputPopUndo(ui_text_state *state, char *buffer, i32 buf_size) {
+static b32 UI_TextInputPopUndo(ui_text_state *state, char *buffer,
+                               i32 buf_size) {
   if (state->undo_count > 0) {
     state->undo_count--;
     state->undo_index =
         (state->undo_index - 1 + UI_MAX_UNDO_STATES) % UI_MAX_UNDO_STATES;
     strncpy(buffer, state->undo_stack[state->undo_index].text,
             (size_t)buf_size - 1);
+    buffer[buf_size - 1] = '\0';
     state->cursor_pos = state->undo_stack[state->undo_index].cursor_pos;
     return true;
   }
   return false;
+}
+
+static void UI_GetSelectionRange(ui_text_state *state, i32 *out_start,
+                                 i32 *out_end) {
+  if (state->selection_start <= state->selection_end) {
+    *out_start = state->selection_start;
+    *out_end = state->selection_end;
+  } else {
+    *out_start = state->selection_end;
+    *out_end = state->selection_start;
+  }
+}
+
+static void UI_DeleteSelection(ui_text_state *state, char *buffer,
+                               i32 *text_len) {
+  i32 start, end;
+  UI_GetSelectionRange(state, &start, &end);
+  i32 start_byte = Text_UTF8ByteOffset(buffer, start);
+  i32 end_byte = Text_UTF8ByteOffset(buffer, end);
+  UI_TextInputPushUndo(state, buffer);
+
+  i32 total_bytes = (i32)strlen(buffer);
+  memmove(buffer + start_byte, buffer + end_byte,
+          (size_t)(total_bytes - end_byte + 1));
+  state->cursor_pos = start;
+  state->selection_start = -1;
+  if (text_len) {
+    *text_len = (i32)strlen(buffer);
+  }
 }
 
 /* Process text input logic (shared by widgets) */
@@ -746,12 +780,8 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
   /* Ctrl+C - Copy */
   if (ctrl && input->key_pressed[KEY_C]) {
     if (state->selection_start >= 0) {
-      i32 start = state->selection_start < state->selection_end
-                      ? state->selection_start
-                      : state->selection_end;
-      i32 end = state->selection_start > state->selection_end
-                    ? state->selection_start
-                    : state->selection_end;
+      i32 start, end;
+      UI_GetSelectionRange(state, &start, &end);
       i32 start_byte = Text_UTF8ByteOffset(buffer, start);
       i32 end_byte = Text_UTF8ByteOffset(buffer, end);
       char temp[UI_MAX_TEXT_INPUT_SIZE];
@@ -768,12 +798,8 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
   /* Ctrl+X - Cut */
   if (ctrl && input->key_pressed[KEY_X]) {
     if (state->selection_start >= 0) {
-      i32 start = state->selection_start < state->selection_end
-                      ? state->selection_start
-                      : state->selection_end;
-      i32 end = state->selection_start > state->selection_end
-                    ? state->selection_start
-                    : state->selection_end;
+      i32 start, end;
+      UI_GetSelectionRange(state, &start, &end);
       i32 start_byte = Text_UTF8ByteOffset(buffer, start);
       i32 end_byte = Text_UTF8ByteOffset(buffer, end);
 
@@ -788,14 +814,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
       Platform_SetClipboard(temp);
 
       /* Delete selection */
-      TextInputPushUndo(state, buffer);
-
-      i32 total_bytes = (i32)strlen(buffer);
-      memmove(buffer + start_byte, buffer + end_byte,
-              (size_t)(total_bytes - end_byte + 1));
-
-      state->cursor_pos = start;
-      state->selection_start = -1;
+      UI_DeleteSelection(state, buffer, &text_len);
       changed = true;
       text_len = (i32)strlen(buffer);
     }
@@ -807,29 +826,13 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
     if (Platform_GetClipboard(clipboard, sizeof(clipboard))) {
       /* Delete selection first if any */
       if (state->selection_start >= 0) {
-        i32 start = state->selection_start < state->selection_end
-                        ? state->selection_start
-                        : state->selection_end;
-        i32 end = state->selection_start > state->selection_end
-                      ? state->selection_start
-                      : state->selection_end;
-        i32 start_byte = Text_UTF8ByteOffset(buffer, start);
-        i32 end_byte = Text_UTF8ByteOffset(buffer, end);
-        TextInputPushUndo(state, buffer);
-
-        i32 total_bytes = (i32)strlen(buffer);
-        memmove(buffer + start_byte, buffer + end_byte,
-                (size_t)(total_bytes - end_byte + 1));
-
-        state->cursor_pos = start;
-        state->selection_start = -1;
-        text_len = (i32)strlen(buffer);
+        UI_DeleteSelection(state, buffer, &text_len);
       }
 
       /* Insert */
       i32 paste_len = (i32)strlen(clipboard);
       if (text_len + paste_len < buffer_size - 1) {
-        TextInputPushUndo(state, buffer);
+        UI_TextInputPushUndo(state, buffer);
         i32 cursor_byte = Text_UTF8ByteOffset(buffer, state->cursor_pos);
         i32 total_bytes = (i32)strlen(buffer);
 
@@ -846,7 +849,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
 
   /* Ctrl+Z - Undo */
   if (ctrl && input->key_pressed[KEY_Z]) {
-    if (TextInputPopUndo(state, buffer, buffer_size)) {
+    if (UI_TextInputPopUndo(state, buffer, buffer_size)) {
       changed = true;
       text_len = (i32)strlen(buffer);
     }
@@ -924,25 +927,10 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
   if (input->key_pressed[KEY_BACKSPACE] || Input_KeyRepeat(KEY_BACKSPACE)) {
     if (state->selection_start >= 0) {
       /* Delete selection */
-      i32 start = state->selection_start < state->selection_end
-                      ? state->selection_start
-                      : state->selection_end;
-      i32 end = state->selection_start > state->selection_end
-                    ? state->selection_start
-                    : state->selection_end;
-      i32 start_byte = Text_UTF8ByteOffset(buffer, start);
-      i32 end_byte = Text_UTF8ByteOffset(buffer, end);
-      TextInputPushUndo(state, buffer);
-
-      i32 total_bytes = (i32)strlen(buffer);
-      memmove(buffer + start_byte, buffer + end_byte,
-              (size_t)(total_bytes - end_byte + 1));
-      state->cursor_pos = start;
-      state->selection_start = -1;
+      UI_DeleteSelection(state, buffer, &text_len);
       changed = true;
-      text_len = (i32)strlen(buffer);
     } else if (state->cursor_pos > 0) {
-      TextInputPushUndo(state, buffer);
+      UI_TextInputPushUndo(state, buffer);
 
       i32 target_pos = state->cursor_pos - 1;
 
@@ -967,25 +955,10 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
   if (input->key_pressed[KEY_DELETE] || Input_KeyRepeat(KEY_DELETE)) {
     if (state->selection_start >= 0) {
       /* Same as backspace with selection */
-      i32 start = state->selection_start < state->selection_end
-                      ? state->selection_start
-                      : state->selection_end;
-      i32 end = state->selection_start > state->selection_end
-                    ? state->selection_start
-                    : state->selection_end;
-      i32 start_byte = Text_UTF8ByteOffset(buffer, start);
-      i32 end_byte = Text_UTF8ByteOffset(buffer, end);
-      TextInputPushUndo(state, buffer);
-
-      i32 total_bytes = (i32)strlen(buffer);
-      memmove(buffer + start_byte, buffer + end_byte,
-              (size_t)(total_bytes - end_byte + 1));
-      state->cursor_pos = start;
-      state->selection_start = -1;
+      UI_DeleteSelection(state, buffer, &text_len);
       changed = true;
-      text_len = (i32)strlen(buffer);
     } else if (state->cursor_pos < Text_UTF8Length(buffer)) {
-      TextInputPushUndo(state, buffer);
+      UI_TextInputPushUndo(state, buffer);
 
       i32 target_pos = state->cursor_pos + 1;
 
@@ -1009,22 +982,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
   if (input->text_input && input->text_input >= 32) {
     /* Delete selection first if any */
     if (state->selection_start >= 0) {
-      i32 start = state->selection_start < state->selection_end
-                      ? state->selection_start
-                      : state->selection_end;
-      i32 end = state->selection_start > state->selection_end
-                    ? state->selection_start
-                    : state->selection_end;
-      i32 start_byte = Text_UTF8ByteOffset(buffer, start);
-      i32 end_byte = Text_UTF8ByteOffset(buffer, end);
-      TextInputPushUndo(state, buffer);
-
-      i32 total_bytes = (i32)strlen(buffer);
-      memmove(buffer + start_byte, buffer + end_byte,
-              (size_t)(total_bytes - end_byte + 1));
-      state->cursor_pos = start;
-      state->selection_start = -1;
-      text_len = (i32)strlen(buffer);
+      UI_DeleteSelection(state, buffer, &text_len);
     }
 
     /* Insert character */
@@ -1051,7 +1009,7 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
   ui_context *ctx = g_ui_ctx;
   ui_id id = UI_GenID(placeholder ? placeholder : "##textinput");
 
-  RegisterFocusable(id);
+  UI_RegisterFocusable(id);
 
   i32 padding = UI_GetStyleInt(UI_STYLE_PADDING);
   i32 font_height = Font_GetLineHeight(ctx->font);
@@ -1154,12 +1112,8 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
   } else {
     /* Draw selection highlight */
     if (state->selection_start >= 0 && ctx->focused == id) {
-      i32 start = state->selection_start < state->selection_end
-                      ? state->selection_start
-                      : state->selection_end;
-      i32 end = state->selection_start > state->selection_end
-                    ? state->selection_start
-                    : state->selection_end;
+      i32 start, end;
+      UI_GetSelectionRange(state, &start, &end);
 
       char temp[UI_MAX_TEXT_INPUT_SIZE];
       strncpy(temp, buffer, (size_t)Text_UTF8ByteOffset(buffer, start));
@@ -1199,6 +1153,7 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
 
   return changed;
 }
+
 /* ===== Modal Management ===== */
 
 void UI_BeginModal(const char *name) {
@@ -1220,11 +1175,10 @@ void UI_DrawPanel(rect bounds) {
   ui_context *ctx = g_ui_ctx;
   const theme *th = ctx->theme;
 
-  /* Background */
-  Render_DrawRectRounded(ctx->renderer, bounds, th->radius_md, th->panel);
-
   /* Border */
   rect border = {bounds.x - 1, bounds.y - 1, bounds.w + 2, bounds.h + 2};
   Render_DrawRectRounded(ctx->renderer, border, th->radius_md + 1, th->border);
+
+  /* Background on top of border */
   Render_DrawRectRounded(ctx->renderer, bounds, th->radius_md, th->panel);
 }

@@ -27,6 +27,7 @@ Workbench is a developer tool that serves as a **file explorer on steroids** - a
 - **Handmade Hero style** - direct, low-level, performance-oriented
 - No external dependencies beyond platform APIs
 - Unity build (all source files in a single translation unit)
+- Composable and reusable UI components
 
 ### Naming Conventions
 
