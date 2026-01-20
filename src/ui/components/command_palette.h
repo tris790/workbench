@@ -40,6 +40,7 @@ typedef struct {
   command_callback callback;
   void *user_data;
   b32 is_file;
+  i32 command_index; /* Index into registered commands array */
 } palette_item;
 
 /* Registered command */
@@ -77,6 +78,10 @@ typedef struct {
   /* Registered commands */
   palette_command commands[PALETTE_MAX_COMMANDS];
   i32 command_count;
+
+  /* Recently used commands (indices) */
+  i32 recent_commands[2];
+  i32 recent_count;
 
   /* File system reference (for file search) */
   fs_state *fs;

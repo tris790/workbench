@@ -54,13 +54,55 @@ static void PopulateCommandItems(command_palette_state *state) {
   while (*query == ' ')
     query++;
 
-  for (i32 i = 0;
-       i < state->command_count && state->item_count < PALETTE_MAX_ITEMS; i++) {
+  b32 empty_query = (query[0] == '\0');
+
+  /* Step 1: Add recently used commands first if query is empty */
+  if (empty_query) {
+    for (i32 r = 0; r < state->recent_count; r++) {
+      i32 cmd_idx = state->recent_commands[r];
+      if (cmd_idx < 0 || cmd_idx >= state->command_count)
+        continue;
+
+      palette_command *cmd = &state->commands[cmd_idx];
+
+      palette_item *item = &state->items[state->item_count];
+      memset(item, 0, sizeof(*item));
+      snprintf(item->label, sizeof(item->label), "%s", cmd->name);
+      snprintf(item->shortcut, sizeof(item->shortcut), "%s", cmd->shortcut);
+      snprintf(item->category, sizeof(item->category), "recently used");
+      snprintf(item->tags, sizeof(item->tags), "%s", cmd->tags);
+      item->icon = FILE_ICON_UNKNOWN;
+      item->is_file = false;
+      item->callback = cmd->callback;
+      item->user_data = cmd->user_data;
+      item->command_index = cmd_idx;
+
+      state->item_count++;
+      if (state->item_count >= PALETTE_MAX_ITEMS)
+        return;
+    }
+  }
+
+  /* Step 2: Add matching commands */
+  for (i32 i = 0; i < state->command_count; i++) {
     palette_command *cmd = &state->commands[i];
+
+    /* If query is empty, skip commands already added in recent list */
+    if (empty_query) {
+      b32 already_added = false;
+      for (i32 r = 0; r < state->recent_count; r++) {
+        if (state->recent_commands[r] == i) {
+          already_added = true;
+          break;
+        }
+      }
+      if (already_added)
+        continue;
+    }
 
     /* Filter by query */
     b32 match = false;
-    if (query[0] == '\0') {
+    if (empty_query) {
       match = true;
     } else {
       /* Match name OR tags */
@@ -79,12 +121,15 @@ static void PopulateCommandItems(command_palette_state *state) {
     snprintf(item->shortcut, sizeof(item->shortcut), "%s", cmd->shortcut);
     snprintf(item->category, sizeof(item->category), "%s", cmd->category);
     snprintf(item->tags, sizeof(item->tags), "%s", cmd->tags);
-    item->icon = FILE_ICON_UNKNOWN; /* Commands don't have file icons */
+    item->icon = FILE_ICON_UNKNOWN;
     item->is_file = false;
     item->callback = cmd->callback;
     item->user_data = cmd->user_data;
+    item->command_index = i;
 
     state->item_count++;
+    if (state->item_count >= PALETTE_MAX_ITEMS)
+      break;
   }
 }
 
@@ -102,6 +147,34 @@ static void CommandPalette_ExecuteSelectedItem(command_palette_state *state) {
       FS_LoadDirectory(state->fs, entry->path);
     }
   } else {
+    /* Track recently used command */
+    i32 cmd_idx = item->command_index;
+
+    /* Move to top of recent list */
+    i32 existing_recent_idx = -1;
+    for (i32 i = 0; i < state->recent_count; i++) {
+      if (state->recent_commands[i] == cmd_idx) {
+        existing_recent_idx = i;
+        break;
+      }
+    }
+
+    if (existing_recent_idx != -1) {
+      /* Shift everything down until the existing slot */
+      for (i32 i = existing_recent_idx; i > 0; i--) {
+        state->recent_commands[i] = state->recent_commands[i - 1];
+      }
+    } else {
+      /* Shift everything down */
+      if (state->recent_count < 2) {
+        state->recent_count++;
+      }
+      for (i32 i = state->recent_count - 1; i > 0; i--) {
+        state->recent_commands[i] = state->recent_commands[i - 1];
+      }
+    }
+    state->recent_commands[0] = cmd_idx;
+
     /* Execute command callback */
     if (item->callback) {
       item->callback(item->user_data);
@@ -119,6 +192,10 @@ void CommandPalette_Init(command_palette_state *state, fs_state *fs) {
   state->mode = PALETTE_MODE_CLOSED;
   state->item_height = 28;
   state->selected_index = 0;
+
+  state->recent_count = 0;
+  state->recent_commands[0] = -1;
+  state->recent_commands[1] = -1;
 
   /* Initialize smooth animation */
   state->fade_anim.current = 0.0f;
