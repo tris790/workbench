@@ -202,6 +202,45 @@ b32 Platform_WindowShouldClose(platform_window *window) {
   return window ? window->should_close : true;
 }
 
+void Platform_RequestQuit(platform_window *window) {
+  if (window) {
+    window->should_close = true;
+    PostMessage(window->hwnd, WM_CLOSE, 0, 0);
+  }
+}
+
+void Platform_SetFullscreen(platform_window *window, b32 fullscreen) {
+  if (!window)
+    return;
+  if (window->fullscreen == fullscreen)
+    return;
+
+  DWORD style = GetWindowLong(window->hwnd, GWL_STYLE);
+  if (fullscreen) {
+    MONITORINFO mi = {sizeof(mi)};
+    if (GetWindowPlacement(window->hwnd, &window->window_position) &&
+        GetMonitorInfo(
+            MonitorFromWindow(window->hwnd, MONITOR_DEFAULTTOPRIMARY), &mi)) {
+      SetWindowLong(window->hwnd, GWL_STYLE, style & ~WS_OVERLAPPEDWINDOW);
+      SetWindowPos(window->hwnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top,
+                   mi.rcMonitor.right - mi.rcMonitor.left,
+                   mi.rcMonitor.bottom - mi.rcMonitor.top,
+                   SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+    }
+  } else {
+    SetWindowLong(window->hwnd, GWL_STYLE, style | WS_OVERLAPPEDWINDOW);
+    SetWindowPlacement(window->hwnd, &window->window_position);
+    SetWindowPos(window->hwnd, NULL, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER |
+                     SWP_FRAMECHANGED);
+  }
+  window->fullscreen = fullscreen;
+}
+
+b32 Platform_IsFullscreen(platform_window *window) {
+  return window ? window->fullscreen : false;
+}
+
 void *Platform_GetFramebuffer(platform_window *window) {
   if (!window)
     return NULL;
