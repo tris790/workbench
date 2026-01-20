@@ -18,6 +18,7 @@
 #define PALETTE_MAX_ITEMS 128
 #define PALETTE_MAX_COMMANDS 64
 #define PALETTE_MAX_SHORTCUT 32
+#define PALETTE_MAX_RECENT_COMMANDS 2
 
 /* ===== Types ===== */
 
@@ -80,7 +81,7 @@ typedef struct {
   i32 command_count;
 
   /* Recently used commands (indices) */
-  i32 recent_commands[2];
+  i32 recent_commands[PALETTE_MAX_RECENT_COMMANDS];
   i32 recent_count;
 
   /* File system reference (for file search) */

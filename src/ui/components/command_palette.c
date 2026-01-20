@@ -43,6 +43,22 @@ static void PopulateFileItems(command_palette_state *state) {
   }
 }
 
+/* Fill a palette item from a registered command */
+static void FillItemFromCommand(palette_item *item, palette_command *cmd,
+                                i32 cmd_idx, const char *category_override) {
+  memset(item, 0, sizeof(*item));
+  snprintf(item->label, sizeof(item->label), "%s", cmd->name);
+  snprintf(item->shortcut, sizeof(item->shortcut), "%s", cmd->shortcut);
+  snprintf(item->category, sizeof(item->category), "%s",
+           category_override ? category_override : cmd->category);
+  snprintf(item->tags, sizeof(item->tags), "%s", cmd->tags);
+  item->icon = FILE_ICON_UNKNOWN;
+  item->is_file = false;
+  item->callback = cmd->callback;
+  item->user_data = cmd->user_data;
+  item->command_index = cmd_idx;
+}
+
 /* Populate items list for command mode */
 static void PopulateCommandItems(command_palette_state *state) {
   state->item_count = 0;
@@ -63,19 +79,8 @@ static void PopulateCommandItems(command_palette_state *state) {
       if (cmd_idx < 0 || cmd_idx >= state->command_count)
         continue;
 
-      palette_command *cmd = &state->commands[cmd_idx];
-
-      palette_item *item = &state->items[state->item_count];
-      memset(item, 0, sizeof(*item));
-      snprintf(item->label, sizeof(item->label), "%s", cmd->name);
-      snprintf(item->shortcut, sizeof(item->shortcut), "%s", cmd->shortcut);
-      snprintf(item->category, sizeof(item->category), "recently used");
-      snprintf(item->tags, sizeof(item->tags), "%s", cmd->tags);
-      item->icon = FILE_ICON_UNKNOWN;
-      item->is_file = false;
-      item->callback = cmd->callback;
-      item->user_data = cmd->user_data;
-      item->command_index = cmd_idx;
+      FillItemFromCommand(&state->items[state->item_count],
+                          &state->commands[cmd_idx], cmd_idx, "recently used");
 
       state->item_count++;
       if (state->item_count >= PALETTE_MAX_ITEMS)
@@ -115,17 +120,7 @@ static void PopulateCommandItems(command_palette_state *state) {
       continue;
     }
 
-    palette_item *item = &state->items[state->item_count];
-    memset(item, 0, sizeof(*item));
-    snprintf(item->label, sizeof(item->label), "%s", cmd->name);
-    snprintf(item->shortcut, sizeof(item->shortcut), "%s", cmd->shortcut);
-    snprintf(item->category, sizeof(item->category), "%s", cmd->category);
-    snprintf(item->tags, sizeof(item->tags), "%s", cmd->tags);
-    item->icon = FILE_ICON_UNKNOWN;
-    item->is_file = false;
-    item->callback = cmd->callback;
-    item->user_data = cmd->user_data;
-    item->command_index = i;
+    FillItemFromCommand(&state->items[state->item_count], cmd, i, NULL);
 
     state->item_count++;
     if (state->item_count >= PALETTE_MAX_ITEMS)
@@ -143,8 +138,12 @@ static void CommandPalette_ExecuteSelectedItem(command_palette_state *state) {
   if (item->is_file) {
     /* Navigate to file or directory */
     fs_entry *entry = (fs_entry *)item->user_data;
-    if (entry && entry->is_directory) {
-      FS_LoadDirectory(state->fs, entry->path);
+    if (entry) {
+      if (entry->is_directory) {
+        FS_LoadDirectory(state->fs, entry->path);
+      } else {
+        Platform_OpenFile(entry->path);
+      }
     }
   } else {
     /* Track recently used command */
@@ -166,7 +165,7 @@ static void CommandPalette_ExecuteSelectedItem(command_palette_state *state) {
       }
     } else {
       /* Shift everything down */
-      if (state->recent_count < 2) {
+      if (state->recent_count < PALETTE_MAX_RECENT_COMMANDS) {
         state->recent_count++;
       }
       for (i32 i = state->recent_count - 1; i > 0; i--) {
@@ -194,8 +193,9 @@ void CommandPalette_Init(command_palette_state *state, fs_state *fs) {
   state->selected_index = 0;
 
   state->recent_count = 0;
-  state->recent_commands[0] = -1;
-  state->recent_commands[1] = -1;
+  for (i32 i = 0; i < PALETTE_MAX_RECENT_COMMANDS; i++) {
+    state->recent_commands[i] = -1;
+  }
 
   /* Initialize smooth animation */
   state->fade_anim.current = 0.0f;
@@ -450,7 +450,7 @@ void CommandPalette_Render(command_palette_state *state, ui_context *ui,
 
   /* Blinking cursor at cursor position (don't blink when there's a selection)
    */
-  if (state->just_opened || CommandPalette_IsOpen(state)) {
+  if (CommandPalette_IsOpen(state)) {
     state->input_state.cursor_blink += ui->dt;
     b32 show_cursor = (state->input_state.selection_start >= 0) ||
                       ((i32)(state->input_state.cursor_blink * 2) % 2 == 0);
@@ -521,9 +521,11 @@ void CommandPalette_Render(command_palette_state *state, ui_context *ui,
     if (state->scroll.target_offset.y > max_scroll) {
       state->scroll.target_offset.y = max_scroll;
     }
-    state->scroll.scroll_v.target = state->scroll.target_offset.y;
     state->scroll_to_selection = false;
   }
+
+  /* Always sync smooth scroll target */
+  state->scroll.scroll_v.target = state->scroll.target_offset.y;
 
   /* Smooth scroll animation */
   SmoothValue_Update(&state->scroll.scroll_v, ui->dt);
@@ -572,7 +574,7 @@ void CommandPalette_Render(command_palette_state *state, ui_context *ui,
     i32 text_x = item_rect.x + 12;
     i32 text_y = item_rect.y + (state->item_height - 16) / 2;
 
-    color item_text = selected ? th->text : th->text;
+    color item_text = selected ? th->text : th->text_muted;
     item_text.a = (u8)(item_text.a * fade);
 
     Render_DrawText(renderer, (v2i){text_x, text_y}, item->label, f, item_text);
