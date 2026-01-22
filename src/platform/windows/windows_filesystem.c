@@ -11,20 +11,6 @@
 #include "windows_internal.h"
 #include <shlwapi.h>
 
-/* ===== UTF-8 / UTF-16 Conversion Helpers ===== */
-
-static int Utf8ToWide(const char *utf8, wchar_t *wide, int wide_size) {
-  if (!utf8 || !wide || wide_size <= 0)
-    return 0;
-  return MultiByteToWideChar(CP_UTF8, 0, utf8, -1, wide, wide_size);
-}
-
-static int WideToUtf8(const wchar_t *wide, char *utf8, int utf8_size) {
-  if (!wide || !utf8 || utf8_size <= 0)
-    return 0;
-  return WideCharToMultiByte(CP_UTF8, 0, wide, -1, utf8, utf8_size, NULL, NULL);
-}
-
 /* ===== File System API ===== */
 
 b32 Platform_ListDirectory(const char *path, directory_listing *listing,
@@ -66,13 +52,10 @@ b32 Platform_ListDirectory(const char *path, directory_listing *listing,
 
     /* Convert filename to UTF-8 */
     if (WideToUtf8(find_data.cFileName, info->name, sizeof(info->name)) == 0) {
-      /* Conversion failed (likely name too long or invalid chars) - skip entry
-       */
       continue;
     }
 
-    /* Skip entries with empty names or just dots (though . is skipped above, ..
-     * might act weird if converted poorly) */
+    /* Skip entries with empty names */
     if (info->name[0] == '\0') {
       continue;
     }
@@ -86,15 +69,13 @@ b32 Platform_ListDirectory(const char *path, directory_listing *listing,
       info->type = FILE_TYPE_FILE;
     }
 
-    /* File size (combine high and low parts) */
+    /* File size */
     info->size = ((u64)find_data.nFileSizeHigh << 32) | find_data.nFileSizeLow;
 
-    /* Convert FILETIME to Unix timestamp */
+    /* Time */
     ULARGE_INTEGER ull;
     ull.LowPart = find_data.ftLastWriteTime.dwLowDateTime;
     ull.HighPart = find_data.ftLastWriteTime.dwHighDateTime;
-    /* FILETIME is 100-nanosecond intervals since Jan 1, 1601 */
-    /* Unix epoch is Jan 1, 1970 - difference is 116444736000000000 */
     info->modified_time = (ull.QuadPart - 116444736000000000ULL) / 10000000ULL;
 
     listing->count++;

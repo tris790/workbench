@@ -88,10 +88,11 @@ static inline void ArenaInit(memory_arena *arena, void *base, usize size) {
 }
 
 static inline void *ArenaPush(memory_arena *arena, usize size) {
+  /* Enforce 8-byte alignment */
+  usize aligned_used = (arena->used + 7) & ~7;
+  arena->used = aligned_used;
+
   if (arena->used + size > arena->size) {
-    fprintf(stderr,
-            "Arena out of memory! Requested: %zu, Used: %zu, Total: %zu\n",
-            size, arena->used, arena->size);
     return NULL;
   }
   void *result = arena->base + arena->used;

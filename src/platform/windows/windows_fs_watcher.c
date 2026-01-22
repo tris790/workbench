@@ -31,26 +31,20 @@ b32 FSWatcher_WatchDirectory(fs_watcher *watcher, const char *path) {
   if (!watcher || !path)
     return false;
 
-  /* Stop watching previous directory if any */
   FSWatcher_StopWatching(watcher);
 
-  /* Convert path to wide string */
-  wchar_t wide_path[1024];
-  if (MultiByteToWideChar(CP_UTF8, 0, path, -1, wide_path, 1024) == 0) {
+  wchar_t wide_path[FS_MAX_PATH];
+  if (Utf8ToWide(path, wide_path, FS_MAX_PATH) == 0)
     return false;
-  }
 
-  /* Create change notification handle */
   watcher->handle = FindFirstChangeNotificationW(
-      wide_path, FALSE, /* Don't watch subtree */
+      wide_path, FALSE,
       FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME |
-          FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_SIZE);
+          FILE_NOTIFY_CHANGE_LAST_WRITE);
 
-  if (watcher->handle == INVALID_HANDLE_VALUE) {
+  if (watcher->handle == INVALID_HANDLE_VALUE)
     return false;
-  }
 
-  /* Store path for reference */
   strncpy(watcher->path, path, sizeof(watcher->path) - 1);
   watcher->path[sizeof(watcher->path) - 1] = '\0';
 

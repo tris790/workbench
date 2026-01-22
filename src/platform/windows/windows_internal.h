@@ -72,4 +72,18 @@ u32 GetModifierState(void);
 b32 CreateFramebuffer(platform_window *window);
 void DestroyFramebuffer(platform_window *window);
 
+/* ===== String Conversions ===== */
+
+static inline int Utf8ToWide(const char *utf8, wchar_t *wide, int wide_size) {
+  if (!utf8 || !wide || wide_size <= 0)
+    return 0;
+  return MultiByteToWideChar(CP_UTF8, 0, utf8, -1, wide, wide_size);
+}
+
+static inline int WideToUtf8(const wchar_t *wide, char *utf8, int utf8_size) {
+  if (!wide || !utf8 || utf8_size <= 0)
+    return 0;
+  return WideCharToMultiByte(CP_UTF8, 0, wide, -1, utf8, utf8_size, NULL, NULL);
+}
+
 #endif /* WINDOWS_INTERNAL_H */

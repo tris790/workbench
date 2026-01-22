@@ -330,7 +330,6 @@ b32 FS_LoadDirectory(fs_state *state, const char *path) {
   }
   FS_NormalizePath(resolved);
 
-  /* Create temporary memory scope for listing */
   temporary_memory temp = BeginTemporaryMemory(state->arena);
 
   /* Load directory listing from platform */
