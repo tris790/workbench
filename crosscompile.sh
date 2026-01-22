@@ -65,7 +65,7 @@ INCLUDES="-Isrc -Isrc/core -Isrc/platform -Isrc/renderer -Isrc/ui -Isrc/ui/compo
 
 # Flags
 # -static to avoid dependency on libgcc/libstdc++ dlls if using mingw
-CFLAGS="-target x86_64-windows-gnu -std=c99 -g -gcodeview -DUNICODE -D_UNICODE -D_CRT_SECURE_NO_WARNINGS -DWB_DEBUG"
+CFLAGS="-target x86_64-windows-gnu -std=c99 -g -gcodeview -DUNICODE -D_UNICODE -D_CRT_SECURE_NO_WARNINGS -DWB_DEBUG -Wl,--subsystem,windows"
 LIBS="-luser32 -lgdi32 -lshell32 -lshlwapi -ldwrite -luuid -lopengl32"
 
 # Compile
