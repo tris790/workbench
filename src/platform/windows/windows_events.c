@@ -287,14 +287,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         mods |= 1; /* MOD_SHIFT is 1 */
 
       /* Check if this key will produce a printable character via WM_CHAR.
-       * If so, we'll wait for WM_CHAR to send the EVENT_KEY_DOWN so we can
-       * include the character codepoint in a single event. */
-      BYTE kst[256];
-      GetKeyboardState(kst);
-      WCHAR buf[2];
-      int res =
-          ToUnicode((UINT)wParam, (UINT)(lParam >> 16) & 0xFF, kst, buf, 2, 0);
-      bool is_printable = (res == 1 && buf[0] >= 32);
+       * We use MapVirtualKey instead of ToUnicode to avoid modifying the
+       * kernel keyboard state (which can break dead keys and cause infinite
+       * loops with tools like PowerToys Quick Accent).
+       */
+      UINT ch = MapVirtualKeyW((UINT)wParam, 2 /* MAPVK_VK_TO_CHAR */);
+      bool is_printable = ((ch & 0x7FFFFFFF) >= 32 && (ch & 0x7FFFFFFF) != 127);
 
       /* We send the event now if:
        * 1. It's NOT a printable character (e.g. Esc, Arrows, Return, etc.)
