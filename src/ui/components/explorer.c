@@ -733,7 +733,7 @@ static void Explorer_OnConfirm(explorer_state *state) {
          idx = FS_GetNextSelected(&state->fs, idx)) {
       fs_entry *entry = FS_GetEntry(&state->fs, idx);
       if (entry && strcmp(entry->name, "..") != 0) {
-        FS_Delete(entry->path);
+        FS_Delete(entry->path, state->fs.arena);
       }
     }
     Explorer_Refresh(state);

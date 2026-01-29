@@ -143,14 +143,38 @@ b32 Platform_CreateFile(const char *path) {
   return false;
 }
 
+#include <sys/wait.h>
+
 b32 Platform_Delete(const char *path) {
   struct stat st;
   if (stat(path, &st) != 0)
     return false;
 
   if (S_ISDIR(st.st_mode)) {
-    return rmdir(path) == 0;
+    /* Use rm -rf for fast recursive deletion */
+    pid_t pid = fork();
+    if (pid == -1)
+      return false;
+
+    if (pid == 0) {
+      /* Child process */
+      int null_fd = open("/dev/null", O_WRONLY);
+      if (null_fd >= 0) {
+        dup2(null_fd, STDOUT_FILENO);
+        dup2(null_fd, STDERR_FILENO);
+        close(null_fd);
+      }
+
+      execlp("rm", "rm", "-rf", path, NULL);
+      _exit(1); /* Should not be reached */
+    }
+
+    /* Parent process */
+    int status;
+    waitpid(pid, &status, 0);
+    return WIFEXITED(status) && WEXITSTATUS(status) == 0;
   }
+
   return unlink(path) == 0;
 }
 

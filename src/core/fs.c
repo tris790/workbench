@@ -616,7 +616,10 @@ b32 FS_NavigateHome(fs_state *state) {
 
 /* ===== File Operations ===== */
 
-b32 FS_Delete(const char *path) { return Platform_Delete(path); }
+b32 FS_Delete(const char *path, memory_arena *arena) {
+  (void)arena; /* Unused, platform handles recursion if needed */
+  return Platform_Delete(path);
+}
 
 b32 FS_Rename(const char *old_path, const char *new_path) {
   return Platform_Rename(old_path, new_path);

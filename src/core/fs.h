@@ -150,8 +150,8 @@ b32 FS_NavigateHome(fs_state *state);
 
 /* ===== File Operations ===== */
 
-/* Delete file or empty directory */
-b32 FS_Delete(const char *path);
+/* Delete file or recursively delete directory */
+b32 FS_Delete(const char *path, memory_arena *arena);
 
 /* Rename file or directory */
 b32 FS_Rename(const char *old_path, const char *new_path);
