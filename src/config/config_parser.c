@@ -113,7 +113,12 @@ static const char *DEFAULT_CONFIG_CONTENT =
     "# %filepath will be replaced with the path of the right-clicked item\n"
     "# context_menu.custom.Open in Code = code %filepath\n"
     "# context_menu.custom.Open Terminal Here = ghostty "
-    "--working-directory=%filepath\n";
+    "--working-directory=%filepath\n"
+    "# Example:\n"
+    "# context_menu.actions.1.label = VS Code\n"
+    "# context_menu.actions.1.cmd = code %filepath\n"
+    "# context_menu.actions.1.icon = "
+    "/usr/share/pixmaps/visual-studio-code.png\n";
 
 b32 ConfigParser_Load(void) {
   const char *path = ConfigParser_GetPath();

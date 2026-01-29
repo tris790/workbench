@@ -9,6 +9,7 @@
 #define CONTEXT_MENU_H
 
 #include "../../core/animation.h"
+#include "../../core/fs.h"
 #include "../ui.h"
 
 /* ===== Configuration ===== */
@@ -40,6 +41,14 @@ typedef struct {
   b32 enabled;
 } menu_item;
 
+/* Custom action (icon only) */
+typedef struct {
+  file_icon_type icon_type;
+  struct image_s *icon_img; /* Loaded image (if any) */
+  char command[256];
+  char label[64]; /* For tooltip/config reference */
+} custom_action;
+
 /* Context menu state */
 typedef struct context_menu_state_s {
   /* Items */
@@ -47,8 +56,9 @@ typedef struct context_menu_state_s {
   i32 item_count;
 
   /* Position and selection */
-  v2i position;       /* Screen position (top-left) */
-  i32 selected_index; /* Keyboard selection (-1 = none) */
+  v2i position;              /* Screen position (top-left) */
+  i32 selected_index;        /* Keyboard selection (-1 = none) */
+  i32 selected_action_index; /* Icon row selection (-1 = none) */
 
   /* Context */
   context_type type;
@@ -61,10 +71,15 @@ typedef struct context_menu_state_s {
   /* Cached dimensions */
   i32 item_height;
   i32 menu_width;
+  i32 action_row_height; /* Height of the icon row (0 if no actions) */
 
   /* Custom commands storage */
   char custom_commands[8][256]; /* Labels or command templates */
   i32 custom_command_count;
+
+  /* Custom icon actions (horizontal row) */
+  custom_action custom_actions[8];
+  i32 custom_action_count;
 
   /* References for action callbacks (set when menu is shown) */
   struct explorer_state_s *explorer;
@@ -92,6 +107,9 @@ b32 ContextMenu_IsMouseOver(context_menu_state *state, v2i mouse_pos);
 
 /* Update context menu (handles input, returns true if consuming input) */
 b32 ContextMenu_Update(context_menu_state *state, ui_context *ui);
+
+/* Refresh context menu configuration (reload icons, etc.) */
+void ContextMenu_RefreshConfig(context_menu_state *state);
 
 /* Render context menu overlay */
 void ContextMenu_Render(context_menu_state *state, ui_context *ui,

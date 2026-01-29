@@ -245,6 +245,27 @@ static void RestoreStderr(void) {}
 
 /* ===== Helper Functions ===== */
 
+#include "../../core/image.h"
+
+static void UploadImageTexture(gl_backend_state *state, image *img) {
+  (void)state;
+  if (img->texture_id != 0)
+    return;
+
+  glGenTextures(1, &img->texture_id);
+  glBindTexture(GL_TEXTURE_2D, img->texture_id);
+
+  /* Upload texture data */
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img->width, img->height, 0, GL_RGBA,
+               GL_UNSIGNED_BYTE, img->pixels);
+
+  /* Set parameters */
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+}
+
 static u32 CompileShader(GLenum type, const char *source) {
   u32 shader = glCreateShader(type);
   glShaderSource(shader, 1, &source, NULL);
@@ -1114,9 +1135,48 @@ static void GL_SetClipRect(render_context *ctx, rect r) {
   /* Clamp to 0 if negative (though r.y + r.h should be <= height if caller
    * clamped) */
   if (y_bottom < 0)
-    y_bottom = 0;
+    glScissor(r.x, y_bottom, r.w, r.h);
+}
 
-  glScissor(r.x, y_bottom, r.w, r.h);
+static void GL_DrawImage(render_context *ctx, rect r, struct image_s *img_ptr,
+                         color c) {
+  gl_backend_state *state = (gl_backend_state *)ctx->backend->user_data;
+  image *img = (image *)img_ptr;
+
+  if (!img || !img->pixels)
+    return;
+
+  /* Ensure texture is uploaded */
+  if (img->texture_id == 0) {
+    UploadImageTexture(state, img);
+  }
+
+  SetBatchState(state, state->rect_program, img->texture_id);
+  EnsureBatchCapacity(state, 6);
+
+  f32 x0 = (f32)r.x;
+  f32 y0 = (f32)r.y;
+  f32 x1 = (f32)(r.x + r.w);
+  f32 y1 = (f32)(r.y + r.h);
+
+  f32 cr = c.r / 255.0f;
+  f32 cg = c.g / 255.0f;
+  f32 cb = c.b / 255.0f;
+  f32 ca = c.a / 255.0f;
+
+  gl_vertex *v = &state->vertices[state->vertex_count];
+
+  /* Triangle 1 */
+  v[0] = (gl_vertex){x0, y0, 0, 0, cr, cg, cb, ca, 0, 0, 0, 0, 0};
+  v[1] = (gl_vertex){x1, y0, 1, 0, cr, cg, cb, ca, 0, 0, 0, 0, 0};
+  v[2] = (gl_vertex){x1, y1, 1, 1, cr, cg, cb, ca, 0, 0, 0, 0, 0};
+
+  /* Triangle 2 */
+  v[3] = (gl_vertex){x0, y0, 0, 0, cr, cg, cb, ca, 0, 0, 0, 0, 0};
+  v[4] = (gl_vertex){x1, y1, 1, 1, cr, cg, cb, ca, 0, 0, 0, 0, 0};
+  v[5] = (gl_vertex){x0, y1, 0, 1, cr, cg, cb, ca, 0, 0, 0, 0, 0};
+
+  state->vertex_count += 6;
 }
 
 static gl_backend_state g_gl_state = {0};
@@ -1132,6 +1192,7 @@ static renderer_backend g_opengl_backend = {.name = "OpenGL",
                                                 GL_DrawRectRounded,
                                             .set_clip_rect = GL_SetClipRect,
                                             .draw_text = GL_DrawText,
+                                            .draw_image = GL_DrawImage,
                                             .set_window = GL_SetWindow,
                                             .presents_frame = true,
                                             .user_data = &g_gl_state};

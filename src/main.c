@@ -344,6 +344,8 @@ int main(int argc, char **argv) {
       Theme_InitFromConfig();
       /* Update explorer settings */
       Layout_RefreshConfig(&layout);
+      /* Update context menu icons */
+      ContextMenu_RefreshConfig(&context_menu);
 
       /* Reload fonts */
       i32 ui_font_size = (i32)Config_GetI64("ui.font_size", 16);

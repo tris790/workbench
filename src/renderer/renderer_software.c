@@ -225,6 +225,55 @@ static void Software_SetWindow(render_context *ctx,
      it uses pixels provided by the platform. */
 }
 
+#include "../core/image.h"
+
+static void Software_DrawImage(render_context *ctx, rect r,
+                               struct image_s *img_ptr, color tint) {
+  if (!ctx->pixels || !img_ptr)
+    return;
+
+  image *img = (image *)img_ptr;
+  if (!img->pixels)
+    return;
+
+  /* Simple Nearest Neighbor Scaling */
+
+  /* Clip rectangle to clip region */
+  i32 x0 = ClampI32(r.x, ctx->clip.x, ctx->clip.x + ctx->clip.w);
+  i32 y0 = ClampI32(r.y, ctx->clip.y, ctx->clip.y + ctx->clip.h);
+  i32 x1 = ClampI32(r.x + r.w, ctx->clip.x, ctx->clip.x + ctx->clip.w);
+  i32 y1 = ClampI32(r.y + r.h, ctx->clip.y, ctx->clip.y + ctx->clip.h);
+
+  if (x0 >= x1 || y0 >= y1)
+    return;
+
+  f32 u_scale = (f32)img->width / (f32)r.w;
+  f32 v_scale = (f32)img->height / (f32)r.h;
+
+  for (i32 y = y0; y < y1; y++) {
+    u32 *row = ctx->pixels + y * ctx->stride;
+    i32 v = (i32)((y - r.y) * v_scale);
+
+    for (i32 x = x0; x < x1; x++) {
+      i32 u = (i32)((x - r.x) * u_scale);
+
+      u32 src_pixel = Image_GetPixel(img, u, v);
+
+      /* Apply tint if needed (simplified: just alpha) */
+      /* Note: Image_GetPixel returns ARGB */
+
+      if (tint.a != 255) {
+        /* Extract alpha from src */
+        u8 a = (src_pixel >> 24) & 0xFF;
+        a = (u8)((a * tint.a) / 255);
+        src_pixel = (src_pixel & 0x00FFFFFF) | ((u32)a << 24);
+      }
+
+      row[x] = BlendPixel(row[x], src_pixel);
+    }
+  }
+}
+
 /* ===== Backend Creation ===== */
 
 static renderer_backend g_software_backend = {
@@ -238,6 +287,7 @@ static renderer_backend g_software_backend = {
     .draw_rect_rounded = Software_DrawRectRounded,
     .set_clip_rect = NULL,
     .draw_text = Software_DrawText,
+    .draw_image = Software_DrawImage,
     .set_window = Software_SetWindow,
     .presents_frame = false,
     .user_data = NULL};
@@ -336,4 +386,13 @@ void Render_DrawText(render_context *ctx, v2i pos, const char *text, font *f,
 void Render_DrawTextDefault(render_context *ctx, v2i pos, const char *text,
                             color c) {
   Render_DrawText(ctx, pos, text, ctx->default_font, c);
+}
+
+/* ===== Image Drawing (Hardware Agnostic) ===== */
+
+void Render_DrawImage(render_context *ctx, rect r, struct image_s *img,
+                      color tint) {
+  if (ctx->backend && ctx->backend->draw_image) {
+    ctx->backend->draw_image(ctx, r, img, tint);
+  }
 }

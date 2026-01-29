@@ -11,6 +11,7 @@
 #include "core/assets_embedded.c"
 #include "core/fs.c"
 #include "core/fuzzy_match.c"
+#include "core/image.c"
 #include "core/input.c"
 #include "core/key_repeat.c"
 #include "core/text.c"

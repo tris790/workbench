@@ -7,6 +7,7 @@
 
 #include "context_menu.h"
 #include "../../config/config.h"
+#include "../../core/image.h"
 #include "../../core/input.h"
 #include "../../platform/platform.h"
 #include "explorer.h"
@@ -114,12 +115,98 @@ static void PopulateEmptyMenu(context_menu_state *state) {
   PopulateCustomItems(state);
 }
 
+#include "../../renderer/icons.h"
+
+static file_icon_type GetIconTypeFromString(const char *name) {
+  if (strcmp(name, "code") == 0)
+    return FILE_ICON_CODE_OTHER;
+  if (strcmp(name, "terminal") == 0)
+    return FILE_ICON_EXECUTABLE;
+  if (strcmp(name, "folder") == 0)
+    return FILE_ICON_DIRECTORY;
+  if (strcmp(name, "file") == 0)
+    return FILE_ICON_FILE;
+  if (strcmp(name, "image") == 0)
+    return FILE_ICON_IMAGE;
+  if (strcmp(name, "audio") == 0)
+    return FILE_ICON_AUDIO;
+  if (strcmp(name, "video") == 0)
+    return FILE_ICON_VIDEO;
+  if (strcmp(name, "config") == 0)
+    return FILE_ICON_CONFIG;
+  if (strcmp(name, "archive") == 0)
+    return FILE_ICON_ARCHIVE;
+  return FILE_ICON_UNKNOWN;
+}
+
+void ContextMenu_RefreshConfig(context_menu_state *state) {
+  /* Free existing images before reloading */
+  for (i32 j = 0; j < 8; j++) {
+    if (state->custom_actions[j].icon_img) {
+      Image_Free(state->custom_actions[j].icon_img);
+      state->custom_actions[j].icon_img = NULL;
+    }
+  }
+  state->custom_action_count = 0;
+
+  /* Check indices 1 through 5 as requested */
+  for (i32 i = 1; i <= 5; i++) {
+    char key_icon[64], key_cmd[64], key_label[64];
+    snprintf(key_icon, sizeof(key_icon), "context_menu.actions.%d.icon", i);
+    snprintf(key_cmd, sizeof(key_cmd), "context_menu.actions.%d.cmd", i);
+    snprintf(key_label, sizeof(key_label), "context_menu.actions.%d.label", i);
+
+    const char *icon_name = Config_GetString(key_icon, "");
+    const char *cmd = Config_GetString(key_cmd, "");
+
+    if (icon_name[0] != '\0' && cmd[0] != '\0') {
+      custom_action *action =
+          &state->custom_actions[state->custom_action_count];
+
+      /* Reset image */
+      action->icon_img = NULL;
+
+      /* Check if it's a file path (contains / or .) */
+      if (strchr(icon_name, '/') || strchr(icon_name, '.') ||
+          strchr(icon_name, '\\')) {
+        action->icon_type = FILE_ICON_IMAGE; /* Fallback type */
+        action->icon_img = Image_Load(icon_name);
+        if (!action->icon_img) {
+          /* Failed to load, fallback to generic */
+          action->icon_type = GetIconTypeFromString(icon_name);
+        }
+      } else {
+        action->icon_type = GetIconTypeFromString(icon_name);
+      }
+
+      /* Fallback to generic code icon if unknown but specified (and no image
+       * loaded) */
+      if (action->icon_type == FILE_ICON_UNKNOWN && !action->icon_img) {
+        action->icon_type = FILE_ICON_CODE_OTHER;
+      }
+
+      strncpy(action->command, cmd, sizeof(action->command) - 1);
+      action->command[sizeof(action->command) - 1] = '\0';
+
+      const char *label = Config_GetString(key_label, cmd);
+      strncpy(action->label, label, sizeof(action->label) - 1);
+      action->label[sizeof(action->label) - 1] = '\0';
+
+      state->custom_action_count++;
+    }
+  }
+}
+
 static void PopulateCustomItems(context_menu_state *state) {
   i32 entry_count = Config_GetEntryCount();
   for (i32 i = 0; i < entry_count; i++) {
     const char *key = Config_GetEntryKey(i);
     if (key && strncmp(key, "context_menu.custom.", 20) == 0) {
       if (Config_GetEntryType(i) != CONFIG_TYPE_STRING)
+        continue;
+
+      /* Skip the new icon actions if they accidentally get picked up */
+      if (strncmp(key, "context_menu.actions.", 21) == 0)
         continue;
 
       const char *label = key + 20;
@@ -155,10 +242,14 @@ static void ContextMenu_ExecuteSelectedItem(context_menu_state *state) {
 
 /* ===== Public API ===== */
 
+/* ===== Public API ===== */
+
 void ContextMenu_Init(context_menu_state *state) {
   memset(state, 0, sizeof(*state));
   state->visible = false;
   state->selected_index = -1;
+  state->selected_action_index = -1;
+  state->action_row_height = 0;
   state->item_height = 28;
   state->menu_width = 180;
 
@@ -166,6 +257,9 @@ void ContextMenu_Init(context_menu_state *state) {
   state->fade_anim.current = 0.0f;
   state->fade_anim.target = 0.0f;
   state->fade_anim.speed = 15.0f;
+
+  /* Load initial config */
+  ContextMenu_RefreshConfig(state);
 
   g_menu = state;
 }
@@ -177,6 +271,7 @@ void ContextMenu_Show(context_menu_state *state, v2i position,
   state->position = position;
   state->type = type;
   state->selected_index = -1;
+  state->selected_action_index = -1;
   state->explorer = explorer;
   state->ui = ui;
 
@@ -204,6 +299,9 @@ void ContextMenu_Show(context_menu_state *state, v2i position,
     break;
   }
 
+  /* Calculate action row height based on loaded actions */
+  state->action_row_height = (state->custom_action_count > 0) ? 36 : 0;
+
   /* Calculate optimal width */
   state->menu_width = 180; /* Minimum width */
 
@@ -221,6 +319,13 @@ void ContextMenu_Show(context_menu_state *state, v2i position,
     if (needed_width > state->menu_width) {
       state->menu_width = needed_width;
     }
+  }
+
+  /* If we have many icons, ensure width is enough */
+  if (state->custom_action_count > 0) {
+    i32 icons_width = state->custom_action_count * 32 + 16;
+    if (icons_width > state->menu_width)
+      state->menu_width = icons_width;
   }
 
   /* Start fade-in animation */
@@ -257,6 +362,9 @@ b32 ContextMenu_IsMouseOver(context_menu_state *state, v2i mouse_pos) {
 
   i32 menu_height =
       state->item_count * state->item_height + separator_count * 8 + 8;
+
+  /* Add action row height */
+  menu_height += state->action_row_height;
 
   rect menu_rect = {state->position.x, state->position.y, state->menu_width,
                     menu_height};
@@ -320,6 +428,9 @@ b32 ContextMenu_Update(context_menu_state *state, ui_context *ui) {
     i32 menu_height =
         state->item_count * state->item_height + separator_count * 8 + 8;
 
+    /* Add action row height */
+    menu_height += state->action_row_height;
+
     rect menu_rect = {state->position.x, state->position.y, state->menu_width,
                       menu_height};
 
@@ -340,6 +451,21 @@ b32 ContextMenu_Update(context_menu_state *state, ui_context *ui) {
           item_y += state->item_height;
           if (state->items[i].separator_after) {
             item_y += 8;
+          }
+        }
+
+        /* Check custom action row */
+        if (state->custom_action_count > 0) {
+          item_y += 5;
+          i32 action_start_x = state->position.x + 8;
+          for (i32 i = 0; i < state->custom_action_count; i++) {
+            rect action_rect = {action_start_x + i * 32, item_y, 28, 28};
+            if (UI_PointInRect(input->mouse_pos, action_rect)) {
+              Action_CustomCommand(state->custom_actions[i].command);
+              ContextMenu_Close(state);
+              input->mouse_pressed[MOUSE_LEFT] = false;
+              return true;
+            }
           }
         }
       }
@@ -369,6 +495,7 @@ void ContextMenu_Render(context_menu_state *state, ui_context *ui,
 
   f32 fade = state->fade_anim.current;
 
+  /* ... inside ContextMenu_Render ... */
   /* Calculate menu dimensions */
   i32 separator_count = 0;
   for (i32 i = 0; i < state->item_count; i++) {
@@ -378,6 +505,9 @@ void ContextMenu_Render(context_menu_state *state, ui_context *ui,
 
   i32 menu_height =
       state->item_count * state->item_height + separator_count * 8 + 8;
+
+  /* Add action row height */
+  menu_height += state->action_row_height;
 
   /* Adjust position if menu would go off-screen */
   i32 menu_x = state->position.x;
@@ -427,9 +557,20 @@ void ContextMenu_Render(context_menu_state *state, ui_context *ui,
     b32 hovered = UI_PointInRect(input->mouse_pos, item_rect);
     b32 selected = (i == state->selected_index);
 
+    /* Ensure we don't select regular items if we are hovering action row */
+    if (state->action_row_height > 0) {
+      rect action_row_check = {menu_x,
+                               menu_y + menu_height - state->action_row_height,
+                               state->menu_width, state->action_row_height};
+      if (UI_PointInRect(input->mouse_pos, action_row_check)) {
+        hovered = false;
+      }
+    }
+
     /* Update selection on hover */
     if (hovered && state->visible) {
       state->selected_index = i;
+      state->selected_action_index = -1; /* Deselect action row */
       selected = true;
     }
 
@@ -469,6 +610,58 @@ void ContextMenu_Render(context_menu_state *state, ui_context *ui,
       sep_color.a = (u8)(sep_color.a * fade);
       Render_DrawRect(renderer, sep_rect, sep_color);
       item_y += 4;
+    }
+  }
+
+  /* ===== Custom Actions Row ===== */
+  if (state->custom_action_count > 0) {
+    /* Separator before actions */
+    rect sep_rect = {menu_x + 8, item_y, state->menu_width - 16, 1};
+    color sep_color = th->border;
+    sep_color.a = (u8)(sep_color.a * fade);
+    Render_DrawRect(renderer, sep_rect, sep_color);
+
+    item_y += 5; // Spacing
+
+    i32 action_start_x = menu_x + 8;
+
+    for (i32 i = 0; i < state->custom_action_count; i++) {
+      rect action_rect = {action_start_x + i * 32, item_y, 28, 28};
+
+      b32 hovered = UI_PointInRect(input->mouse_pos, action_rect);
+      b32 selected = (i == state->selected_action_index);
+
+      if (hovered && state->visible) {
+        state->selected_action_index = i;
+        state->selected_index = -1; /* Deselect regular list */
+        selected = true;
+      }
+
+      /* Highlight */
+      if (selected) {
+        color sel_bg = th->selection;
+        sel_bg.a = (u8)(sel_bg.a * fade);
+        Render_DrawRectRounded(renderer, action_rect, th->radius_sm, sel_bg);
+      }
+
+#include "../../core/image.h"
+
+      /* Icon */
+      custom_action *action = &state->custom_actions[i];
+      color icon_col = Icon_GetTypeColor(action->icon_type, th);
+      icon_col.a = (u8)(icon_col.a * fade);
+
+      /* Using smaller rect for icon inside button */
+      rect icon_draw_rect = {action_rect.x + 4, action_rect.y + 4, 20, 20};
+
+      if (action->icon_img) {
+        /* Draw user image */
+        color tint = {255, 255, 255, (u8)(255 * fade)};
+        Render_DrawImage(renderer, icon_draw_rect, action->icon_img, tint);
+      } else {
+        /* Draw vector icon */
+        Icon_Draw(renderer, icon_draw_rect, action->icon_type, icon_col);
+      }
     }
   }
 }

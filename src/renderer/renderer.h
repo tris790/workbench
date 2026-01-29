@@ -46,6 +46,10 @@ typedef void (*PFN_BackendDrawRectRounded)(render_context *ctx, rect r,
 typedef void (*PFN_BackendSetClipRect)(render_context *ctx, rect r);
 typedef void (*PFN_BackendDrawText)(render_context *ctx, v2i pos,
                                     const char *text, font *f, color c);
+/* Forward declare image struct */
+struct image_s;
+typedef void (*PFN_BackendDrawImage)(render_context *ctx, rect r,
+                                     struct image_s *img, color tint);
 typedef void (*PFN_BackendSetWindow)(render_context *ctx,
                                      struct platform_window *window);
 
@@ -61,6 +65,7 @@ struct renderer_backend {
   PFN_BackendDrawRectRounded draw_rect_rounded;
   PFN_BackendSetClipRect set_clip_rect;
   PFN_BackendDrawText draw_text;
+  PFN_BackendDrawImage draw_image;
   PFN_BackendSetWindow set_window;
 
   b32 presents_frame;
@@ -148,5 +153,9 @@ void Render_DrawText(render_context *ctx, v2i pos, const char *text, font *f,
 /* Draw text with default font */
 void Render_DrawTextDefault(render_context *ctx, v2i pos, const char *text,
                             color c);
+
+/* Draw image */
+void Render_DrawImage(render_context *ctx, rect r, struct image_s *img,
+                      color tint);
 
 #endif /* RENDERER_H */

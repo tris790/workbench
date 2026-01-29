@@ -76,6 +76,8 @@ static void SetDefaults(void) {
   Config_SetString("explorer.sort_order", "ascending");
   Config_SetI64("terminal.font_size", 14);
   Config_SetI64("terminal.scrollback_lines", 10000);
+
+  /* Default Actions */
 }
 
 /* Lifecycle */
