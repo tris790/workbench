@@ -1122,7 +1122,19 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
 
   /* Breadcrumb at top */
   rect breadcrumb = {bounds.x, bounds.y, bounds.w, EXPLORER_BREADCRUMB_HEIGHT};
-  Breadcrumb_Render(ui, breadcrumb, state->fs.current_path);
+  breadcrumb_result bc_result =
+      Breadcrumb_Render(ui, breadcrumb, state->fs.current_path);
+
+  /* Handle breadcrumb navigation */
+  if (bc_result.clicked_segment >= 0) {
+    char target_path[FS_MAX_PATH];
+    if (Breadcrumb_GetPathForSegment(state->fs.current_path,
+                                      bc_result.clicked_segment, target_path,
+                                      sizeof(target_path))) {
+      Explorer_NavigateTo(state, target_path,
+                          QuickFilter_IsActive(&state->filter));
+    }
+  }
 
   /* File list area */
   rect list_area = {bounds.x, bounds.y + EXPLORER_BREADCRUMB_HEIGHT, bounds.w,
