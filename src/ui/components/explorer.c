@@ -53,12 +53,24 @@ static b32 Explorer_IsEntryVisible(explorer_state *state, i32 index) {
   if (QuickFilter_IsActive(&state->filter)) {
     const char *query = QuickFilter_GetQuery(&state->filter);
 
-    /* Use only the part after the last separator for matching filenames */
-    const char *last_sep = FS_FindLastSeparator(query);
-    const char *match_query = last_sep ? last_sep + 1 : query;
+    /* Skip filtering for pure navigation prefixes:
+     * - Just "~" (navigating to home, show all files)
+     * - Just "/" (navigating to root, show all files)
+     * - Path ending with separator (user is still typing path)
+     */
+    if (query[0] == '\0' ||
+        (query[0] == '~' && query[1] == '\0') ||
+        (query[0] == '/' && query[1] == '\0')) {
+      /* Pure navigation prefix - show all (except hidden per above) */
+    } else {
+      /* Use only the part after the last separator for matching filenames */
+      const char *last_sep = FS_FindLastSeparator(query);
+      const char *match_query = last_sep ? last_sep + 1 : query;
 
-    if (match_query[0] != '\0' && !FuzzyMatch(match_query, entry->name)) {
-      return false;
+      /* If query ends with separator, user is still typing path - show all */
+      if (match_query[0] != '\0' && !FuzzyMatch(match_query, entry->name)) {
+        return false;
+      }
     }
   }
 
@@ -209,12 +221,14 @@ b32 Explorer_NavigateTo(explorer_state *state, const char *path,
   if (FS_LoadDirectory(&state->fs, path)) {
     if (keep_filter) {
       /* Update filter text to match the new location relative to search start
+       * Need to use the normalized current_path (which resolves .. and .)
        */
       size_t start_len = strlen(state->search_start_path);
+      const char *normalized_path = state->fs.current_path;
 
       /* Ensure we are still inside the search root */
-      if (strncmp(path, state->search_start_path, start_len) == 0) {
-        const char *rel_path = path + start_len;
+      if (strncmp(normalized_path, state->search_start_path, start_len) == 0) {
+        const char *rel_path = normalized_path + start_len;
 
         /* Skip leading separator of relative path if present */
         if (FS_IsPathSeparator(rel_path[0])) {
@@ -950,46 +964,74 @@ void Explorer_Update(explorer_state *state, ui_context *ui,
       /* Filter is active - handle folder traversal */
       const char *query = QuickFilter_GetQuery(&state->filter);
       if (query) {
-        /* Extract path part from query (everything up to last separator) */
-        char path_part[FS_MAX_PATH] = {0};
-        const char *last_sep = FS_FindLastSeparator(query);
-
-        if (last_sep) {
-          size_t len = (size_t)(last_sep - query) + 1;
-          if (len < sizeof(path_part)) {
-            memcpy(path_part, query, len);
-            path_part[len] = '\0';
+        /* Check for special root/home navigation triggers */
+        if (query[0] == '/' && strlen(query) == 1) {
+          /* User typed just "/" - navigate to root */
+          if (!FS_PathsEqual(state->fs.current_path, "/")) {
+            if (FS_LoadDirectory(&state->fs, "/")) {
+              /* Update search root to root directory */
+              strncpy(state->search_start_path, "/", FS_MAX_PATH - 1);
+              state->search_start_path[FS_MAX_PATH - 1] = '\0';
+              state->scroll.scroll_v.current = 0;
+              state->scroll.scroll_v.target = 0;
+              state->scroll.target_offset.y = 0;
+            }
           }
-        }
-
-        /* Construct target path: search_start_path + path_part */
-        char target_path[FS_MAX_PATH] = {0};
-
-        /* Always start from the search start location */
-        if (path_part[0] != '\0') {
-          FS_JoinPath(target_path, FS_MAX_PATH, state->search_start_path,
-                      path_part);
+        } else if (query[0] == '~' && (query[1] == '\0' || query[1] == '/')) {
+          /* User typed "~" or "~/" - navigate to home */
+          const char *home = FS_GetHomePath();
+          if (!FS_PathsEqual(state->fs.current_path, home)) {
+            if (FS_LoadDirectory(&state->fs, home)) {
+              /* Update search root to home directory */
+              strncpy(state->search_start_path, home, FS_MAX_PATH - 1);
+              state->search_start_path[FS_MAX_PATH - 1] = '\0';
+              state->scroll.scroll_v.current = 0;
+              state->scroll.scroll_v.target = 0;
+              state->scroll.target_offset.y = 0;
+            }
+          }
         } else {
-          strncpy(target_path, state->search_start_path, FS_MAX_PATH - 1);
-          target_path[FS_MAX_PATH - 1] = '\0';
-        }
+          /* Extract path part from query (everything up to last separator) */
+          char path_part[FS_MAX_PATH] = {0};
+          const char *last_sep = FS_FindLastSeparator(query);
 
-        /* Strip trailing slash from target_path for comparison and loading
-           (unless it is just root "/") */
-        size_t target_len = strlen(target_path);
-        if (target_len > 1 && target_path[target_len - 1] == '/') {
-          target_path[target_len - 1] = '\0';
-        }
+          if (last_sep) {
+            size_t len = (size_t)(last_sep - query) + 1;
+            if (len < sizeof(path_part)) {
+              memcpy(path_part, query, len);
+              path_part[len] = '\0';
+            }
+          }
 
-        /* If target path is different from current, navigate */
-        if (target_path[0] != '\0' &&
-            !FS_PathsEqual(state->fs.current_path, target_path)) {
-          /* Use FS_LoadDirectory directly to avoid history push and filter
-           * clear */
-          if (FS_LoadDirectory(&state->fs, target_path)) {
-            state->scroll.scroll_v.current = 0;
-            state->scroll.scroll_v.target = 0;
-            state->scroll.target_offset.y = 0;
+          /* Construct target path: search_start_path + path_part */
+          char target_path[FS_MAX_PATH] = {0};
+
+          /* Always start from the search start location */
+          if (path_part[0] != '\0') {
+            FS_JoinPath(target_path, FS_MAX_PATH, state->search_start_path,
+                        path_part);
+          } else {
+            strncpy(target_path, state->search_start_path, FS_MAX_PATH - 1);
+            target_path[FS_MAX_PATH - 1] = '\0';
+          }
+
+          /* Strip trailing slash from target_path for comparison and loading
+             (unless it is just root "/") */
+          size_t target_len = strlen(target_path);
+          if (target_len > 1 && target_path[target_len - 1] == '/') {
+            target_path[target_len - 1] = '\0';
+          }
+
+          /* If target path is different from current, navigate */
+          if (target_path[0] != '\0' &&
+              !FS_PathsEqual(state->fs.current_path, target_path)) {
+            /* Use FS_LoadDirectory directly to avoid history push and filter
+             * clear */
+            if (FS_LoadDirectory(&state->fs, target_path)) {
+              state->scroll.scroll_v.current = 0;
+              state->scroll.scroll_v.target = 0;
+              state->scroll.target_offset.y = 0;
+            }
           }
         }
       }
