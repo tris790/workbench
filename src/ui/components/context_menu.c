@@ -85,7 +85,13 @@ static void PopulateFileMenu(context_menu_state *state) {
   AddMenuItem(state, labels.delete_item, "Del", Action_Delete, state, true);
   AddMenuItem(state, "Copy Path", "", Action_CopyPath, state, true);
 
+  i32 before_custom = state->item_count;
   PopulateCustomItems(state);
+
+  /* Remove trailing separator if no custom items were added */
+  if (state->item_count == before_custom && state->item_count > 0) {
+    state->items[state->item_count - 1].separator_after = false;
+  }
 }
 
 static void PopulateDirectoryMenu(context_menu_state *state) {
@@ -102,7 +108,13 @@ static void PopulateDirectoryMenu(context_menu_state *state) {
   AddMenuItem(state, labels.delete_item, "Del", Action_Delete, state, true);
   AddMenuItem(state, "Copy Path", "", Action_CopyPath, state, true);
 
+  i32 before_custom = state->item_count;
   PopulateCustomItems(state);
+
+  /* Remove trailing separator if no custom items were added */
+  if (state->item_count == before_custom && state->item_count > 0) {
+    state->items[state->item_count - 1].separator_after = false;
+  }
 }
 
 static void PopulateEmptyMenu(context_menu_state *state) {
@@ -112,7 +124,13 @@ static void PopulateEmptyMenu(context_menu_state *state) {
               true);
   AddMenuItem(state, "Paste", "Ctrl+V", Action_Paste, state, true);
 
+  i32 before_custom = state->item_count;
   PopulateCustomItems(state);
+
+  /* Remove trailing separator if no custom items were added */
+  if (state->item_count == before_custom && state->item_count > 0) {
+    state->items[state->item_count - 1].separator_after = false;
+  }
 }
 
 #include "../../renderer/icons.h"
