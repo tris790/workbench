@@ -1132,10 +1132,11 @@ static void GL_SetClipRect(render_context *ctx, rect r) {
 
   i32 y_bottom = ctx->height - (r.y + r.h);
 
-  /* Clamp to 0 if negative (though r.y + r.h should be <= height if caller
-   * clamped) */
+  /* Clamp y_bottom to valid range (OpenGL scissor doesn't accept negative) */
   if (y_bottom < 0)
-    glScissor(r.x, y_bottom, r.w, r.h);
+    y_bottom = 0;
+
+  glScissor(r.x, y_bottom, r.w, r.h);
 }
 
 static void GL_DrawImage(render_context *ctx, rect r, struct image_s *img_ptr,
