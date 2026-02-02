@@ -77,38 +77,71 @@ static b32 Explorer_IsEntryVisible(explorer_state *state, i32 index) {
   return true;
 }
 
+/* Update the cached list of visible entries */
+static void Explorer_UpdateVisibleEntries(explorer_state *state) {
+  state->visible_count = 0;
+  for (u32 i = 0; i < state->fs.entry_count; i++) {
+    if (Explorer_IsEntryVisible(state, (i32)i)) {
+      if (state->visible_count < FS_MAX_ENTRIES) {
+        state->visible_entries[state->visible_count++] = (i32)i;
+      }
+    }
+  }
+}
+
 /* Find the next visible entry index in the given direction */
 /* Returns -1 if no visible entry found */
 static i32 Explorer_FindNextVisible(explorer_state *state, i32 from,
                                     i32 direction) {
-  i32 index = from + direction;
+  if (state->visible_count == 0)
+    return -1;
 
-  while (index >= 0 && (u32)index < state->fs.entry_count) {
-    if (Explorer_IsEntryVisible(state, index)) {
-      return index;
+  /* Find where 'from' sits in the current visible list */
+  i32 visible_idx = -1;
+  for (i32 i = 0; i < state->visible_count; i++) {
+    if (state->visible_entries[i] == from) {
+      visible_idx = i;
+      break;
     }
-    index += direction;
   }
 
-  return -1; /* No visible entry found */
+  /* If 'from' is not visible, find the nearest visible entry in preferred
+   * direction */
+  if (visible_idx == -1) {
+    if (direction > 0) {
+      for (i32 i = 0; i < state->visible_count; i++) {
+        if (state->visible_entries[i] > from)
+          return state->visible_entries[i];
+      }
+    } else {
+      for (i32 i = state->visible_count - 1; i >= 0; i--) {
+        if (state->visible_entries[i] < from)
+          return state->visible_entries[i];
+      }
+    }
+    return -1;
+  }
+
+  i32 next_visible_idx = visible_idx + direction;
+  if (next_visible_idx >= 0 && next_visible_idx < state->visible_count) {
+    return state->visible_entries[next_visible_idx];
+  }
+
+  return -1;
 }
 
 /* Find the first visible entry */
 static i32 Explorer_FindFirstVisible(explorer_state *state) {
-  for (i32 i = 0; (u32)i < state->fs.entry_count; i++) {
-    if (Explorer_IsEntryVisible(state, i)) {
-      return i;
-    }
+  if (state->visible_count > 0) {
+    return state->visible_entries[0];
   }
   return 0;
 }
 
 /* Find the last visible entry */
 static i32 Explorer_FindLastVisible(explorer_state *state) {
-  for (i32 i = (i32)state->fs.entry_count - 1; i >= 0; i--) {
-    if (Explorer_IsEntryVisible(state, i)) {
-      return i;
-    }
+  if (state->visible_count > 0) {
+    return state->visible_entries[state->visible_count - 1];
   }
   return 0;
 }
@@ -126,36 +159,38 @@ static void Explorer_MoveVisibleSelection(explorer_state *state, i32 delta) {
     current = next;
   }
 
-  FS_SetSelection(&state->fs, current);
+  Explorer_SetSelection(state, current);
 }
 
 /* Count visible entries */
 static i32 Explorer_CountVisible(explorer_state *state) {
-  i32 count = 0;
-  for (u32 i = 0; i < state->fs.entry_count; i++) {
-    if (Explorer_IsEntryVisible(state, (i32)i)) {
-      count++;
-    }
-  }
-  return count;
+  return state->visible_count;
 }
 
 /* Get actual entry index from visible index (for mouse clicks) */
 static i32 Explorer_VisibleToActualIndex(explorer_state *state,
                                          i32 visible_index) {
-  i32 visible_count = 0;
-  for (u32 i = 0; i < state->fs.entry_count; i++) {
-    if (Explorer_IsEntryVisible(state, (i32)i)) {
-      if (visible_count == visible_index) {
-        return (i32)i;
-      }
-      visible_count++;
-    }
+  if (visible_index >= 0 && visible_index < state->visible_count) {
+    return state->visible_entries[visible_index];
   }
-  return -1; /* Not found */
+  return -1;
+}
+
+void Explorer_SetSelection(explorer_state *state, i32 index) {
+  FS_SetSelection(&state->fs, index);
+  SmoothValue_SetTarget(&state->selection_anim, (f32)state->fs.selected_index);
+  state->scroll_to_selection = true;
 }
 
 /* ===== Initialization ===== */
+
+static void Explorer_ResetScroll(explorer_state *state) {
+  state->scroll.scroll_v.current = 0;
+  state->scroll.scroll_v.target = 0;
+  state->scroll.target_offset.y = 0;
+  SmoothValue_SetImmediate(&state->selection_anim,
+                           (f32)state->fs.selected_index);
+}
 
 void Explorer_Init(explorer_state *state, memory_arena *arena) {
   memset(state, 0, sizeof(*state));
@@ -200,6 +235,9 @@ void Explorer_Init(explorer_state *state, memory_arena *arena) {
 
   /* Start watching the initial directory */
   FSWatcher_WatchDirectory(&state->watcher, state->fs.current_path);
+
+  /* Initialize visible entries */
+  Explorer_UpdateVisibleEntries(state);
 
   /* Initialize history */
   strncpy(state->history[0], state->fs.current_path, FS_MAX_PATH - 1);
@@ -259,9 +297,7 @@ b32 Explorer_NavigateTo(explorer_state *state, const char *path,
     FSWatcher_WatchDirectory(&state->watcher, path);
 
     /* Push to history */
-    state->scroll.scroll_v.current = 0;
-    state->scroll.scroll_v.target = 0;
-    state->scroll.target_offset.y = 0;
+    Explorer_ResetScroll(state);
 
     if (state->history_index < EXPLORER_MAX_HISTORY - 1) {
       state->history_index++;
@@ -274,6 +310,10 @@ b32 Explorer_NavigateTo(explorer_state *state, const char *path,
 
     strncpy(state->history[state->history_index], path, FS_MAX_PATH - 1);
     state->history_count = state->history_index + 1;
+
+    /* Update visible entries cache */
+    Explorer_UpdateVisibleEntries(state);
+
     return true;
   }
   return false;
@@ -283,9 +323,8 @@ void Explorer_GoBack(explorer_state *state) {
   if (state->history_index > 0) {
     state->history_index--;
     if (FS_LoadDirectory(&state->fs, state->history[state->history_index])) {
-      state->scroll.scroll_v.current = 0;
-      state->scroll.scroll_v.target = 0;
-      state->scroll.target_offset.y = 0;
+      Explorer_ResetScroll(state);
+      Explorer_UpdateVisibleEntries(state);
     }
   }
 }
@@ -294,9 +333,8 @@ void Explorer_GoForward(explorer_state *state) {
   if (state->history_index < state->history_count - 1) {
     state->history_index++;
     if (FS_LoadDirectory(&state->fs, state->history[state->history_index])) {
-      state->scroll.scroll_v.current = 0;
-      state->scroll.scroll_v.target = 0;
-      state->scroll.target_offset.y = 0;
+      Explorer_ResetScroll(state);
+      Explorer_UpdateVisibleEntries(state);
     }
   }
 }
@@ -304,7 +342,8 @@ void Explorer_GoForward(explorer_state *state) {
 void Explorer_Refresh(explorer_state *state) {
   i32 old_selection = state->fs.selected_index;
   FS_LoadDirectory(&state->fs, state->fs.current_path);
-  FS_SetSelection(&state->fs, old_selection);
+  Explorer_UpdateVisibleEntries(state);
+  Explorer_SetSelection(state, old_selection);
 }
 
 fs_entry *Explorer_GetSelected(explorer_state *state) {
@@ -324,9 +363,31 @@ void Explorer_ToggleHidden(explorer_state *state) {
       next = Explorer_FindNextVisible(state, state->fs.selected_index, -1);
     }
     if (next >= 0) {
-      FS_SetSelection(&state->fs, next);
+      Explorer_SetSelection(state, next);
     }
   }
+}
+
+/* ===== Dialog Helpers ===== */
+
+static void Explorer_SetupInputDialog(explorer_state *state, explorer_mode mode,
+                                      const char *initial_text) {
+  state->mode = mode;
+  Input_PushFocus(INPUT_TARGET_DIALOG);
+  if (initial_text) {
+    strncpy(state->input_buffer, initial_text, sizeof(state->input_buffer) - 1);
+    state->input_buffer[sizeof(state->input_buffer) - 1] = '\0';
+  } else {
+    state->input_buffer[0] = '\0';
+  }
+  memset(&state->input_state, 0, sizeof(state->input_state));
+  state->input_state.cursor_pos = (i32)strlen(state->input_buffer);
+  state->input_state.has_focus = true;
+}
+
+static void Explorer_GetInputPath(explorer_state *state, char *out_path,
+                                  size_t out_size) {
+  FS_JoinPath(out_path, out_size, state->fs.current_path, state->input_buffer);
 }
 
 /* ===== File Operations ===== */
@@ -334,29 +395,16 @@ void Explorer_ToggleHidden(explorer_state *state) {
 void Explorer_StartRename(explorer_state *state) {
   fs_entry *entry = FS_GetSelectedEntry(&state->fs);
   if (entry && strcmp(entry->name, "..") != 0) {
-    state->mode = EXPLORER_MODE_RENAME;
-    Input_PushFocus(INPUT_TARGET_DIALOG);
-    strncpy(state->input_buffer, entry->name, sizeof(state->input_buffer) - 1);
-    memset(&state->input_state, 0, sizeof(state->input_state));
-    state->input_state.cursor_pos = (i32)strlen(state->input_buffer);
-    state->input_state.has_focus = true;
+    Explorer_SetupInputDialog(state, EXPLORER_MODE_RENAME, entry->name);
   }
 }
 
 void Explorer_StartCreateFile(explorer_state *state) {
-  state->mode = EXPLORER_MODE_CREATE_FILE;
-  Input_PushFocus(INPUT_TARGET_DIALOG);
-  state->input_buffer[0] = '\0';
-  memset(&state->input_state, 0, sizeof(state->input_state));
-  state->input_state.has_focus = true;
+  Explorer_SetupInputDialog(state, EXPLORER_MODE_CREATE_FILE, NULL);
 }
 
 void Explorer_StartCreateDir(explorer_state *state) {
-  state->mode = EXPLORER_MODE_CREATE_DIR;
-  Input_PushFocus(INPUT_TARGET_DIALOG);
-  state->input_buffer[0] = '\0';
-  memset(&state->input_state, 0, sizeof(state->input_state));
-  state->input_state.has_focus = true;
+  Explorer_SetupInputDialog(state, EXPLORER_MODE_CREATE_DIR, NULL);
 }
 
 void Explorer_ConfirmDelete(explorer_state *state, ui_context *ui) {
@@ -541,114 +589,72 @@ void Explorer_OpenSelected(explorer_state *state) {
 }
 
 void Explorer_InvertSelection(explorer_state *state) {
-  for (u32 i = 0; i < state->fs.entry_count; i++) {
+  for (i32 i = 0; i < state->visible_count; i++) {
+    i32 actual_index = state->visible_entries[i];
     /* Skip ".." - never toggle it */
-    if (strcmp(state->fs.entries[i].name, "..") == 0)
+    if (strcmp(state->fs.entries[actual_index].name, "..") == 0)
       continue;
-    /* Only toggle visible entries */
-    if (Explorer_IsEntryVisible(state, (i32)i)) {
-      FS_SelectToggle(&state->fs, (i32)i);
-    }
+    FS_SelectToggle(&state->fs, actual_index);
   }
 }
 
 void Explorer_ResetToSingleSelection(explorer_state *state) {
-  FS_ClearSelection(&state->fs);
-  /* Keep cursor position but only that item selected */
+  /* Keep current cursor position but clear multi-selection */
   if (state->fs.entry_count > 0) {
-    i32 cursor = state->fs.selected_index;
-    if (cursor < 0 || cursor >= (i32)state->fs.entry_count) {
-      cursor = 0;
-    }
-    FS_SelectSingle(&state->fs, cursor);
+    Explorer_SetSelection(state, state->fs.selected_index);
+  } else {
+    FS_ClearSelection(&state->fs);
   }
 }
 
 /* ===== Input Handling ===== */
 
-static void HandleNormalInput(explorer_state *state, ui_context *ui) {
+static void Explorer_HandleNavigationInput(explorer_state *state,
+                                           ui_context *ui, b32 filter_active) {
   ui_input *input = &ui->input;
-  b32 filter_active = QuickFilter_IsActive(&state->filter);
 
   /* Vim-style navigation - disabled when filter is active (j/k are printable)
    */
   if (!filter_active && Input_KeyRepeat(KEY_J)) {
     Explorer_MoveVisibleSelection(state, 1);
-    SmoothValue_SetTarget(&state->selection_anim,
-                          (f32)state->fs.selected_index);
-    state->scroll_to_selection = true;
   }
 
   if (!filter_active && Input_KeyRepeat(KEY_K)) {
     Explorer_MoveVisibleSelection(state, -1);
-    SmoothValue_SetTarget(&state->selection_anim,
-                          (f32)state->fs.selected_index);
-    state->scroll_to_selection = true;
   }
 
   /* Arrow key navigation - always works */
   if (Input_KeyRepeat(KEY_DOWN) && !(input->modifiers & MOD_CTRL)) {
     Explorer_MoveVisibleSelection(state, 1);
-    SmoothValue_SetTarget(&state->selection_anim,
-                          (f32)state->fs.selected_index);
-    state->scroll_to_selection = true;
   }
 
   if (Input_KeyRepeat(KEY_UP) && !(input->modifiers & MOD_CTRL)) {
     Explorer_MoveVisibleSelection(state, -1);
-    SmoothValue_SetTarget(&state->selection_anim,
-                          (f32)state->fs.selected_index);
-    state->scroll_to_selection = true;
   }
 
   /* Page navigation */
   if (Input_KeyRepeat(KEY_PAGE_DOWN)) {
     i32 visible = (i32)(state->scroll.view_size.y / state->item_height);
     Explorer_MoveVisibleSelection(state, visible);
-    state->scroll_to_selection = true;
   }
 
   if (Input_KeyRepeat(KEY_PAGE_UP)) {
     i32 visible = (i32)(state->scroll.view_size.y / state->item_height);
     Explorer_MoveVisibleSelection(state, -visible);
-    state->scroll_to_selection = true;
   }
 
   /* Home/End */
   if (Input_KeyPressed(KEY_HOME)) {
-    FS_SetSelection(&state->fs, Explorer_FindFirstVisible(state));
-    state->scroll_to_selection = true;
+    Explorer_SetSelection(state, Explorer_FindFirstVisible(state));
   }
 
   if (Input_KeyPressed(KEY_END)) {
-    FS_SetSelection(&state->fs, Explorer_FindLastVisible(state));
-    state->scroll_to_selection = true;
-  }
-
-  /* Enter directory or open file */
-  if (Input_KeyPressed(KEY_RETURN)) {
-    fs_entry *entry = FS_GetSelectedEntry(&state->fs);
-    if (entry) {
-      if (entry->is_directory) {
-        char target_path[FS_MAX_PATH];
-        strncpy(target_path, entry->path, FS_MAX_PATH - 1);
-        target_path[FS_MAX_PATH - 1] = '\0';
-        Explorer_NavigateTo(state, target_path,
-                            QuickFilter_IsActive(&state->filter));
-      } else {
-        Platform_OpenFile(entry->path);
-      }
-    }
+    Explorer_SetSelection(state, Explorer_FindLastVisible(state));
   }
 
   /* Go home */
   if (Input_KeyPressed(KEY_H) && (input->modifiers & MOD_CTRL)) {
     Explorer_NavigateTo(state, FS_GetHomePath(), false);
-  }
-
-  /* Select all */
-  if (Input_KeyPressed(KEY_A) && (input->modifiers & MOD_CTRL)) {
-    FS_SelectAll(&state->fs);
   }
 
   /* History Navigation */
@@ -660,6 +666,21 @@ static void HandleNormalInput(explorer_state *state, ui_context *ui) {
   if ((Input_KeyPressed(KEY_RIGHT) && (input->modifiers & MOD_ALT)) ||
       Input_KeyPressed(KEY_BROWSER_FORWARD) || input->mouse_pressed[MOUSE_X2]) {
     Explorer_GoForward(state);
+  }
+}
+
+static void Explorer_HandleOperationInput(explorer_state *state,
+                                          ui_context *ui) {
+  ui_input *input = &ui->input;
+
+  /* Enter directory or open file */
+  if (Input_KeyPressed(KEY_RETURN)) {
+    Explorer_OpenSelected(state);
+  }
+
+  /* Select all */
+  if (Input_KeyPressed(KEY_A) && (input->modifiers & MOD_CTRL)) {
+    FS_SelectAll(&state->fs);
   }
 
   /* Toggle hidden files */
@@ -688,18 +709,33 @@ static void HandleNormalInput(explorer_state *state, ui_context *ui) {
   if (Input_KeyPressed(KEY_DELETE)) {
     Explorer_ConfirmDelete(state, ui);
   }
+}
 
-  if (Input_KeyPressed(KEY_C) && (input->modifiers & MOD_CTRL)) {
-    Explorer_Copy(state);
-  }
+static void Explorer_HandleClipboardInput(explorer_state *state,
+                                          ui_context *ui) {
+  ui_input *input = &ui->input;
 
-  if (Input_KeyPressed(KEY_X) && (input->modifiers & MOD_CTRL)) {
-    Explorer_Cut(state);
-  }
+  if (input->modifiers & MOD_CTRL) {
+    if (Input_KeyPressed(KEY_C)) {
+      Explorer_Copy(state);
+    }
 
-  if (Input_KeyPressed(KEY_V) && (input->modifiers & MOD_CTRL)) {
-    Explorer_Paste(state);
+    if (Input_KeyPressed(KEY_X)) {
+      Explorer_Cut(state);
+    }
+
+    if (Input_KeyPressed(KEY_V)) {
+      Explorer_Paste(state);
+    }
   }
+}
+
+static void HandleNormalInput(explorer_state *state, ui_context *ui) {
+  b32 filter_active = QuickFilter_IsActive(&state->filter);
+
+  Explorer_HandleNavigationInput(state, ui, filter_active);
+  Explorer_HandleOperationInput(state, ui);
+  Explorer_HandleClipboardInput(state, ui);
 }
 
 static void Explorer_OnConfirm(explorer_state *state) {
@@ -708,8 +744,7 @@ static void Explorer_OnConfirm(explorer_state *state) {
     fs_entry *entry = FS_GetSelectedEntry(&state->fs);
     if (entry && state->input_buffer[0] != '\0') {
       char new_path[FS_MAX_PATH];
-      FS_JoinPath(new_path, FS_MAX_PATH, state->fs.current_path,
-                  state->input_buffer);
+      Explorer_GetInputPath(state, new_path, sizeof(new_path));
       if (FS_Rename(entry->path, new_path)) {
         Explorer_Refresh(state);
       }
@@ -720,8 +755,7 @@ static void Explorer_OnConfirm(explorer_state *state) {
   case EXPLORER_MODE_CREATE_FILE: {
     if (state->input_buffer[0] != '\0') {
       char new_path[FS_MAX_PATH];
-      FS_JoinPath(new_path, FS_MAX_PATH, state->fs.current_path,
-                  state->input_buffer);
+      Explorer_GetInputPath(state, new_path, sizeof(new_path));
       if (FS_CreateFile(new_path)) {
         Explorer_Refresh(state);
       }
@@ -732,8 +766,7 @@ static void Explorer_OnConfirm(explorer_state *state) {
   case EXPLORER_MODE_CREATE_DIR: {
     if (state->input_buffer[0] != '\0') {
       char new_path[FS_MAX_PATH];
-      FS_JoinPath(new_path, FS_MAX_PATH, state->fs.current_path,
-                  state->input_buffer);
+      Explorer_GetInputPath(state, new_path, sizeof(new_path));
       if (FS_CreateDirectory(new_path)) {
         Explorer_Refresh(state);
       }
@@ -865,7 +898,7 @@ void Explorer_Update(explorer_state *state, ui_context *ui,
           if (actual_index == state->last_click_index &&
               (now - state->last_click_time) < EXPLORER_DOUBLE_CLICK_MS) {
             /* Double-click - navigate into */
-            FS_SetSelection(&state->fs, actual_index);
+            Explorer_SetSelection(state, actual_index);
             fs_entry *entry = FS_GetSelectedEntry(&state->fs);
             if (entry) {
               if (entry->is_directory) {
@@ -897,7 +930,7 @@ void Explorer_Update(explorer_state *state, ui_context *ui,
               /* Only reset selection if clicking on unselected item.
                * If clicking on already-selected item, preserve multi-selection
                * to allow dragging multiple items. */
-              FS_SetSelection(&state->fs, actual_index);
+              Explorer_SetSelection(state, actual_index);
             }
             state->last_click_time = now;
             state->last_click_index = actual_index;
@@ -927,7 +960,7 @@ void Explorer_Update(explorer_state *state, ui_context *ui,
         if (actual_index >= 0) {
           /* Only change selection if clicking on unselected item */
           if (!FS_IsSelected(&state->fs, actual_index)) {
-            FS_SetSelection(&state->fs, actual_index);
+            Explorer_SetSelection(state, actual_index);
           }
 
           /* Determine context type and show menu */
@@ -1028,9 +1061,7 @@ void Explorer_Update(explorer_state *state, ui_context *ui,
             /* Use FS_LoadDirectory directly to avoid history push and filter
              * clear */
             if (FS_LoadDirectory(&state->fs, target_path)) {
-              state->scroll.scroll_v.current = 0;
-              state->scroll.scroll_v.target = 0;
-              state->scroll.target_offset.y = 0;
+              Explorer_ResetScroll(state);
             }
           }
         }
@@ -1049,32 +1080,26 @@ void Explorer_Update(explorer_state *state, ui_context *ui,
               sizeof(state->last_filter_buffer) - 1);
       state->last_filter_buffer[sizeof(state->last_filter_buffer) - 1] = '\0';
 
+      /* Update visible entries when filter changes */
+      Explorer_UpdateVisibleEntries(state);
+
       /* Find first and second visible items to apply selection preference:
          - If > 1 result (e.g. ".." and "match"), select 2nd (the match)
          - Else select 1st (e.g. "..")
       */
       i32 first_idx = -1;
       i32 second_idx = -1;
-      i32 found = 0;
 
-      for (u32 i = 0; i < state->fs.entry_count; i++) {
-        if (Explorer_IsEntryVisible(state, (i32)i)) {
-          if (found == 0)
-            first_idx = (i32)i;
-          if (found == 1) {
-            second_idx = (i32)i;
-            break; /* Found enough to decide */
-          }
-          found++;
-        }
-      }
+      if (state->visible_count > 0)
+        first_idx = state->visible_entries[0];
+      if (state->visible_count > 1)
+        second_idx = state->visible_entries[1];
 
       /* Use second if found, otherwise first */
       i32 target = (second_idx != -1) ? second_idx : first_idx;
 
       if (target >= 0) {
-        FS_SetSelection(&state->fs, target);
-        state->scroll_to_selection = true;
+        Explorer_SetSelection(state, target);
       }
     }
 
@@ -1194,12 +1219,16 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
 
   /* Ensure selection is visible - only when navigation triggered it */
   if (state->scroll_to_selection) {
-    /* Calculate the visible index of the selected entry */
+    /* Calculate the visible index of the selected entry or closest visible
+     * entry
+     */
     i32 visible_sel_index = 0;
-    for (i32 i = 0; i < state->fs.selected_index; i++) {
-      if (Explorer_IsEntryVisible(state, i)) {
-        visible_sel_index++;
+    for (i32 i = 0; i < state->visible_count; i++) {
+      if (state->visible_entries[i] >= state->fs.selected_index) {
+        visible_sel_index = i;
+        break;
       }
+      visible_sel_index = i;
     }
 
     f32 sel_y = (f32)(visible_sel_index * state->item_height);
@@ -1216,58 +1245,52 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
       (focus == INPUT_TARGET_COMMAND_PALETTE || focus == INPUT_TARGET_DIALOG ||
        focus == INPUT_TARGET_CONTEXT_MENU);
 
-  /* Draw visible items - iterate through all entries but track visible position
-   */
-  i32 visible_index = 0;
+  /* Draw visible items - iterate only through items in the viewport using
+   * cached indices */
   i32 start_visible = (i32)(state->scroll.offset.y / state->item_height);
   i32 end_visible = start_visible + list_area.h / state->item_height + 2;
 
-  for (u32 i = 0; i < state->fs.entry_count; i++) {
-    fs_entry *entry = FS_GetEntry(&state->fs, (i32)i);
+  if (start_visible < 0)
+    start_visible = 0;
+  if (end_visible > state->visible_count)
+    end_visible = state->visible_count;
+
+  for (i32 i = start_visible; i < end_visible; i++) {
+    i32 actual_index = state->visible_entries[i];
+    fs_entry *entry = FS_GetEntry(&state->fs, actual_index);
     if (!entry)
       continue;
 
-    /* Skip hidden files if not showing them */
-    if (!Explorer_IsEntryVisible(state, (i32)i)) {
-      continue;
+    i32 item_y =
+        list_area.y + (i * state->item_height) - (i32)state->scroll.offset.y;
+    i32 actual_width = list_area.w;
+    if (state->scroll.content_size.y > state->scroll.view_size.y) {
+      actual_width -=
+          EXPLORER_SCROLLBAR_GUTTER; /* Reserve space for scrollbar */
+    }
+    rect item_bounds = {list_area.x, item_y, actual_width, state->item_height};
+
+    /* Check if this folder is a drop target */
+    if (DragDrop_IsDragging(drag) && entry->is_directory) {
+      DragDrop_CheckTarget(drag, entry, item_bounds, panel_idx);
+
+      /* Render highlight if this is the current target */
+      if (drag->target_type != DROP_TARGET_NONE &&
+          drag->target_panel_idx == panel_idx &&
+          drag->target_bounds.x == item_bounds.x &&
+          drag->target_bounds.y == item_bounds.y) {
+        DragDrop_RenderTargetHighlight(drag, ui, item_bounds);
+      }
     }
 
-    /* Only render if in visible range */
-    if (visible_index >= start_visible && visible_index <= end_visible) {
-      i32 item_y = list_area.y + (visible_index * state->item_height) -
-                   (i32)state->scroll.offset.y;
-      i32 actual_width = list_area.w;
-      if (state->scroll.content_size.y > state->scroll.view_size.y) {
-        actual_width -=
-            EXPLORER_SCROLLBAR_GUTTER; /* Reserve space for scrollbar */
-      }
-      rect item_bounds = {list_area.x, item_y, actual_width,
-                          state->item_height};
-
-      /* Check if this folder is a drop target */
-      if (DragDrop_IsDragging(drag) && entry->is_directory) {
-        DragDrop_CheckTarget(drag, entry, item_bounds, panel_idx);
-
-        /* Render highlight if this is the current target */
-        if (drag->target_type != DROP_TARGET_NONE &&
-            drag->target_panel_idx == panel_idx &&
-            drag->target_bounds.x == item_bounds.x &&
-            drag->target_bounds.y == item_bounds.y) {
-          DragDrop_RenderTargetHighlight(drag, ui, item_bounds);
-        }
-      }
-
-      b32 is_selected = FS_IsSelected(&state->fs, (i32)i);
-      b32 is_hovered = !modal_active && (ui->active == UI_ID_NONE) &&
-                       UI_PointInRect(ui->input.mouse_pos, item_bounds);
-      file_item_config item_config = {.icon_size = EXPLORER_ICON_SIZE,
-                                      .icon_padding = EXPLORER_ICON_PADDING,
-                                      .show_size = state->show_size_column};
-      FileItem_Render(ui, entry, item_bounds, is_selected, is_hovered,
-                      &item_config);
-    }
-
-    visible_index++;
+    b32 is_selected = FS_IsSelected(&state->fs, actual_index);
+    b32 is_hovered = !modal_active && (ui->active == UI_ID_NONE) &&
+                     UI_PointInRect(ui->input.mouse_pos, item_bounds);
+    file_item_config item_config = {.icon_size = EXPLORER_ICON_SIZE,
+                                    .icon_padding = EXPLORER_ICON_PADDING,
+                                    .show_size = state->show_size_column};
+    FileItem_Render(ui, entry, item_bounds, is_selected, is_hovered,
+                    &item_config);
   }
 
   /* Check panel itself as drop target (empty area) */

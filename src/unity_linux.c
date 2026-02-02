@@ -48,6 +48,8 @@
 #include "ui/components/quick_filter.c"
 #include "ui/components/scroll_container.c"
 #include "ui/components/terminal_panel.c"
+#include "ui/components/text_input.c"
+#include "ui/components/widgets.c"
 #include "ui/layout.c"
 #include "ui/ui.c"
 

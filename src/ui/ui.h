@@ -264,6 +264,7 @@ void UI_EndFrame(ui_context *ctx);
 
 /* Get global context (for widget implementations) */
 ui_context *UI_GetContext(void);
+extern ui_context *g_ui_ctx;
 
 /* ===== Widgets ===== */
 
@@ -310,6 +311,12 @@ b32 UI_IsHot(ui_id id);
 
 /* Check if element is active (mouse down) */
 b32 UI_IsActive(ui_id id);
+
+/* Register element in focus order */
+void UI_RegisterFocusable(ui_id id);
+
+/* Update hot/active state for an element */
+b32 UI_UpdateInteraction(ui_id id, rect bounds);
 
 /* ===== Utility ===== */
 

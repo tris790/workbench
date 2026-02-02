@@ -86,6 +86,10 @@ typedef struct explorer_state_s {
 
   /* File system watcher for external changes */
   fs_watcher watcher;
+
+  /* Cached visible entries (indices into fs.entries) */
+  i32 visible_entries[FS_MAX_ENTRIES];
+  i32 visible_count;
 } explorer_state;
 
 /* ===== Explorer API ===== */
@@ -153,5 +157,6 @@ void Explorer_OpenSelected(explorer_state *state);
 /* Selection operations */
 void Explorer_InvertSelection(explorer_state *state);
 void Explorer_ResetToSingleSelection(explorer_state *state);
+void Explorer_SetSelection(explorer_state *state, i32 index);
 
 #endif /* EXPLORER_H */
