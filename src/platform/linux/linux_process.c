@@ -17,7 +17,9 @@ struct platform_process {
 };
 
 platform_process *Platform_SpawnProcess(const char *command,
-                                        const char *working_dir) {
+                                        const char *working_dir,
+                                        b32 show_window) {
+  (void)show_window; /* Linux doesn't need this - GUI apps work normally */
   int in_pipe[2];  /* Parent writes, child reads */
   int out_pipe[2]; /* Child writes, parent reads */
   int err_pipe[2]; /* Child writes, parent reads */

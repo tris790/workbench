@@ -786,5 +786,7 @@ static void Action_CustomCommand(void *user_data) {
     }
   }
 
-  Platform_SpawnProcess(command, working_dir[0] != '\0' ? working_dir : NULL);
+  /* Pass show_window=true so GUI applications can display properly */
+  Platform_SpawnProcess(command, working_dir[0] != '\0' ? working_dir : NULL,
+                        true);
 }

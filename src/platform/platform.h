@@ -231,7 +231,8 @@ b32 Platform_SetClipboard(const char *text);
 typedef struct platform_process platform_process;
 
 platform_process *Platform_SpawnProcess(const char *command,
-                                        const char *working_dir);
+                                        const char *working_dir,
+                                        b32 show_window);
 b32 Platform_ProcessIsRunning(platform_process *process);
 i32 Platform_ProcessRead(platform_process *process, char *buffer,
                          usize buffer_size);

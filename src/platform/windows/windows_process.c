@@ -18,58 +18,76 @@ struct platform_process {
 };
 
 platform_process *Platform_SpawnProcess(const char *command,
-                                        const char *working_dir) {
+                                        const char *working_dir,
+                                        b32 show_window) {
   HANDLE stdin_read = NULL, stdin_write = NULL;
   HANDLE stdout_read = NULL, stdout_write = NULL;
 
-  /* Create pipes with inheritable handles */
-  SECURITY_ATTRIBUTES sa = {0};
-  sa.nLength = sizeof(SECURITY_ATTRIBUTES);
-  sa.bInheritHandle = TRUE;
-  sa.lpSecurityDescriptor = NULL;
+  /* For GUI apps (show_window=true), we don't need pipes and should not
+   * use CREATE_NO_WINDOW so the app can show its window properly */
 
-  if (!CreatePipe(&stdout_read, &stdout_write, &sa, 0))
-    return NULL;
+  /* Create pipes only for console/background processes */
+  if (!show_window) {
+    /* Create pipes with inheritable handles */
+    SECURITY_ATTRIBUTES sa = {0};
+    sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+    sa.bInheritHandle = TRUE;
+    sa.lpSecurityDescriptor = NULL;
 
-  /* Ensure read handle is not inherited */
-  if (!SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0)) {
-    CloseHandle(stdout_read);
-    CloseHandle(stdout_write);
-    return NULL;
-  }
+    if (!CreatePipe(&stdout_read, &stdout_write, &sa, 0))
+      return NULL;
 
-  if (!CreatePipe(&stdin_read, &stdin_write, &sa, 0)) {
-    CloseHandle(stdout_read);
-    CloseHandle(stdout_write);
-    return NULL;
-  }
+    /* Ensure read handle is not inherited */
+    if (!SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0)) {
+      CloseHandle(stdout_read);
+      CloseHandle(stdout_write);
+      return NULL;
+    }
 
-  /* Ensure write handle is not inherited */
-  if (!SetHandleInformation(stdin_write, HANDLE_FLAG_INHERIT, 0)) {
-    CloseHandle(stdout_read);
-    CloseHandle(stdout_write);
-    CloseHandle(stdin_read);
-    CloseHandle(stdin_write);
-    return NULL;
+    if (!CreatePipe(&stdin_read, &stdin_write, &sa, 0)) {
+      CloseHandle(stdout_read);
+      CloseHandle(stdout_write);
+      return NULL;
+    }
+
+    /* Ensure write handle is not inherited */
+    if (!SetHandleInformation(stdin_write, HANDLE_FLAG_INHERIT, 0)) {
+      CloseHandle(stdout_read);
+      CloseHandle(stdout_write);
+      CloseHandle(stdin_read);
+      CloseHandle(stdin_write);
+      return NULL;
+    }
   }
 
   /* Setup startup info */
   STARTUPINFOW si = {0};
   si.cb = sizeof(STARTUPINFOW);
-  si.hStdError = stdout_write;
-  si.hStdOutput = stdout_write;
-  si.hStdInput = stdin_read;
-  si.dwFlags = STARTF_USESTDHANDLES;
+
+  if (!show_window) {
+    /* Console process: redirect std handles */
+    si.hStdError = stdout_write;
+    si.hStdOutput = stdout_write;
+    si.hStdInput = stdin_read;
+    si.dwFlags = STARTF_USESTDHANDLES;
+  }
 
   PROCESS_INFORMATION pi = {0};
 
   /* Convert command to wide string */
-  /* Wrap in cmd.exe /c to handle shell commands */
-  char cmdline[FS_MAX_PATH];
-  snprintf(cmdline, sizeof(cmdline), "cmd.exe /c %s", command);
+  wchar_t wide_cmdline[FS_MAX_PATH * 2];
 
-  wchar_t wide_cmdline[FS_MAX_PATH];
-  MultiByteToWideChar(CP_UTF8, 0, cmdline, -1, wide_cmdline, FS_MAX_PATH);
+  if (show_window) {
+    /* For GUI apps: use the command directly without cmd.exe wrapper
+     * This allows GUI apps to open properly */
+    MultiByteToWideChar(CP_UTF8, 0, command, -1, wide_cmdline,
+                        FS_MAX_PATH * 2);
+  } else {
+    /* For console apps: wrap in cmd.exe /c to handle shell commands */
+    char cmdline[FS_MAX_PATH * 2];
+    snprintf(cmdline, sizeof(cmdline), "cmd.exe /c %s", command);
+    MultiByteToWideChar(CP_UTF8, 0, cmdline, -1, wide_cmdline, FS_MAX_PATH * 2);
+  }
 
   wchar_t wide_working_dir[FS_MAX_PATH];
   wchar_t *working_dir_ptr = NULL;
@@ -79,25 +97,31 @@ platform_process *Platform_SpawnProcess(const char *command,
     working_dir_ptr = wide_working_dir;
   }
 
+  DWORD creation_flags = show_window ? CREATE_NEW_CONSOLE : CREATE_NO_WINDOW;
+
   BOOL success = CreateProcessW(NULL, /* Application name (use command line) */
-                                wide_cmdline, /* Command line (modifiable) */
-                                NULL,         /* Process security attributes */
-                                NULL,         /* Thread security attributes */
-                                TRUE,         /* Inherit handles */
-                                CREATE_NO_WINDOW, /* Creation flags */
-                                NULL,             /* Environment */
-                                working_dir_ptr,  /* Working directory */
-                                &si,              /* Startup info */
-                                &pi               /* Process info */
+                                wide_cmdline,  /* Command line (modifiable) */
+                                NULL,          /* Process security attributes */
+                                NULL,          /* Thread security attributes */
+                                !show_window,  /* Inherit handles (only for console) */
+                                creation_flags, /* Creation flags */
+                                NULL,          /* Environment */
+                                working_dir_ptr, /* Working directory */
+                                &si,           /* Startup info */
+                                &pi            /* Process info */
   );
 
   /* Close pipe ends that child uses */
-  CloseHandle(stdout_write);
-  CloseHandle(stdin_read);
+  if (!show_window) {
+    CloseHandle(stdout_write);
+    CloseHandle(stdin_read);
+  }
 
   if (!success) {
-    CloseHandle(stdout_read);
-    CloseHandle(stdin_write);
+    if (!show_window) {
+      CloseHandle(stdout_read);
+      CloseHandle(stdin_write);
+    }
     return NULL;
   }
 
