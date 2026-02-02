@@ -11,7 +11,6 @@
 #include <dwrite.h>
 #include <initguid.h>
 #include <math.h>
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,20 +35,6 @@ DEFINE_GUID(IID_IDWriteFontFileStream, 0x6d48655c, 0xe508, 0x4903, 0x90, 0xa7,
 
 #define GLYPH_CACHE_SIZE 256
 #define MAX_FONT_PATH 512
-
-/* ===== logging ===== */
-
-static void Font_Log(const char *fmt, ...) {
-  FILE *f = fopen("font_debug.txt", "a");
-  if (f) {
-    va_list args;
-    va_start(args, fmt);
-    vfprintf(f, fmt, args);
-    va_end(args);
-    fprintf(f, "\n");
-    fclose(f);
-  }
-}
 
 /* ===== Cached Glyph ===== */
 
@@ -267,7 +252,6 @@ b32 Font_SystemInit(void) {
                           (IUnknown **)&g_font_system.factory);
 
   if (FAILED(hr)) {
-    Font_Log("Font: DWriteCreateFactory failed: 0x%08X", (unsigned int)hr);
     fprintf(stderr, "Font: DWriteCreateFactory failed: 0x%08X\n",
             (unsigned int)hr);
     return false;
@@ -277,7 +261,6 @@ b32 Font_SystemInit(void) {
   IDWriteFactory_RegisterFontFileLoader(
       g_font_system.factory, (IDWriteFontFileLoader *)&g_MemoryFontLoader);
 
-  Font_Log("Font: System initialized successfully");
   g_font_system.initialized = true;
   return true;
 }
@@ -314,9 +297,6 @@ static void UpdateFontMetrics(font *f) {
       (metrics.ascent + metrics.descent + metrics.lineGap) * f->scale);
 
   f->em_size = (f32)f->size_pixels;
-  Font_Log(
-      "Font metrics updated: size=%d, em_size=%.2f, asc=%d, desc=%d, line=%d",
-      f->size_pixels, f->em_size, f->ascender, f->descender, f->line_height);
 }
 
 /* ===== Font Loading ===== */
@@ -354,7 +334,6 @@ font *Font_Load(const char *name, i32 size_pixels) {
   HRESULT hr = IDWriteFactory_GetSystemFontCollection(g_font_system.factory,
                                                       &collection, FALSE);
   if (FAILED(hr)) {
-    Font_Log("Font: GetSystemFontCollection failed");
     free(f);
     return NULL;
   }
@@ -390,13 +369,11 @@ font *Font_Load(const char *name, i32 size_pixels) {
   IDWriteFontCollection_Release(collection);
 
   if (!f->face) {
-    Font_Log("Font: Failed to create face for %s", name ? name : "default");
     free(f);
     return NULL;
   }
 
   UpdateFontMetrics(f);
-  Font_Log("Font loaded: %s (%dpx)", name ? name : "default", size_pixels);
   return f;
 }
 
@@ -472,8 +449,6 @@ font *Font_LoadFromFile(const char *path, i32 size_pixels) {
       g_font_system.factory, abs_path, NULL, &font_file);
 
   if (FAILED(hr)) {
-    Font_Log("Font: CreateFontFileReference failed for '%ls' (0x%X)", abs_path,
-             (unsigned int)hr);
     fprintf(stderr,
             "Font: CreateFontFileReference failed for '%ls' (0x%X), using "
             "system fallback.\n",
@@ -491,7 +466,6 @@ font *Font_LoadFromFile(const char *path, i32 size_pixels) {
                                &numberOfFaces);
 
   if (FAILED(hr) || !isSupported) {
-    Font_Log("Font: Analyze failed or unsupported for '%ls'", abs_path);
     fprintf(stderr,
             "Font: Analyze failed or unsupported for '%ls', using system "
             "fallback.\n",
@@ -509,8 +483,6 @@ font *Font_LoadFromFile(const char *path, i32 size_pixels) {
   IDWriteFontFile_Release(font_file);
 
   if (FAILED(hr)) {
-    Font_Log("Font: CreateFontFace failed for '%ls' (0x%X)", abs_path,
-             (unsigned int)hr);
     fprintf(stderr,
             "Font: CreateFontFace failed for '%ls' (0x%X). Type: %d, Faces: "
             "%d. Using system fallback.\n",
@@ -520,7 +492,6 @@ font *Font_LoadFromFile(const char *path, i32 size_pixels) {
   }
 
   UpdateFontMetrics(f);
-  Font_Log("Font loaded from file: %ls (%dpx)", abs_path, size_pixels);
   return f;
 }
 
@@ -537,8 +508,6 @@ font *Font_LoadFromMemory(const void *data, usize size, i32 size_pixels) {
       (IDWriteFontFileLoader *)&g_MemoryFontLoader, &font_file);
 
   if (FAILED(hr)) {
-    Font_Log("Font: CreateCustomFontFileReference failed (0x%08X)",
-             (unsigned int)hr);
     return Font_Load("Segoe UI", size_pixels);
   }
 
@@ -551,7 +520,6 @@ font *Font_LoadFromMemory(const void *data, usize size, i32 size_pixels) {
                                &numberOfFaces);
 
   if (FAILED(hr) || !isSupported) {
-    Font_Log("Font: Memory font analysis failed or unsupported");
     IDWriteFontFile_Release(font_file);
     return Font_Load("Segoe UI", size_pixels);
   }
@@ -571,14 +539,11 @@ font *Font_LoadFromMemory(const void *data, usize size, i32 size_pixels) {
   IDWriteFontFile_Release(font_file);
 
   if (FAILED(hr)) {
-    Font_Log("Font: CreateFontFace failed for memory font (0x%08X)",
-             (unsigned int)hr);
     free(f);
     return Font_Load("Segoe UI", size_pixels);
   }
 
   UpdateFontMetrics(f);
-  Font_Log("Font loaded from memory (%zu bytes, %dpx)", size, size_pixels);
   return f;
 }
 
@@ -628,8 +593,7 @@ static cached_glyph *GetCachedGlyph(font *f, u32 codepoint) {
   u16 glyph_indices[1];
   u32 cp = codepoint;
   HRESULT hr = IDWriteFontFace_GetGlyphIndices(f->face, &cp, 1, glyph_indices);
-  if (FAILED(hr)) {
-    Font_Log("Failed to get glyph index for codepoint %u", codepoint);
+  if (FAILED(hr) || glyph_indices[0] == 0) {
     return NULL;
   }
 
@@ -697,8 +661,6 @@ static cached_glyph *GetCachedGlyph(font *f, u32 codepoint) {
                 glyph->bitmap[i] = (u8)((r + g + b) / 3);
               }
             }
-          } else {
-            Font_Log("CreateAlphaTexture failed 0x%X", (unsigned int)hr);
           }
           free(raw_alpha);
         }
@@ -710,12 +672,8 @@ static cached_glyph *GetCachedGlyph(font *f, u32 codepoint) {
         glyph->height = 0;
         glyph->bitmap = NULL;
       }
-    } else {
-      Font_Log("GetAlphaTextureBounds failed 0x%X", (unsigned int)hr);
     }
     IDWriteGlyphRunAnalysis_Release(analysis);
-  } else {
-    Font_Log("CreateGlyphRunAnalysis failed 0x%X", (unsigned int)hr);
   }
 
   glyph->valid = true;
