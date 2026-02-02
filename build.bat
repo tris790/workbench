@@ -1,62 +1,30 @@
 @echo off
-REM build.bat - Windows build script for Workbench
+REM build.bat - Windows build wrapper for Workbench
+REM This delegates to build_windows.sh which uses zig cc
+REM 
 REM Usage: build.bat [debug|release]
+REM Requires: Git Bash (comes with Git for Windows) and Zig
 
 setlocal EnableDelayedExpansion
 
-REM Set build mode (default: debug)
-set MODE=debug
-if "%1"=="release" set MODE=release
+REM Pass all arguments to the bash script
+set ARGS=%*
 
-REM Create build directory
-if not exist build mkdir build
-
-REM Build and run the embedding tool (native C approach)
-cl /nologo /O2 scripts/embed.c /Fe:build/embed.exe
-build\embed.exe
-
-REM Set compiler flags based on mode
-if "%MODE%"=="release" (
-    echo Building in RELEASE mode...
-    set CFLAGS=/O2 /DNDEBUG
-) else (
-    echo Building in DEBUG mode...
-    set CFLAGS=/Od /Zi /DWB_DEBUG
-)
-
-REM Common flags
-set CFLAGS=%CFLAGS% /W4 /WX /DUNICODE /D_UNICODE /D_CRT_SECURE_NO_WARNINGS
-
-REM Include paths
-set INCLUDES=/I src /I src\core /I src\platform /I src\renderer /I src\ui /I src\ui\components /I src\terminal /I src\config
-
-REM Source files (Unity Build)
-set SOURCES=src\unity_windows.c src\platform\windows\workbench.rc
-
-REM Libraries
-set LIBS=user32.lib gdi32.lib shell32.lib shlwapi.lib dwrite.lib uuid.lib opengl32.lib
-
-REM Output
-set OUTPUT=/Fe:build\wb.exe
-
-REM Set subsystem based on mode
-REM CONSOLE for debug (allows printf debugging), WINDOWS for release (proper GUI app)
-if "%MODE%"=="release" (
-    set SUBSYSTEM=WINDOWS
-) else (
-    set SUBSYSTEM=CONSOLE
-)
-
-REM Full command
-echo Compiling (unity build)...
-cl.exe %CFLAGS% %INCLUDES% %OUTPUT% ^
-    %SOURCES% ^
-    %LIBS% ^
-    /link /SUBSYSTEM:%SUBSYSTEM%
-
+REM Check if sh is available (Git Bash)
+where sh >nul 2>nul
 if %ERRORLEVEL% NEQ 0 (
-    echo Build FAILED!
+    echo Error: Git Bash not found. Please install Git for Windows.
+    echo Download from: https://git-scm.com/download/win
     exit /b 1
 )
 
-echo Build successful: build\wb.exe
+REM Check if zig is available
+where zig >nul 2>nul
+if %ERRORLEVEL% NEQ 0 (
+    echo Error: Zig compiler not found. Please install Zig.
+    echo Download from: https://ziglang.org/download/
+    exit /b 1
+)
+
+REM Run the bash build script
+sh build_windows.sh %ARGS%

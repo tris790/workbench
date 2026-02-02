@@ -7,8 +7,8 @@ This document serves as the coding style guide and project documentation for Wor
 Workbench is a developer tool that serves as a **file explorer on steroids** - a keyboard-focused, professional-grade file management application with integrated terminal, command palette, and extensibility. It is a desktop application.
 
 ### Target Platforms
-- **Primary**: Arch Linux + KDE Wayland (native, no XWayland) ./build.sh
-- **Secondary**: Windows ./crossplatform.sh
+- **Primary**: Arch Linux + KDE Wayland (native, no XWayland) - use `./build.sh`
+- **Secondary**: Windows - use `build.bat` (Windows) or `./build_windows.sh` (cross-compile from Linux/Mac)
 
 ### Core Philosophy
 - **Insanely fast and lightweight** - no bloat, portable single executable
@@ -118,11 +118,22 @@ Platform implementations:
 
 ## Build System
 
-Single script: `./build.sh [debug|release]`
+### Linux
+```bash
+./build.sh [debug|release]   # Output: build/wb
+```
 
-Output: `build/wb`
+### Windows
+```bash
+# On Windows:
+build.bat [debug|release]    # Output: build/wb.exe
 
-- Default/preferred: debug mode (`-O0 -g -DWB_DEBUG`)
+# On Linux/Mac (cross-compile, requires Zig):
+./build_windows.sh [debug|release]  # Output: build/wb.exe
+```
+
+### Build Options
+- Default: debug mode (`-O0 -g -DWB_DEBUG`)
 - Release: optimized (`-O2 -DNDEBUG`)
 - Zero warnings policy (`-Wall -Wextra -Werror`)
 
