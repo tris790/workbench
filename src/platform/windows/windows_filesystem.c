@@ -206,7 +206,7 @@ b32 Platform_CreateFile(const char *path) {
 }
 
 b32 Platform_Delete(const char *path) {
-  wchar_t wide_path[FS_MAX_PATH] = {0};
+  wchar_t wide_path[FS_MAX_PATH + 2] = {0}; /* +2 for double-null termination */
   if (Utf8ToWide(path, wide_path, FS_MAX_PATH) == 0)
     return false;
 
@@ -215,7 +215,26 @@ b32 Platform_Delete(const char *path) {
     return false;
 
   if (attrs & FILE_ATTRIBUTE_DIRECTORY) {
-    return RemoveDirectoryW(wide_path) != 0;
+    /* Use SHFileOperationW for fast recursive deletion.
+     * This is the same API Windows Explorer uses and is highly optimized
+     * for deleting deep directory trees like node_modules. */
+
+    /* SHFileOperationW requires double-null terminated paths */
+    usize len = wcslen(wide_path);
+    wide_path[len] = L'\0';
+    wide_path[len + 1] = L'\0';
+
+    SHFILEOPSTRUCTW file_op = {0};
+    file_op.hwnd = NULL;
+    file_op.wFunc = FO_DELETE;
+    file_op.pFrom = wide_path;
+    file_op.pTo = NULL;
+    file_op.fFlags = FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT;
+    file_op.fAnyOperationsAborted = FALSE;
+    file_op.hNameMappings = NULL;
+    file_op.lpszProgressTitle = NULL;
+
+    return SHFileOperationW(&file_op) == 0 && !file_op.fAnyOperationsAborted;
   } else {
     /* Clear read-only attribute if present to ensure deletion works */
     if (attrs & FILE_ATTRIBUTE_READONLY) {
