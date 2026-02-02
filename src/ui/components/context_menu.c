@@ -346,6 +346,18 @@ void ContextMenu_Show(context_menu_state *state, v2i position,
       state->menu_width = icons_width;
   }
 
+  /* Calculate initial menu height and set adjusted position
+   * (will be refined in render when we know window dimensions) */
+  i32 separator_count = 0;
+  for (i32 i = 0; i < state->item_count; i++) {
+    if (state->items[i].separator_after)
+      separator_count++;
+  }
+  state->menu_height =
+      state->item_count * state->item_height + separator_count * 8 + 8;
+  state->menu_height += state->action_row_height;
+  state->adjusted_position = position; /* Will be corrected in render */
+
   /* Start fade-in animation */
   state->fade_anim.target = 1.0f;
 
@@ -372,20 +384,9 @@ b32 ContextMenu_IsMouseOver(context_menu_state *state, v2i mouse_pos) {
   if (!state->visible)
     return false;
 
-  i32 separator_count = 0;
-  for (i32 i = 0; i < state->item_count; i++) {
-    if (state->items[i].separator_after)
-      separator_count++;
-  }
-
-  i32 menu_height =
-      state->item_count * state->item_height + separator_count * 8 + 8;
-
-  /* Add action row height */
-  menu_height += state->action_row_height;
-
-  rect menu_rect = {state->position.x, state->position.y, state->menu_width,
-                    menu_height};
+  /* Use pre-calculated adjusted position */
+  rect menu_rect = {state->adjusted_position.x, state->adjusted_position.y,
+                    state->menu_width, state->menu_height};
 
   return UI_PointInRect(mouse_pos, menu_rect);
 }
@@ -435,30 +436,22 @@ b32 ContextMenu_Update(context_menu_state *state, ui_context *ui) {
     return true;
   }
 
-  /* Handle mouse clicks - calculate menu rect for hit testing */
+  /* Handle mouse clicks - use adjusted position for hit testing */
   if (input->mouse_pressed[MOUSE_LEFT] || input->mouse_pressed[MOUSE_RIGHT]) {
-    /* Need to calculate menu dimensions for hit testing */
-    i32 separator_count = 0;
-    for (i32 i = 0; i < state->item_count; i++) {
-      if (state->items[i].separator_after)
-        separator_count++;
-    }
-    i32 menu_height =
-        state->item_count * state->item_height + separator_count * 8 + 8;
+    /* Use pre-calculated adjusted position for accurate hit testing */
+    i32 menu_x = state->adjusted_position.x;
+    i32 menu_y = state->adjusted_position.y;
+    i32 menu_height = state->menu_height;
 
-    /* Add action row height */
-    menu_height += state->action_row_height;
-
-    rect menu_rect = {state->position.x, state->position.y, state->menu_width,
-                      menu_height};
+    rect menu_rect = {menu_x, menu_y, state->menu_width, menu_height};
 
     if (UI_PointInRect(input->mouse_pos, menu_rect)) {
       /* Click inside menu - check which item */
       if (input->mouse_pressed[MOUSE_LEFT]) {
-        i32 item_y = state->position.y + 4;
+        i32 item_y = menu_y + 4;
         for (i32 i = 0; i < state->item_count; i++) {
-          rect item_rect = {state->position.x + 4, item_y,
-                            state->menu_width - 8, state->item_height};
+          rect item_rect = {menu_x + 4, item_y, state->menu_width - 8,
+                            state->item_height};
           if (UI_PointInRect(input->mouse_pos, item_rect)) {
             state->selected_index = i;
             ContextMenu_ExecuteSelectedItem(state);
@@ -475,7 +468,7 @@ b32 ContextMenu_Update(context_menu_state *state, ui_context *ui) {
         /* Check custom action row */
         if (state->custom_action_count > 0) {
           item_y += 5;
-          i32 action_start_x = state->position.x + 8;
+          i32 action_start_x = menu_x + 8;
           for (i32 i = 0; i < state->custom_action_count; i++) {
             rect action_rect = {action_start_x + i * 32, item_y, 28, 28};
             if (UI_PointInRect(input->mouse_pos, action_rect)) {
@@ -541,6 +534,11 @@ void ContextMenu_Render(context_menu_state *state, ui_context *ui,
     menu_x = 4;
   if (menu_y < 4)
     menu_y = 4;
+
+  /* Store adjusted position for hit testing in Update */
+  state->adjusted_position.x = menu_x;
+  state->adjusted_position.y = menu_y;
+  state->menu_height = menu_height;
 
   rect menu_rect = {menu_x, menu_y, state->menu_width, menu_height};
 
@@ -748,27 +746,8 @@ static void Action_CustomCommand(void *user_data) {
   if (!state || !command_template)
     return;
 
-  char command[1024];
-
-  /* Substitution: %filepath -> target_path */
-  const char *placeholder = strstr(command_template, "%filepath");
-  if (placeholder) {
-    usize prefix_len = (usize)(placeholder - command_template);
-    if (prefix_len > sizeof(command) - 1)
-      prefix_len = sizeof(command) - 1;
-
-    memcpy(command, command_template, prefix_len);
-    command[prefix_len] = '\0';
-
-    strncat(command, state->target_path, sizeof(command) - strlen(command) - 1);
-    strncat(command, placeholder + 9, sizeof(command) - strlen(command) - 1);
-  } else {
-    strncpy(command, command_template, sizeof(command) - 1);
-    command[sizeof(command) - 1] = '\0';
-  }
-
-  /* Set working directory to the target path's directory or the path itself if
-   * it's a directory */
+  /* Calculate working directory (parent of target for files, target itself for
+   * directories) */
   char working_dir[FS_MAX_PATH] = {0};
   if (state->target_path[0] != '\0') {
     strncpy(working_dir, state->target_path, sizeof(working_dir) - 1);
@@ -785,6 +764,48 @@ static void Action_CustomCommand(void *user_data) {
       }
     }
   }
+
+  /* Perform substitutions: %filepath -> target_path, %dir -> working_dir */
+  char command[1024];
+  char temp[1024];
+  strncpy(temp, command_template, sizeof(temp) - 1);
+  temp[sizeof(temp) - 1] = '\0';
+
+  /* First pass: replace %filepath with quoted target path */
+  command[0] = '\0';
+  char *src = temp;
+  char *dst = command;
+  usize remaining = sizeof(command) - 1;
+
+  while (*src && remaining > 0) {
+    if (strncmp(src, "%filepath", 9) == 0) {
+      /* Insert quoted path to handle spaces */
+      usize path_len = strlen(state->target_path);
+      if (path_len + 2 < remaining) {
+        *dst++ = '"';
+        memcpy(dst, state->target_path, path_len);
+        dst += path_len;
+        *dst++ = '"';
+        remaining -= path_len + 2;
+      }
+      src += 9;
+    } else if (strncmp(src, "%dir", 4) == 0) {
+      /* Insert quoted directory path */
+      usize dir_len = strlen(working_dir);
+      if (dir_len + 2 < remaining) {
+        *dst++ = '"';
+        memcpy(dst, working_dir, dir_len);
+        dst += dir_len;
+        *dst++ = '"';
+        remaining -= dir_len + 2;
+      }
+      src += 4;
+    } else {
+      *dst++ = *src++;
+      remaining--;
+    }
+  }
+  *dst = '\0';
 
   /* Pass show_window=true so GUI applications can display properly */
   Platform_SpawnProcess(command, working_dir[0] != '\0' ? working_dir : NULL,

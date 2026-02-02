@@ -77,17 +77,21 @@ platform_process *Platform_SpawnProcess(const char *command,
   /* Convert command to wide string */
   wchar_t wide_cmdline[FS_MAX_PATH * 2];
 
+  /* Always use cmd.exe to resolve commands from PATH.
+   * For GUI apps: Use 'cmd.exe /c start "" /B' which:
+   *   - /c: Execute command and terminate
+   *   - start: Use shell to resolve PATH and launch
+   *   - "": Empty title (required before command with spaces)
+   *   - /B: Don't create a new console window for the started app
+   * For console apps: Use 'cmd.exe /c' directly */
+  char cmdline[FS_MAX_PATH * 2];
   if (show_window) {
-    /* For GUI apps: use the command directly without cmd.exe wrapper
-     * This allows GUI apps to open properly */
-    MultiByteToWideChar(CP_UTF8, 0, command, -1, wide_cmdline,
-                        FS_MAX_PATH * 2);
+    /* Use 'start /B' for GUI apps - the /B prevents a cmd window flash */
+    snprintf(cmdline, sizeof(cmdline), "cmd.exe /c start \"\" /B %s", command);
   } else {
-    /* For console apps: wrap in cmd.exe /c to handle shell commands */
-    char cmdline[FS_MAX_PATH * 2];
     snprintf(cmdline, sizeof(cmdline), "cmd.exe /c %s", command);
-    MultiByteToWideChar(CP_UTF8, 0, cmdline, -1, wide_cmdline, FS_MAX_PATH * 2);
   }
+  MultiByteToWideChar(CP_UTF8, 0, cmdline, -1, wide_cmdline, FS_MAX_PATH * 2);
 
   wchar_t wide_working_dir[FS_MAX_PATH];
   wchar_t *working_dir_ptr = NULL;
@@ -97,19 +101,22 @@ platform_process *Platform_SpawnProcess(const char *command,
     working_dir_ptr = wide_working_dir;
   }
 
-  DWORD creation_flags = show_window ? CREATE_NEW_CONSOLE : CREATE_NO_WINDOW;
+  /* Use CREATE_NO_WINDOW since we're using cmd.exe which handles window
+   * creation */
+  DWORD creation_flags = CREATE_NO_WINDOW;
 
-  BOOL success = CreateProcessW(NULL, /* Application name (use command line) */
-                                wide_cmdline,  /* Command line (modifiable) */
-                                NULL,          /* Process security attributes */
-                                NULL,          /* Thread security attributes */
-                                !show_window,  /* Inherit handles (only for console) */
-                                creation_flags, /* Creation flags */
-                                NULL,          /* Environment */
-                                working_dir_ptr, /* Working directory */
-                                &si,           /* Startup info */
-                                &pi            /* Process info */
-  );
+  BOOL success =
+      CreateProcessW(NULL,            /* Application name (use command line) */
+                     wide_cmdline,    /* Command line (modifiable) */
+                     NULL,            /* Process security attributes */
+                     NULL,            /* Thread security attributes */
+                     !show_window,    /* Inherit handles (only for console) */
+                     creation_flags,  /* Creation flags */
+                     NULL,            /* Environment */
+                     working_dir_ptr, /* Working directory */
+                     &si,             /* Startup info */
+                     &pi              /* Process info */
+      );
 
   /* Close pipe ends that child uses */
   if (!show_window) {

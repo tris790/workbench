@@ -56,9 +56,12 @@ typedef struct context_menu_state_s {
   i32 item_count;
 
   /* Position and selection */
-  v2i position;              /* Screen position (top-left) */
-  i32 selected_index;        /* Keyboard selection (-1 = none) */
+  v2i position; /* Screen position (top-left) - original click position */
+  v2i adjusted_position; /* Actual rendered position after off-screen adjustment
+                          */
+  i32 selected_index;    /* Keyboard selection (-1 = none) */
   i32 selected_action_index; /* Icon row selection (-1 = none) */
+  i32 menu_height; /* Calculated menu height (cached for hit testing) */
 
   /* Context */
   context_type type;
