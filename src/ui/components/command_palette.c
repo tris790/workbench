@@ -14,6 +14,13 @@
 
 /* ===== Internal Helpers ===== */
 
+/* Compare palette items by match score (descending) for qsort */
+static int ComparePaletteItemsByScore(const void *a, const void *b) {
+  const palette_item *item_a = (const palette_item *)a;
+  const palette_item *item_b = (const palette_item *)b;
+  return item_b->match_score - item_a->match_score; /* Higher score first */
+}
+
 /* Populate items list for file mode */
 static void PopulateFileItems(command_palette_state *state) {
   state->item_count = 0;
@@ -21,15 +28,20 @@ static void PopulateFileItems(command_palette_state *state) {
     return;
 
   const char *query = state->input_buffer;
+  b32 has_query = query[0] != '\0';
 
   for (u32 i = 0;
        i < state->fs->entry_count && state->item_count < PALETTE_MAX_ITEMS;
        i++) {
     fs_entry *entry = &state->fs->entries[i];
 
-    /* Filter by query */
-    if (query[0] != '\0' && !FuzzyMatch(query, entry->name)) {
-      continue;
+    /* Filter by query with scoring */
+    i32 score = 0;
+    if (has_query) {
+      fuzzy_match_result result = FuzzyMatchScore(query, entry->name);
+      if (!result.matches)
+        continue;
+      score = result.score;
     }
 
     palette_item *item = &state->items[state->item_count];
@@ -38,8 +50,15 @@ static void PopulateFileItems(command_palette_state *state) {
     item->icon = entry->icon;
     item->is_file = true;
     item->user_data = entry;
+    item->match_score = score;
 
     state->item_count++;
+  }
+
+  /* Sort by score if we have a query */
+  if (has_query && state->item_count > 1) {
+    qsort(state->items, (size_t)state->item_count, sizeof(palette_item),
+          ComparePaletteItemsByScore);
   }
 }
 
@@ -81,6 +100,7 @@ static void PopulateCommandItems(command_palette_state *state) {
 
       FillItemFromCommand(&state->items[state->item_count],
                           &state->commands[cmd_idx], cmd_idx, "recently used");
+      state->items[state->item_count].match_score = 10000; /* High score for recent */
 
       state->item_count++;
       if (state->item_count >= PALETTE_MAX_ITEMS)
@@ -105,26 +125,37 @@ static void PopulateCommandItems(command_palette_state *state) {
         continue;
     }
 
-    /* Filter by query */
-    b32 match = false;
+    /* Filter by query with scoring */
+    i32 score = 0;
     if (empty_query) {
-      match = true;
+      score = 0; /* No query = no special score */
     } else {
-      /* Match name OR tags */
-      if (FuzzyMatch(query, cmd->name) || FuzzyMatch(query, cmd->tags)) {
-        match = true;
+      /* Match name OR tags, take highest score */
+      fuzzy_match_result name_result = FuzzyMatchScore(query, cmd->name);
+      fuzzy_match_result tags_result = FuzzyMatchScore(query, cmd->tags);
+      if (name_result.matches) {
+        score = name_result.score;
+      }
+      if (tags_result.matches && tags_result.score > score) {
+        score = tags_result.score;
+      }
+      if (!name_result.matches && !tags_result.matches) {
+        continue; /* No match */
       }
     }
 
-    if (!match) {
-      continue;
-    }
-
     FillItemFromCommand(&state->items[state->item_count], cmd, i, NULL);
+    state->items[state->item_count].match_score = score;
 
     state->item_count++;
     if (state->item_count >= PALETTE_MAX_ITEMS)
       break;
+  }
+
+  /* Sort by score if we have a query */
+  if (!empty_query && state->item_count > 1) {
+    qsort(state->items, (size_t)state->item_count, sizeof(palette_item),
+          ComparePaletteItemsByScore);
   }
 }
 

@@ -77,15 +77,75 @@ static b32 Explorer_IsEntryVisible(explorer_state *state, i32 index) {
   return true;
 }
 
+/* Entry with match score for sorting */
+typedef struct {
+  i32 index;      /* Index into fs.entries */
+  i32 score;      /* Fuzzy match score (higher = better) */
+} scored_entry;
+
+/* Compare scored entries by score (descending) for qsort */
+static int CompareScoredEntries(const void *a, const void *b) {
+  const scored_entry *se_a = (const scored_entry *)a;
+  const scored_entry *se_b = (const scored_entry *)b;
+  return se_b->score - se_a->score; /* Higher score first */
+}
+
 /* Update the cached list of visible entries */
 static void Explorer_UpdateVisibleEntries(explorer_state *state) {
   state->visible_count = 0;
+  
+  /* Check if quick filter is active */
+  b32 filter_active = QuickFilter_IsActive(&state->filter);
+  const char *query = QuickFilter_GetQuery(&state->filter);
+  b32 has_query = filter_active && query[0] != '\0';
+  
+  /* Use stack-allocated array for scored entries when filtering */
+  scored_entry scored_entries[FS_MAX_ENTRIES];
+  
   for (u32 i = 0; i < state->fs.entry_count; i++) {
-    if (Explorer_IsEntryVisible(state, (i32)i)) {
-      if (state->visible_count < FS_MAX_ENTRIES) {
-        state->visible_entries[state->visible_count++] = (i32)i;
+    /* Get match score if filter is active */
+    i32 score = 0;
+    if (has_query) {
+      fs_entry *entry = &state->fs.entries[i];
+      
+      /* Skip filtering for pure navigation prefixes */
+      if (query[0] == '\0' ||
+          (query[0] == '~' && query[1] == '\0') ||
+          (query[0] == '/' && query[1] == '\0')) {
+        /* Pure navigation prefix - show all */
+      } else {
+        /* Use only the part after the last separator for matching filenames */
+        const char *last_sep = FS_FindLastSeparator(query);
+        const char *match_query = last_sep ? last_sep + 1 : query;
+        
+        /* If query ends with separator, user is still typing path - show all */
+        if (match_query[0] != '\0') {
+          fuzzy_match_result result = FuzzyMatchScore(match_query, entry->name);
+          if (!result.matches)
+            continue;
+          score = result.score;
+        }
       }
     }
+    
+    if (Explorer_IsEntryVisible(state, (i32)i)) {
+      if (state->visible_count < FS_MAX_ENTRIES) {
+        scored_entries[state->visible_count].index = (i32)i;
+        scored_entries[state->visible_count].score = score;
+        state->visible_count++;
+      }
+    }
+  }
+  
+  /* Sort by score if filter is active with a query */
+  if (has_query && state->visible_count > 1) {
+    qsort(scored_entries, (size_t)state->visible_count, sizeof(scored_entry),
+          CompareScoredEntries);
+  }
+  
+  /* Copy sorted indices to visible_entries */
+  for (i32 i = 0; i < state->visible_count; i++) {
+    state->visible_entries[i] = scored_entries[i].index;
   }
 }
 
@@ -1088,20 +1148,24 @@ void Explorer_Update(explorer_state *state, ui_context *ui,
       /* Update visible entries when filter changes */
       Explorer_UpdateVisibleEntries(state);
 
-      /* Find first and second visible items to apply selection preference:
-         - If > 1 result (e.g. ".." and "match"), select 2nd (the match)
-         - Else select 1st (e.g. "..")
-      */
-      i32 first_idx = -1;
-      i32 second_idx = -1;
+      /* When filter has a query, select the first visible entry (best match after
+         sorting by score). Otherwise (no query), skip ".." and select first real
+         match if available. */
+      i32 target = -1;
 
-      if (state->visible_count > 0)
-        first_idx = state->visible_entries[0];
-      if (state->visible_count > 1)
-        second_idx = state->visible_entries[1];
-
-      /* Use second if found, otherwise first */
-      i32 target = (second_idx != -1) ? second_idx : first_idx;
+      if (filter_is_active && current_filter[0] != '\0') {
+        /* Filter has query - select first entry (best fuzzy match) */
+        if (state->visible_count > 0) {
+          target = state->visible_entries[0];
+        }
+      } else {
+        /* No query - old behavior: skip ".." if there's a second item */
+        if (state->visible_count > 1) {
+          target = state->visible_entries[1];
+        } else if (state->visible_count > 0) {
+          target = state->visible_entries[0];
+        }
+      }
 
       if (target >= 0) {
         Explorer_SetSelection(state, target);

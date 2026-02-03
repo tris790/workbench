@@ -42,6 +42,7 @@ typedef struct {
   void *user_data;
   b32 is_file;
   i32 command_index; /* Index into registered commands array */
+  i32 match_score;   /* Fuzzy match score for sorting (higher = better) */
 } palette_item;
 
 /* Registered command */
