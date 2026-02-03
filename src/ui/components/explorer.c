@@ -1214,6 +1214,12 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
   i32 visible_item_count = Explorer_CountVisible(state);
   f32 content_height = (f32)(visible_item_count * state->item_height);
 
+  /* Add extra padding (3 items) when scrollbar is needed so user can scroll
+   * past the end to access empty space for right-clicking */
+  if (content_height > list_area.h) {
+    content_height += (f32)(3 * state->item_height);
+  }
+
   /* Update scroll container content size */
   ScrollContainer_SetContentSize(&state->scroll, content_height);
 
