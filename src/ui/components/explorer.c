@@ -945,6 +945,10 @@ void Explorer_Update(explorer_state *state, ui_context *ui,
                                       input->mouse_pos, now);
             }
           }
+        } else {
+          /* Clicked on empty space - clear selection */
+          FS_ClearSelection(&state->fs);
+          state->fs.selected_index = -1;
         }
       }
 
