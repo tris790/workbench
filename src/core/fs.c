@@ -635,6 +635,89 @@ b32 FS_Copy(const char *src, const char *dst) {
   return Platform_Copy(src, dst);
 }
 
+/* Helper: Recursively copy directory contents */
+static b32 CopyDirectoryRecursive(const char *src_dir, const char *dst_dir, memory_arena *arena) {
+  directory_listing listing = {0};
+  temporary_memory temp = BeginTemporaryMemory(arena);
+  
+  if (!Platform_ListDirectory(src_dir, &listing, arena)) {
+    EndTemporaryMemory(temp);
+    return false;
+  }
+  
+  b32 success = true;
+  
+  for (usize i = 0; i < listing.count && success; i++) {
+    file_info *info = &listing.entries[i];
+    
+    /* Skip . and .. */
+    if (strcmp(info->name, ".") == 0 || strcmp(info->name, "..") == 0) {
+      continue;
+    }
+    
+    /* Build source and destination paths */
+    char src_path[FS_MAX_PATH];
+    char dst_path[FS_MAX_PATH];
+    FS_JoinPath(src_path, sizeof(src_path), src_dir, info->name);
+    FS_JoinPath(dst_path, sizeof(dst_path), dst_dir, info->name);
+    
+    if (info->type == FILE_TYPE_DIRECTORY) {
+      /* Create destination directory */
+      if (!Platform_CreateDirectory(dst_path)) {
+        /* Directory might already exist, that's OK */
+        if (!Platform_IsDirectory(dst_path)) {
+          success = false;
+          break;
+        }
+      }
+      /* Recursively copy subdirectory */
+      if (!CopyDirectoryRecursive(src_path, dst_path, arena)) {
+        success = false;
+        break;
+      }
+    } else {
+      /* Copy file */
+      if (!Platform_Copy(src_path, dst_path)) {
+        success = false;
+        break;
+      }
+    }
+  }
+  
+  Platform_FreeDirectoryListing(&listing);
+  EndTemporaryMemory(temp);
+  return success;
+}
+
+b32 FS_CopyRecursive(const char *src, const char *dst, memory_arena *arena) {
+  /* Check if source exists */
+  file_info info;
+  if (!Platform_GetFileInfo(src, &info)) {
+    return false;
+  }
+  
+  if (info.type == FILE_TYPE_FILE) {
+    /* Simple file copy */
+    return Platform_Copy(src, dst);
+  }
+  
+  if (info.type == FILE_TYPE_DIRECTORY) {
+    /* Create destination directory */
+    if (!Platform_CreateDirectory(dst)) {
+      /* Directory might already exist, that's OK for root of copy */
+      if (!Platform_IsDirectory(dst)) {
+        return false;
+      }
+    }
+    
+    /* Recursively copy contents */
+    return CopyDirectoryRecursive(src, dst, arena);
+  }
+  
+  /* Symlinks not supported for recursive copy */
+  return false;
+}
+
 b32 FS_Exists(const char *path) { return Platform_FileExists(path); }
 
 b32 FS_ResolvePath(const char *path, char *out_path, usize out_size) {

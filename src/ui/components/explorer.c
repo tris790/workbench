@@ -455,26 +455,24 @@ void Explorer_ConfirmDelete(explorer_state *state, ui_context *ui) {
   state->dialog_text = Text_Wrap(state->fs.arena, msg, ui->font, max_text_w);
 }
 
-/* Helper to copy selected items to shared clipboard */
+/* Helper to copy selected items to OS clipboard */
 static void Explorer_CopyToClipboard(explorer_state *state, b32 is_cut) {
-  if (!state->layout)
-    return;
-  layout_state *layout = state->layout;
+  const char *paths[EXPLORER_MAX_CLIPBOARD];
+  i32 count = 0;
 
-  layout->clipboard_count = 0;
-  layout->clipboard_is_cut = is_cut;
-
-  /* Iterate through all selected items */
+  /* Collect selected paths */
   for (i32 idx = FS_GetFirstSelected(&state->fs);
-       idx >= 0 && layout->clipboard_count < EXPLORER_MAX_CLIPBOARD;
+       idx >= 0 && count < EXPLORER_MAX_CLIPBOARD;
        idx = FS_GetNextSelected(&state->fs, idx)) {
     fs_entry *entry = FS_GetEntry(&state->fs, idx);
     if (entry && strcmp(entry->name, "..") != 0) {
-      strncpy(layout->clipboard_paths[layout->clipboard_count], entry->path,
-              FS_MAX_PATH - 1);
-      layout->clipboard_paths[layout->clipboard_count][FS_MAX_PATH - 1] = '\0';
-      layout->clipboard_count++;
+      paths[count] = entry->path;
+      count++;
     }
+  }
+
+  if (count > 0) {
+    Platform_ClipboardSetFiles(paths, count, is_cut);
   }
 }
 
@@ -489,15 +487,21 @@ void Explorer_Cut(explorer_state *state) {
 paste_result Explorer_Paste(explorer_state *state) {
   paste_result result = {0};
 
-  if (!state->layout)
-    return result;
-  layout_state *layout = state->layout;
+  /* Get files from OS clipboard */
+  char *paths[EXPLORER_MAX_CLIPBOARD];
+  char path_buffers[EXPLORER_MAX_CLIPBOARD][FS_MAX_PATH];
+  for (i32 i = 0; i < EXPLORER_MAX_CLIPBOARD; i++) {
+    paths[i] = path_buffers[i];
+  }
 
-  if (layout->clipboard_count == 0)
+  b32 is_cut = false;
+  i32 count = Platform_ClipboardGetFiles(paths, EXPLORER_MAX_CLIPBOARD, &is_cut);
+
+  if (count == 0)
     return result;
 
-  for (i32 i = 0; i < layout->clipboard_count; i++) {
-    const char *src = layout->clipboard_paths[i];
+  for (i32 i = 0; i < count; i++) {
+    const char *src = paths[i];
     if (src[0] == '\0')
       continue;
 
@@ -506,10 +510,11 @@ paste_result Explorer_Paste(explorer_state *state) {
     FS_JoinPath(dest, FS_MAX_PATH, state->fs.current_path, filename);
 
     b32 success;
-    if (layout->clipboard_is_cut) {
+    if (is_cut) {
       success = FS_Rename(src, dest);
     } else {
-      success = FS_Copy(src, dest);
+      /* Use recursive copy to handle both files and directories */
+      success = FS_CopyRecursive(src, dest, state->fs.arena);
     }
 
     if (success) {
@@ -517,17 +522,13 @@ paste_result Explorer_Paste(explorer_state *state) {
     } else {
       result.failure_count++;
       snprintf(result.last_error, sizeof(result.last_error), "Failed to %s: %s",
-               layout->clipboard_is_cut ? "move" : "copy", filename);
+               is_cut ? "move" : "copy", filename);
     }
   }
 
   /* Show toast/status error if any failures */
   if (result.failure_count > 0) {
     /* TODO: StatusBar_ShowError(result.last_error); */
-  }
-
-  if (layout->clipboard_is_cut && result.success_count > 0) {
-    layout->clipboard_count = 0; /* Clear clipboard after move */
   }
 
   if (result.success_count > 0) {

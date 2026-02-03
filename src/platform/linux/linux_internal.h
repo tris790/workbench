@@ -19,6 +19,16 @@
 #include <unistd.h>
 #include <wayland-client.h>
 
+/* ===== File Clipboard Support ===== */
+
+#define CLIPBOARD_MAX_FILES 64
+
+typedef struct {
+  char paths[CLIPBOARD_MAX_FILES][FS_MAX_PATH];
+  i32 count;
+  b32 is_cut; /* true = move on paste, false = copy on paste */
+} clipboard_files;
+
 /* ===== Platform State ===== */
 
 typedef struct {
@@ -38,6 +48,9 @@ typedef struct {
   struct wl_data_offer *selection_offer;
   u32 last_serial;
   b32 initialized;
+  
+  /* File clipboard state */
+  clipboard_files file_clipboard;
 } linux_platform;
 
 extern linux_platform g_platform;

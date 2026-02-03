@@ -165,6 +165,11 @@ b32 FS_CreateFile(const char *path);
 /* Copy file to destination */
 b32 FS_Copy(const char *src, const char *dst);
 
+/* Copy file or recursively copy directory to destination.
+ * Creates destination directory if needed.
+ * Returns true on success. */
+b32 FS_CopyRecursive(const char *src, const char *dst, memory_arena *arena);
+
 /* Check if file or directory exists */
 b32 FS_Exists(const char *path);
 

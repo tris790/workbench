@@ -20,6 +20,23 @@ static void DataSourceSend(void *data, struct wl_data_source *source,
       write(fd, g_platform.clipboard_content,
             strlen(g_platform.clipboard_content));
     }
+  } else if (strcmp(mime_type, "text/uri-list") == 0) {
+    /* Send file URIs */
+    clipboard_files *files = &g_platform.file_clipboard;
+    if (files->count > 0) {
+      char uri[FS_MAX_PATH + 16];
+      for (i32 i = 0; i < files->count; i++) {
+        /* Convert path to file:// URI */
+        /* Handle paths that may already have file:// prefix */
+        const char *path = files->paths[i];
+        if (strncmp(path, "file://", 7) == 0) {
+          snprintf(uri, sizeof(uri), "%s\r\n", path);
+        } else {
+          snprintf(uri, sizeof(uri), "file://%s\r\n", path);
+        }
+        write(fd, uri, strlen(uri));
+      }
+    }
   }
   close(fd);
 }
@@ -58,8 +75,13 @@ static void DataOfferOffer(void *data, struct wl_data_offer *offer,
   (void)data;
   if (strcmp(mime_type, "text/plain;charset=utf-8") == 0 ||
       strcmp(mime_type, "text/plain") == 0) {
-    /* Mark offer as containing text */
-    wl_data_offer_set_user_data(offer, (void *)(intptr_t)1);
+    /* Mark offer as containing text (1 = text, 2 = files, 3 = both) */
+    intptr_t existing = (intptr_t)wl_data_offer_get_user_data(offer);
+    wl_data_offer_set_user_data(offer, (void *)(existing | 1));
+  } else if (strcmp(mime_type, "text/uri-list") == 0) {
+    /* Mark offer as containing files */
+    intptr_t existing = (intptr_t)wl_data_offer_get_user_data(offer);
+    wl_data_offer_set_user_data(offer, (void *)(existing | 2));
   }
 }
 
@@ -130,8 +152,9 @@ char *Platform_GetClipboard(char *buffer, usize buffer_size) {
     return NULL;
   }
 
-  /* Check if text is available */
-  if ((intptr_t)wl_data_offer_get_user_data(g_platform.selection_offer) != 1) {
+  /* Check if text is available (bit 0 set = text available) */
+  intptr_t user_data = (intptr_t)wl_data_offer_get_user_data(g_platform.selection_offer);
+  if ((user_data & 1) == 0) {
     return NULL;
   }
 
@@ -190,4 +213,129 @@ b32 Platform_SetClipboard(const char *text) {
   wl_data_device_set_selection(g_platform.data_device, g_platform.clipboard_source, g_platform.last_serial); 
   
   return true;
+}
+
+/* ===== File Clipboard API ===== */
+
+b32 Platform_ClipboardSetFiles(const char **paths, i32 count, b32 is_cut) {
+  (void)is_cut; /* Cut vs copy is handled by the app on paste, not by Wayland protocol */
+  
+  if (!g_platform.data_device_manager || !g_platform.seat) {
+    return false;
+  }
+  
+  if (count <= 0 || count > CLIPBOARD_MAX_FILES) {
+    return false;
+  }
+  
+  /* Store files in our clipboard state */
+  clipboard_files *files = &g_platform.file_clipboard;
+  files->count = count;
+  files->is_cut = is_cut;
+  
+  for (i32 i = 0; i < count; i++) {
+    strncpy(files->paths[i], paths[i], FS_MAX_PATH - 1);
+    files->paths[i][FS_MAX_PATH - 1] = '\0';
+  }
+  
+  /* Clear text content when setting files */
+  if (g_platform.clipboard_content) {
+    free(g_platform.clipboard_content);
+    g_platform.clipboard_content = NULL;
+  }
+  
+  /* Create new source for file data */
+  if (g_platform.clipboard_source) {
+    wl_data_source_destroy(g_platform.clipboard_source);
+  }
+  
+  g_platform.clipboard_source = wl_data_device_manager_create_data_source(g_platform.data_device_manager);
+  wl_data_source_add_listener(g_platform.clipboard_source, &data_source_listener, NULL);
+  
+  /* Offer text/uri-list MIME type */
+  wl_data_source_offer(g_platform.clipboard_source, "text/uri-list");
+  
+  wl_data_device_set_selection(g_platform.data_device, g_platform.clipboard_source, g_platform.last_serial);
+  
+  return true;
+}
+
+i32 Platform_ClipboardGetFiles(char **paths_out, i32 max_paths, b32 *is_cut_out) {
+  *is_cut_out = false; /* Wayland doesn't distinguish cut vs copy in protocol */
+  
+  if (!g_platform.selection_offer) {
+    return 0;
+  }
+  
+  /* Check if files are available (bit 1 set = files available) */
+  intptr_t user_data = (intptr_t)wl_data_offer_get_user_data(g_platform.selection_offer);
+  if ((user_data & 2) == 0) {
+    return 0;
+  }
+  
+  int fds[2];
+  if (pipe(fds) != 0) {
+    return 0;
+  }
+  
+  wl_data_offer_receive(g_platform.selection_offer, "text/uri-list", fds[1]);
+  close(fds[1]);
+  
+  /* Flush request to server */
+  wl_display_roundtrip(g_platform.display);
+  
+  /* Read uri-list from pipe */
+  char buffer[65536];
+  usize total_len = 0;
+  
+  while (total_len < sizeof(buffer) - 1) {
+    ssize_t r = read(fds[0], buffer + total_len, sizeof(buffer) - total_len - 1);
+    if (r <= 0) break;
+    total_len += r;
+  }
+  buffer[total_len] = '\0';
+  close(fds[0]);
+  
+  /* Parse uri-list (format: file:///path/to/file\r\n or #comments) */
+  i32 count = 0;
+  char *line = buffer;
+  
+  while (count < max_paths && *line) {
+    /* Find end of line */
+    char *end = strstr(line, "\r\n");
+    if (!end) end = line + strlen(line);
+    
+    /* Skip empty lines and comments */
+    if (line[0] != '\0' && line[0] != '#' && line[0] != '\r' && line[0] != '\n') {
+      /* Temporarily null terminate */
+      char saved = *end;
+      *end = '\0';
+      
+      /* Extract path from file:// URI */
+      const char *path = line;
+      if (strncmp(line, "file://", 7) == 0) {
+        path = line + 7;
+      }
+      
+      /* Copy path, ensuring null termination without truncation warnings */
+      usize path_len = strlen(path);
+      if (path_len >= FS_MAX_PATH) {
+        path_len = FS_MAX_PATH - 1;
+      }
+      memcpy(paths_out[count], path, path_len);
+      paths_out[count][path_len] = '\0';
+      count++;
+      
+      *end = saved;
+    }
+    
+    /* Move to next line */
+    if (end[0] == '\r' && end[1] == '\n') {
+      line = end + 2;
+    } else {
+      break;
+    }
+  }
+  
+  return count;
 }

@@ -226,6 +226,23 @@ b32 Platform_GetRealPath(const char *path, char *out_path, usize out_size);
 char *Platform_GetClipboard(char *buffer, usize buffer_size);
 b32 Platform_SetClipboard(const char *text);
 
+/* ===== Clipboard File API =====
+ * For copy/paste of files between applications.
+ * Uses text/uri-list on Linux, CF_HDROP on Windows.
+ */
+
+/* Set files to OS clipboard. paths is array of absolute paths, count is number of paths.
+ * is_cut: true for cut operation (files will be moved on paste), false for copy.
+ * Returns true on success. */
+b32 Platform_ClipboardSetFiles(const char **paths, i32 count, b32 is_cut);
+
+/* Get files from OS clipboard. Returns number of paths retrieved (0 if none).
+ * paths_out: array of buffers to store paths (each FS_MAX_PATH size).
+ * max_paths: size of paths_out array.
+ * is_cut_out: set to true if these were cut (move on paste), false if copy.
+ * Returns: number of paths retrieved (0 if no files on clipboard). */
+i32 Platform_ClipboardGetFiles(char **paths_out, i32 max_paths, b32 *is_cut_out);
+
 /* ===== Process API ===== */
 
 typedef struct platform_process platform_process;
