@@ -100,9 +100,6 @@ static void PopulateDirectoryMenu(context_menu_state *state) {
   multi_select_labels labels;
   GetMultiSelectLabels(state, &labels);
 
-  AddMenuItem(state, "New File", "Ctrl+N", Action_NewFile, state, false);
-  AddMenuItem(state, "New Directory", "Ctrl+Shift+N", Action_NewDir, state,
-              true);
   AddMenuItem(state, labels.copy, "Ctrl+C", Action_Copy, state, false);
   AddMenuItem(state, labels.cut, "Ctrl+X", Action_Cut, state, false);
   AddMenuItem(state, labels.delete_item, "Del", Action_Delete, state, true);
