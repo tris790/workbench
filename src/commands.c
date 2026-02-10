@@ -224,7 +224,7 @@ static void Cmd_SortByName(void *u) {
   (void)u;
   explorer_state *e = GET_ACTIVE_EXPLORER();
   if (e) {
-    FS_SetSortOptions(&e->fs, SORT_BY_NAME, e->fs.sort_dir);
+    FS_SetSortOptions(&e->fs, WB_SORT_BY_NAME, e->fs.sort_dir);
     Config_SetString("explorer.sort_type", "name");
     Config_Save();
   }
@@ -234,7 +234,7 @@ static void Cmd_SortBySize(void *u) {
   (void)u;
   explorer_state *e = GET_ACTIVE_EXPLORER();
   if (e) {
-    FS_SetSortOptions(&e->fs, SORT_BY_SIZE, e->fs.sort_dir);
+    FS_SetSortOptions(&e->fs, WB_SORT_BY_SIZE, e->fs.sort_dir);
     Config_SetString("explorer.sort_type", "size");
     Config_Save();
   }
@@ -244,7 +244,7 @@ static void Cmd_SortByDate(void *u) {
   (void)u;
   explorer_state *e = GET_ACTIVE_EXPLORER();
   if (e) {
-    FS_SetSortOptions(&e->fs, SORT_BY_DATE, e->fs.sort_dir);
+    FS_SetSortOptions(&e->fs, WB_SORT_BY_DATE, e->fs.sort_dir);
     Config_SetString("explorer.sort_type", "date");
     Config_Save();
   }
@@ -254,7 +254,7 @@ static void Cmd_SortAscending(void *u) {
   (void)u;
   explorer_state *e = GET_ACTIVE_EXPLORER();
   if (e) {
-    FS_SetSortOptions(&e->fs, e->fs.sort_by, SORT_ASCENDING);
+    FS_SetSortOptions(&e->fs, e->fs.sort_by, WB_SORT_ASCENDING);
     Config_SetString("explorer.sort_order", "ascending");
     Config_Save();
   }
@@ -264,7 +264,7 @@ static void Cmd_SortDescending(void *u) {
   (void)u;
   explorer_state *e = GET_ACTIVE_EXPLORER();
   if (e) {
-    FS_SetSortOptions(&e->fs, e->fs.sort_by, SORT_DESCENDING);
+    FS_SetSortOptions(&e->fs, e->fs.sort_by, WB_SORT_DESCENDING);
     Config_SetString("explorer.sort_order", "descending");
     Config_Save();
   }
@@ -284,7 +284,7 @@ static void Cmd_ConfigDiagnostics(void *u) {
 
   g_layout->show_config_diagnostics = true;
   ScrollContainer_Init(&g_layout->diagnostic_scroll);
-  Input_PushFocus(INPUT_TARGET_DIALOG);
+  Input_PushFocus(WB_INPUT_TARGET_DIALOG);
 }
 
 static void Cmd_ConfigOpenFile(void *u) {

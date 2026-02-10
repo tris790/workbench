@@ -14,14 +14,14 @@
 /* ===== Dialog Types ===== */
 
 typedef enum {
-  DIALOG_TYPE_INPUT,   /* Text input dialog (rename, create) */
-  DIALOG_TYPE_CONFIRM, /* Confirmation dialog (delete) */
+  WB_DIALOG_TYPE_INPUT,   /* Text input dialog (rename, create) */
+  WB_DIALOG_TYPE_CONFIRM, /* Confirmation dialog (delete) */
 } dialog_type;
 
 typedef enum {
-  DIALOG_RESULT_NONE,    /* No action taken */
-  DIALOG_RESULT_CONFIRM, /* User confirmed */
-  DIALOG_RESULT_CANCEL,  /* User cancelled */
+  WB_DIALOG_RESULT_NONE,    /* No action taken */
+  WB_DIALOG_RESULT_CONFIRM, /* User confirmed */
+  WB_DIALOG_RESULT_CANCEL,  /* User cancelled */
 } dialog_result;
 
 /* Dialog configuration */

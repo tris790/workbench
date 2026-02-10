@@ -13,10 +13,10 @@
 
 /* Source of suggestion */
 typedef enum {
-  SUGGESTION_NONE = 0,
-  SUGGESTION_HISTORY, /* From command history */
-  SUGGESTION_PATH,    /* File/directory path completion */
-  SUGGESTION_BUILTIN, /* Built-in command completion */
+  WB_SUGGESTION_NONE = 0,
+  WB_SUGGESTION_HISTORY, /* From command history */
+  WB_SUGGESTION_PATH,    /* File/directory path completion */
+  WB_SUGGESTION_BUILTIN, /* Built-in command completion */
 } suggestion_source;
 
 /* Suggestion result */

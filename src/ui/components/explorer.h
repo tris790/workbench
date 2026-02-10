@@ -13,6 +13,7 @@
 #include "../../core/text.h"
 #include "../ui.h"
 #include "quick_filter.h"
+#include "breadcrumb.h"
 #include "scroll_container.h"
 
 /* ===== Explorer State ===== */
@@ -26,11 +27,11 @@ struct context_menu_state_s;
 struct layout_state_s;
 
 typedef enum {
-  EXPLORER_MODE_NORMAL,
-  EXPLORER_MODE_RENAME,
-  EXPLORER_MODE_CREATE_FILE,
-  EXPLORER_MODE_CREATE_DIR,
-  EXPLORER_MODE_CONFIRM_DELETE,
+  WB_EXPLORER_MODE_NORMAL,
+  WB_EXPLORER_MODE_RENAME,
+  WB_EXPLORER_MODE_CREATE_FILE,
+  WB_EXPLORER_MODE_CREATE_DIR,
+  WB_EXPLORER_MODE_CONFIRM_DELETE,
 } explorer_mode;
 
 typedef struct explorer_state_s {
@@ -72,6 +73,9 @@ typedef struct explorer_state_s {
 
   /* Wrapped text for dialogs (arena-allocated) */
   wrapped_text dialog_text;
+
+  /* Breadcrumb state */
+  breadcrumb_state breadcrumb;
 
   /* Quick filter state */
   quick_filter_state filter;

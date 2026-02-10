@@ -23,9 +23,9 @@
 /* ===== Types ===== */
 
 typedef enum {
-  PALETTE_MODE_CLOSED = 0,
-  PALETTE_MODE_FILE,    /* Ctrl+P - file search */
-  PALETTE_MODE_COMMAND, /* Ctrl+Shift+P - command mode */
+  WB_PALETTE_MODE_CLOSED = 0,
+  WB_PALETTE_MODE_FILE,    /* Ctrl+P - file search */
+  WB_PALETTE_MODE_COMMAND, /* Ctrl+Shift+P - command mode */
 } palette_mode;
 
 /* Command callback function pointer */

@@ -52,7 +52,7 @@ b32 QuickFilter_Update(quick_filter_state *state, ui_context *ui) {
   }
 
   /* Handle ESC to clear filter (Success Criteria 33) */
-  if (ui->input.key_pressed[KEY_ESCAPE]) {
+  if (ui->input.key_pressed[WB_KEY_ESCAPE]) {
     QuickFilter_Clear(state);
     Input_ConsumeKeys();
     return true;
@@ -83,10 +83,10 @@ b32 QuickFilter_Update(quick_filter_state *state, ui_context *ui) {
   }
 
   /* Consume keys if we are active to prevent explorer navigation etc. */
-  if (Input_GetTextInput() >= 32 || Input_KeyRepeat(KEY_BACKSPACE) ||
-      Input_KeyRepeat(KEY_DELETE) || Input_KeyRepeat(KEY_LEFT) ||
-      Input_KeyRepeat(KEY_RIGHT) || Input_KeyRepeat(KEY_HOME) ||
-      Input_KeyRepeat(KEY_END) || (Input_GetModifiers() & MOD_CTRL)) {
+  if (Input_GetTextInput() >= 32 || Input_KeyRepeat(WB_KEY_BACKSPACE) ||
+      Input_KeyRepeat(WB_KEY_DELETE) || Input_KeyRepeat(WB_KEY_LEFT) ||
+      Input_KeyRepeat(WB_KEY_RIGHT) || Input_KeyRepeat(WB_KEY_HOME) ||
+      Input_KeyRepeat(WB_KEY_END) || (Input_GetModifiers() & MOD_CTRL)) {
     Input_ConsumeKeys();
     Input_ConsumeText();
     return true;
@@ -260,9 +260,9 @@ const char *QuickFilter_GetQuery(quick_filter_state *state) {
 void QuickFilter_Focus(quick_filter_state *state) {
   state->active = true;
   state->fade_anim.target = 1.0f;
-  if (!Input_HasFocus(INPUT_TARGET_EXPLORER)) {
+  if (!Input_HasFocus(WB_INPUT_TARGET_EXPLORER)) {
     /* If explorer isn't focused, we should probably focus it so filter gets
      * input */
-    Input_PushFocus(INPUT_TARGET_EXPLORER);
+    Input_PushFocus(WB_INPUT_TARGET_EXPLORER);
   }
 }

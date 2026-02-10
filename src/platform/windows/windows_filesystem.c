@@ -62,11 +62,11 @@ b32 Platform_ListDirectory(const char *path, directory_listing *listing,
 
     /* Determine file type */
     if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-      info->type = FILE_TYPE_DIRECTORY;
+      info->type = WB_FILE_TYPE_DIRECTORY;
     } else if (find_data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
-      info->type = FILE_TYPE_SYMLINK;
+      info->type = WB_FILE_TYPE_SYMLINK;
     } else {
-      info->type = FILE_TYPE_FILE;
+      info->type = WB_FILE_TYPE_FILE;
     }
 
     /* File size */
@@ -143,11 +143,11 @@ b32 Platform_GetFileInfo(const char *path, file_info *info) {
   info->name[sizeof(info->name) - 1] = '\0';
 
   if (attr.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-    info->type = FILE_TYPE_DIRECTORY;
+    info->type = WB_FILE_TYPE_DIRECTORY;
   } else if (attr.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
-    info->type = FILE_TYPE_SYMLINK;
+    info->type = WB_FILE_TYPE_SYMLINK;
   } else {
-    info->type = FILE_TYPE_FILE;
+    info->type = WB_FILE_TYPE_FILE;
   }
 
   info->size = ((u64)attr.nFileSizeHigh << 32) | attr.nFileSizeLow;

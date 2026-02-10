@@ -38,6 +38,18 @@ const char *FS_FindLastSeparator(const char *path) {
   return (last_slash > last_backslash) ? last_slash : last_backslash;
 }
 
+b32 FS_IsWindowsDriveRoot(const char *path) {
+#ifdef _WIN32
+  if ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z')) {
+    if (path[1] == ':') {
+      return true;
+    }
+  }
+#endif
+  (void)path;
+  return false;
+}
+
 void FS_NormalizePath(char *path) {
   if (!path)
     return;
@@ -118,13 +130,13 @@ void FS_FormatTime(u64 timestamp, char *buffer, usize buffer_size) {
 
 file_icon_type FS_GetIconType(const char *filename, b32 is_directory) {
   if (is_directory) {
-    return FILE_ICON_DIRECTORY;
+    return WB_FILE_ICON_DIRECTORY;
   }
 
   const char *ext = FS_GetExtension(filename);
   if (!ext || ext[0] == '\0') {
     /* Check if executable */
-    return FILE_ICON_FILE;
+    return WB_FILE_ICON_FILE;
   }
 
   /* Convert to lowercase for comparison */
@@ -139,24 +151,24 @@ file_icon_type FS_GetIconType(const char *filename, b32 is_directory) {
   /* C/C++ source files */
   if (strcmp(lower, ".c") == 0 || strcmp(lower, ".cpp") == 0 ||
       strcmp(lower, ".cc") == 0 || strcmp(lower, ".cxx") == 0) {
-    return FILE_ICON_CODE_C;
+    return WB_FILE_ICON_CODE_C;
   }
 
   /* C/C++ header files */
   if (strcmp(lower, ".h") == 0 || strcmp(lower, ".hpp") == 0 ||
       strcmp(lower, ".hxx") == 0) {
-    return FILE_ICON_CODE_H;
+    return WB_FILE_ICON_CODE_H;
   }
 
   /* Python */
   if (strcmp(lower, ".py") == 0 || strcmp(lower, ".pyw") == 0) {
-    return FILE_ICON_CODE_PY;
+    return WB_FILE_ICON_CODE_PY;
   }
 
   /* JavaScript/TypeScript */
   if (strcmp(lower, ".js") == 0 || strcmp(lower, ".jsx") == 0 ||
       strcmp(lower, ".ts") == 0 || strcmp(lower, ".tsx") == 0) {
-    return FILE_ICON_CODE_JS;
+    return WB_FILE_ICON_CODE_JS;
   }
 
   /* Other code files */
@@ -168,7 +180,7 @@ file_icon_type FS_GetIconType(const char *filename, b32 is_directory) {
       strcmp(lower, ".css") == 0 || strcmp(lower, ".xml") == 0 ||
       strcmp(lower, ".sql") == 0 || strcmp(lower, ".asm") == 0 ||
       strcmp(lower, ".s") == 0) {
-    return FILE_ICON_CODE_OTHER;
+    return WB_FILE_ICON_CODE_OTHER;
   }
 
   /* Images */
@@ -177,7 +189,7 @@ file_icon_type FS_GetIconType(const char *filename, b32 is_directory) {
       strcmp(lower, ".bmp") == 0 || strcmp(lower, ".svg") == 0 ||
       strcmp(lower, ".webp") == 0 || strcmp(lower, ".ico") == 0 ||
       strcmp(lower, ".tiff") == 0) {
-    return FILE_ICON_IMAGE;
+    return WB_FILE_ICON_IMAGE;
   }
 
   /* Documents */
@@ -187,7 +199,7 @@ file_icon_type FS_GetIconType(const char *filename, b32 is_directory) {
       strcmp(lower, ".pptx") == 0 || strcmp(lower, ".odt") == 0 ||
       strcmp(lower, ".ods") == 0 || strcmp(lower, ".odp") == 0 ||
       strcmp(lower, ".txt") == 0 || strcmp(lower, ".rtf") == 0) {
-    return FILE_ICON_DOCUMENT;
+    return WB_FILE_ICON_DOCUMENT;
   }
 
   /* Archives */
@@ -196,26 +208,26 @@ file_icon_type FS_GetIconType(const char *filename, b32 is_directory) {
       strcmp(lower, ".xz") == 0 || strcmp(lower, ".7z") == 0 ||
       strcmp(lower, ".rar") == 0 || strcmp(lower, ".deb") == 0 ||
       strcmp(lower, ".rpm") == 0) {
-    return FILE_ICON_ARCHIVE;
+    return WB_FILE_ICON_ARCHIVE;
   }
 
   /* Audio */
   if (strcmp(lower, ".mp3") == 0 || strcmp(lower, ".wav") == 0 ||
       strcmp(lower, ".flac") == 0 || strcmp(lower, ".ogg") == 0 ||
       strcmp(lower, ".aac") == 0 || strcmp(lower, ".m4a") == 0) {
-    return FILE_ICON_AUDIO;
+    return WB_FILE_ICON_AUDIO;
   }
 
   /* Video */
   if (strcmp(lower, ".mp4") == 0 || strcmp(lower, ".mkv") == 0 ||
       strcmp(lower, ".avi") == 0 || strcmp(lower, ".mov") == 0 ||
       strcmp(lower, ".webm") == 0 || strcmp(lower, ".flv") == 0) {
-    return FILE_ICON_VIDEO;
+    return WB_FILE_ICON_VIDEO;
   }
 
   /* Markdown */
   if (strcmp(lower, ".md") == 0 || strcmp(lower, ".markdown") == 0) {
-    return FILE_ICON_MARKDOWN;
+    return WB_FILE_ICON_MARKDOWN;
   }
 
   /* Config files */
@@ -223,16 +235,16 @@ file_icon_type FS_GetIconType(const char *filename, b32 is_directory) {
       strcmp(lower, ".yml") == 0 || strcmp(lower, ".toml") == 0 ||
       strcmp(lower, ".ini") == 0 || strcmp(lower, ".conf") == 0 ||
       strcmp(lower, ".cfg") == 0) {
-    return FILE_ICON_CONFIG;
+    return WB_FILE_ICON_CONFIG;
   }
 
-  return FILE_ICON_FILE;
+  return WB_FILE_ICON_FILE;
 }
 
 /* ===== Sorting ===== */
 
-static sort_type g_sort_type = SORT_BY_NAME;
-static sort_order g_sort_order = SORT_ASCENDING;
+static sort_type g_sort_type = WB_SORT_BY_NAME;
+static sort_order g_sort_order = WB_SORT_ASCENDING;
 
 static int CompareEntries(const void *a, const void *b) {
   const fs_entry *ea = (const fs_entry *)a;
@@ -252,10 +264,10 @@ static int CompareEntries(const void *a, const void *b) {
 
   int result = 0;
   switch (g_sort_type) {
-  case SORT_BY_NAME:
+  case WB_SORT_BY_NAME:
     result = strcasecmp(ea->name, eb->name);
     break;
-  case SORT_BY_SIZE:
+  case WB_SORT_BY_SIZE:
     if (ea->size < eb->size)
       result = -1;
     else if (ea->size > eb->size)
@@ -263,7 +275,7 @@ static int CompareEntries(const void *a, const void *b) {
     else
       result = strcasecmp(ea->name, eb->name);
     break;
-  case SORT_BY_DATE:
+  case WB_SORT_BY_DATE:
     if (ea->modified_time < eb->modified_time)
       result = -1;
     else if (ea->modified_time > eb->modified_time)
@@ -273,7 +285,7 @@ static int CompareEntries(const void *a, const void *b) {
     break;
   }
 
-  if (g_sort_order == SORT_DESCENDING) {
+  if (g_sort_order == WB_SORT_DESCENDING) {
     result = -result;
   }
 
@@ -316,8 +328,8 @@ void FS_Init(fs_state *state, memory_arena *arena) {
   state->selection_count = 0;
   state->selection_anchor = -1;
 
-  state->sort_by = SORT_BY_NAME;
-  state->sort_dir = SORT_ASCENDING;
+  state->sort_by = WB_SORT_BY_NAME;
+  state->sort_dir = WB_SORT_ASCENDING;
 }
 
 b32 FS_LoadDirectory(fs_state *state, const char *path) {
@@ -361,13 +373,13 @@ b32 FS_LoadDirectory(fs_state *state, const char *path) {
     FS_JoinPath(entry->path, FS_MAX_PATH, resolved, info->name);
 
     /* Set properties */
-    entry->is_directory = (info->type == FILE_TYPE_DIRECTORY);
+    entry->is_directory = (info->type == WB_FILE_TYPE_DIRECTORY);
     entry->size = info->size;
     entry->modified_time = info->modified_time;
 
     /* Determine icon type */
-    if (info->type == FILE_TYPE_SYMLINK) {
-      entry->icon = FILE_ICON_SYMLINK;
+    if (info->type == WB_FILE_TYPE_SYMLINK) {
+      entry->icon = WB_FILE_ICON_SYMLINK;
     } else {
       entry->icon = FS_GetIconType(info->name, entry->is_directory);
     }
@@ -661,7 +673,7 @@ static b32 CopyDirectoryRecursive(const char *src_dir, const char *dst_dir, memo
     FS_JoinPath(src_path, sizeof(src_path), src_dir, info->name);
     FS_JoinPath(dst_path, sizeof(dst_path), dst_dir, info->name);
     
-    if (info->type == FILE_TYPE_DIRECTORY) {
+    if (info->type == WB_FILE_TYPE_DIRECTORY) {
       /* Create destination directory */
       if (!Platform_CreateDirectory(dst_path)) {
         /* Directory might already exist, that's OK */
@@ -696,12 +708,12 @@ b32 FS_CopyRecursive(const char *src, const char *dst, memory_arena *arena) {
     return false;
   }
   
-  if (info.type == FILE_TYPE_FILE) {
+  if (info.type == WB_FILE_TYPE_FILE) {
     /* Simple file copy */
     return Platform_Copy(src, dst);
   }
   
-  if (info.type == FILE_TYPE_DIRECTORY) {
+  if (info.type == WB_FILE_TYPE_DIRECTORY) {
     /* Create destination directory */
     if (!Platform_CreateDirectory(dst)) {
       /* Directory might already exist, that's OK for root of copy */
@@ -757,4 +769,103 @@ b32 FS_ResolvePath(const char *path, char *out_path, usize out_size) {
   out_path[out_size - 1] = '\0';
   FS_NormalizePath(out_path);
   return true;
+}
+
+/* Helper: Check if path is absolute (platform-aware) */
+static b32 IsAbsolutePath(const char *path) {
+  if (!path || path[0] == '\0')
+    return false;
+  if (path[0] == '/')
+    return true; /* Unix absolute */
+#ifdef _WIN32
+  /* Windows drive letter like C:\ or C:/ */
+  if (path[1] == ':' && ((path[0] >= 'A' && path[0] <= 'Z') ||
+                         (path[0] >= 'a' && path[0] <= 'z'))) {
+    return true;
+  }
+  /* UNC path like \\server\share */
+  if (path[0] == '\\' && path[1] == '\\')
+    return true;
+#endif
+  return false;
+}
+
+b32 FS_FindDeepestValidDirectory(const char *path, char *out_dir,
+                                  usize out_size) {
+  if (!path || !out_dir || out_size == 0)
+    return false;
+
+  i32 len = (i32)strlen(path);
+  if (len == 0)
+    return false;
+
+  /* Normalize path first */
+  char normalized[FS_MAX_PATH];
+  if ((usize)len >= sizeof(normalized))
+    len = (i32)sizeof(normalized) - 1;
+  memcpy(normalized, path, len);
+  normalized[len] = '\0';
+  FS_NormalizePath(normalized);
+  len = (i32)strlen(normalized);
+
+  /* Start with root if path is absolute */
+  char deepest_valid[FS_MAX_PATH] = {0};
+  i32 i = 0;
+
+  if (IsAbsolutePath(normalized)) {
+    if (normalized[0] == '/') {
+      /* Unix root */
+      deepest_valid[0] = '/';
+      deepest_valid[1] = '\0';
+      i = 1;
+    }
+#ifdef _WIN32
+    else if (normalized[1] == ':') {
+      /* Windows drive root like C:/ */
+      deepest_valid[0] = normalized[0];
+      deepest_valid[1] = ':';
+      deepest_valid[2] = '/';
+      deepest_valid[3] = '\0';
+      i = 3;
+    }
+#endif
+  }
+
+  /* Scan through path, validating each component */
+  while (i < len) {
+    /* Skip leading slashes */
+    while (i < len && FS_IsPathSeparator(normalized[i]))
+      i++;
+    if (i >= len)
+      break;
+
+    /* Find end of this component */
+    while (i < len && !FS_IsPathSeparator(normalized[i]))
+      i++;
+
+    /* Build path up to this component */
+    char test_path[FS_MAX_PATH];
+    i32 test_len = i;
+    if (test_len >= FS_MAX_PATH)
+      test_len = FS_MAX_PATH - 1;
+    memcpy(test_path, normalized, test_len);
+    test_path[test_len] = '\0';
+
+    /* Check if this path exists and is a directory */
+    if (Platform_IsDirectory(test_path)) {
+      memcpy(deepest_valid, test_path, test_len + 1);
+    } else {
+      /* This component is invalid, stop here */
+      break;
+    }
+  }
+
+  /* Return the deepest valid directory we found */
+  if (deepest_valid[0] != '\0') {
+    strncpy(out_dir, deepest_valid, out_size - 1);
+    out_dir[out_size - 1] = '\0';
+    return true;
+  }
+
+  return false;
 }

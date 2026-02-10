@@ -560,19 +560,19 @@ static void process_byte(Terminal *term, u8 byte) {
   ansi_result result = ANSI_Parse(&term->parser, byte);
 
   switch (result.action) {
-  case ANSI_ACTION_PRINT:
+  case WB_ANSI_ACTION_PRINT:
     put_char(term, result.data.character);
     break;
 
-  case ANSI_ACTION_EXECUTE:
+  case WB_ANSI_ACTION_EXECUTE:
     handle_control(term, result.data.control);
     break;
 
-  case ANSI_ACTION_CSI:
+  case WB_ANSI_ACTION_CSI:
     handle_csi(term, &result);
     break;
 
-  case ANSI_ACTION_OSC:
+  case WB_ANSI_ACTION_OSC:
     /* Handle window title (OSC 0 or 2) */
     if (result.data.osc) {
       const char *text = result.data.osc;
@@ -597,11 +597,11 @@ static void process_byte(Terminal *term, u8 byte) {
     }
     break;
 
-  case ANSI_ACTION_DCS:
+  case WB_ANSI_ACTION_DCS:
     /* DCS sequences handled (and ignored/consumed) by parser */
     break;
 
-  case ANSI_ACTION_NONE:
+  case WB_ANSI_ACTION_NONE:
     break;
   }
 }

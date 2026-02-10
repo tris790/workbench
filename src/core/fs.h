@@ -17,31 +17,31 @@
 /* ===== File Icon Types ===== */
 
 typedef enum {
-  FILE_ICON_UNKNOWN = 0,
-  FILE_ICON_DIRECTORY,
-  FILE_ICON_FILE,
-  FILE_ICON_CODE_C,
-  FILE_ICON_CODE_H,
-  FILE_ICON_CODE_PY,
-  FILE_ICON_CODE_JS,
-  FILE_ICON_CODE_OTHER,
-  FILE_ICON_IMAGE,
-  FILE_ICON_DOCUMENT,
-  FILE_ICON_ARCHIVE,
-  FILE_ICON_EXECUTABLE,
-  FILE_ICON_AUDIO,
-  FILE_ICON_VIDEO,
-  FILE_ICON_CONFIG,
-  FILE_ICON_MARKDOWN,
-  FILE_ICON_SYMLINK,
-  FILE_ICON_COUNT
+  WB_FILE_ICON_UNKNOWN = 0,
+  WB_FILE_ICON_DIRECTORY,
+  WB_FILE_ICON_FILE,
+  WB_FILE_ICON_CODE_C,
+  WB_FILE_ICON_CODE_H,
+  WB_FILE_ICON_CODE_PY,
+  WB_FILE_ICON_CODE_JS,
+  WB_FILE_ICON_CODE_OTHER,
+  WB_FILE_ICON_IMAGE,
+  WB_FILE_ICON_DOCUMENT,
+  WB_FILE_ICON_ARCHIVE,
+  WB_FILE_ICON_EXECUTABLE,
+  WB_FILE_ICON_AUDIO,
+  WB_FILE_ICON_VIDEO,
+  WB_FILE_ICON_CONFIG,
+  WB_FILE_ICON_MARKDOWN,
+  WB_FILE_ICON_SYMLINK,
+  WB_FILE_ICON_COUNT
 } file_icon_type;
 
 /* ===== Sort Options ===== */
 
-typedef enum { SORT_BY_NAME = 0, SORT_BY_SIZE, SORT_BY_DATE } sort_type;
+typedef enum { WB_SORT_BY_NAME = 0, WB_SORT_BY_SIZE, WB_SORT_BY_DATE } sort_type;
 
-typedef enum { SORT_ASCENDING = 0, SORT_DESCENDING } sort_order;
+typedef enum { WB_SORT_ASCENDING = 0, WB_SORT_DESCENDING } sort_order;
 
 /* ===== File Entry ===== */
 
@@ -196,8 +196,16 @@ b32 FS_IsPathSeparator(char c);
 b32 FS_PathsEqual(const char *p1, const char *p2);
 const char *FS_FindLastSeparator(const char *path);
 void FS_NormalizePath(char *path);
+b32 FS_IsWindowsDriveRoot(const char *path);
 
 /* Resolve path (handles ~ and relative paths) */
 b32 FS_ResolvePath(const char *path, char *out_path, usize out_size);
+
+/* Find the deepest valid parent directory for a path.
+ * Walks up the path components and returns the longest prefix that exists.
+ * Useful when user types a path that doesn't fully exist yet.
+ * Returns true if a valid directory was found, false otherwise. */
+b32 FS_FindDeepestValidDirectory(const char *path, char *out_dir,
+                                  usize out_size);
 
 #endif /* FS_H */

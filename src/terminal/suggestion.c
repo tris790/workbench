@@ -209,7 +209,7 @@ Suggestion Suggestion_Get(SuggestionEngine *engine, const char *input) {
     if (history_match) {
         strncpy(sug.full_text, history_match, sizeof(sug.full_text) - 1);
         strncpy(sug.suffix, history_match + input_len, sizeof(sug.suffix) - 1);
-        sug.source = SUGGESTION_HISTORY;
+        sug.source = WB_SUGGESTION_HISTORY;
         sug.valid = true;
         return sug;
     }
@@ -229,7 +229,7 @@ Suggestion Suggestion_Get(SuggestionEngine *engine, const char *input) {
                 snprintf(sug.full_text, sizeof(sug.full_text), 
                          "%.*s%s", (int)prefix_len, input, path_match);
                 strncpy(sug.suffix, path_match + word_len, sizeof(sug.suffix) - 1);
-                sug.source = SUGGESTION_PATH;
+                sug.source = WB_SUGGESTION_PATH;
                 sug.valid = true;
                 return sug;
             }

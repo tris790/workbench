@@ -102,7 +102,7 @@ static void XdgToplevelConfigure(void *data, struct xdg_toplevel *toplevel,
       CreateShmBuffer(window, 1);
 
       platform_event event = {0};
-      event.type = EVENT_WINDOW_RESIZE;
+      event.type = WB_EVENT_WINDOW_RESIZE;
       event.data.resize.width = width;
       event.data.resize.height = height;
       PushEvent(window, &event);
@@ -116,7 +116,7 @@ static void XdgToplevelClose(void *data, struct xdg_toplevel *toplevel) {
   window->should_close = true;
 
   platform_event event = {0};
-  event.type = EVENT_QUIT;
+  event.type = WB_EVENT_QUIT;
   PushEvent(window, &event);
 }
 
@@ -279,7 +279,7 @@ void Platform_RequestQuit(platform_window *window) {
     window->should_close = true;
 
     platform_event event = {0};
-    event.type = EVENT_QUIT;
+    event.type = WB_EVENT_QUIT;
     PushEvent(window, &event);
   }
 }

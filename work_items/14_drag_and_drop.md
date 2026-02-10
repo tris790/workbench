@@ -200,17 +200,17 @@ i32  FS_GetNextSelected(fs_state *state, i32 after);        /* Iterator for sele
 #define DRAG_MAX_ITEMS 256  /* Max items in a single drag operation */
 
 typedef enum {
-    DRAG_STATE_IDLE,
-    DRAG_STATE_PENDING,      /* Mouse down, waiting for threshold */
-    DRAG_STATE_DRAGGING,     /* Actively dragging */
-    DRAG_STATE_DROPPING,     /* Animation playing after drop */
+    WB_DRAG_STATE_IDLE,
+    WB_DRAG_STATE_PENDING,      /* Mouse down, waiting for threshold */
+    WB_DRAG_STATE_DRAGGING,     /* Actively dragging */
+    WB_DRAG_STATE_DROPPING,     /* Animation playing after drop */
 } drag_state;
 
 typedef enum {
-    DROP_TARGET_NONE,
-    DROP_TARGET_FOLDER,      /* Valid folder target */
-    DROP_TARGET_PANEL,       /* Current directory of another panel */
-    DROP_TARGET_INVALID,     /* Cannot drop here */
+    WB_DROP_TARGET_NONE,
+    WB_DROP_TARGET_FOLDER,      /* Valid folder target */
+    WB_DROP_TARGET_PANEL,       /* Current directory of another panel */
+    WB_DROP_TARGET_INVALID,     /* Cannot drop here */
 } drop_target_type;
 
 /* Info for a single dragged item */
@@ -375,7 +375,7 @@ Execute the move when drop completes:
 
 ```c
 /* In DragDrop_Update, when drop confirmed: */
-if (state->state == DRAG_STATE_DROPPING && animation_complete) {
+if (state->state == WB_DRAG_STATE_DROPPING && animation_complete) {
     /* Construct destination path */
     char dest_path[FS_MAX_PATH];
     FS_JoinPath(dest_path, FS_MAX_PATH, 
@@ -389,7 +389,7 @@ if (state->state == DRAG_STATE_DROPPING && animation_complete) {
         Explorer_Refresh(&layout->panels[1].explorer);
     }
     
-    state->state = DRAG_STATE_IDLE;
+    state->state = WB_DRAG_STATE_IDLE;
 }
 ```
 

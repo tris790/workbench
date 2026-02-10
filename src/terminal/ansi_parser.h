@@ -12,42 +12,42 @@
 
 /* Parser state machine states */
 typedef enum {
-  ANSI_STATE_GROUND,   /* Normal character processing */
-  ANSI_STATE_ESCAPE,   /* Just saw ESC */
-  ANSI_STATE_CSI,      /* Control Sequence Introducer (ESC [) */
-  ANSI_STATE_OSC,      /* Operating System Command (ESC ]) */
-  ANSI_STATE_OSC_TEXT, /* Reading OSC text */
-  ANSI_STATE_DCS, /* Device Control String (ESC P), APC (ESC _), PM (ESC ^) */
-  ANSI_STATE_DCS_ESCAPE /* ESC seen within DCS/APC/PM */
+  WB_ANSI_STATE_GROUND,   /* Normal character processing */
+  WB_ANSI_STATE_ESCAPE,   /* Just saw ESC */
+  WB_ANSI_STATE_CSI,      /* Control Sequence Introducer (ESC [) */
+  WB_ANSI_STATE_OSC,      /* Operating System Command (ESC ]) */
+  WB_ANSI_STATE_OSC_TEXT, /* Reading OSC text */
+  WB_ANSI_STATE_DCS, /* Device Control String (ESC P), APC (ESC _), PM (ESC ^) */
+  WB_ANSI_STATE_DCS_ESCAPE /* ESC seen within DCS/APC/PM */
 } ansi_state;
 
 /* Action types returned by parser */
 typedef enum {
-  ANSI_ACTION_NONE,
-  ANSI_ACTION_PRINT,   /* Print character */
-  ANSI_ACTION_EXECUTE, /* Control character (CR, LF, etc.) */
-  ANSI_ACTION_CSI,     /* CSI sequence complete */
-  ANSI_ACTION_OSC,     /* OSC sequence complete */
-  ANSI_ACTION_DCS,     /* DCS sequence complete */
+  WB_ANSI_ACTION_NONE,
+  WB_ANSI_ACTION_PRINT,   /* Print character */
+  WB_ANSI_ACTION_EXECUTE, /* Control character (CR, LF, etc.) */
+  WB_ANSI_ACTION_CSI,     /* CSI sequence complete */
+  WB_ANSI_ACTION_OSC,     /* OSC sequence complete */
+  WB_ANSI_ACTION_DCS,     /* DCS sequence complete */
 } ansi_action;
 
 /* CSI command codes */
 typedef enum {
-  CSI_CUU = 'A', /* Cursor Up */
-  CSI_CUD = 'B', /* Cursor Down */
-  CSI_CUF = 'C', /* Cursor Forward */
-  CSI_CUB = 'D', /* Cursor Back */
-  CSI_CUP = 'H', /* Cursor Position */
-  CSI_ED = 'J',  /* Erase Display */
-  CSI_EL = 'K',  /* Erase Line */
-  CSI_SGR = 'm', /* Select Graphic Rendition */
-  CSI_DSR = 'n', /* Device Status Report */
-  CSI_SCP = 's', /* Save Cursor Position */
-  CSI_RCP = 'u', /* Restore Cursor Position */
-  CSI_SM = 'h',  /* Set Mode */
-  CSI_RM = 'l',  /* Reset Mode */
-  CSI_SD = 'S',  /* Scroll Up */
-  CSI_SU = 'T',  /* Scroll Down */
+  WB_CSI_CUU = 'A', /* Cursor Up */
+  WB_CSI_CUD = 'B', /* Cursor Down */
+  WB_CSI_CUF = 'C', /* Cursor Forward */
+  WB_CSI_CUB = 'D', /* Cursor Back */
+  WB_CSI_CUP = 'H', /* Cursor Position */
+  WB_CSI_ED = 'J',  /* Erase Display */
+  WB_CSI_EL = 'K',  /* Erase Line */
+  WB_CSI_SGR = 'm', /* Select Graphic Rendition */
+  WB_CSI_DSR = 'n', /* Device Status Report */
+  WB_CSI_SCP = 's', /* Save Cursor Position */
+  WB_CSI_RCP = 'u', /* Restore Cursor Position */
+  WB_CSI_SM = 'h',  /* Set Mode */
+  WB_CSI_RM = 'l',  /* Reset Mode */
+  WB_CSI_SD = 'S',  /* Scroll Up */
+  WB_CSI_SU = 'T',  /* Scroll Down */
 } csi_command;
 
 #define ANSI_MAX_PARAMS 16

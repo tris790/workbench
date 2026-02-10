@@ -43,15 +43,15 @@ b32 Platform_ListDirectory(const char *path, directory_listing *listing,
     struct stat st;
     if (stat(full_path, &st) == 0) {
       if (S_ISDIR(st.st_mode))
-        info->type = FILE_TYPE_DIRECTORY;
+        info->type = WB_FILE_TYPE_DIRECTORY;
       else if (S_ISLNK(st.st_mode))
-        info->type = FILE_TYPE_SYMLINK;
+        info->type = WB_FILE_TYPE_SYMLINK;
       else
-        info->type = FILE_TYPE_FILE;
+        info->type = WB_FILE_TYPE_FILE;
       info->size = st.st_size;
       info->modified_time = st.st_mtime;
     } else {
-      info->type = FILE_TYPE_FILE;
+      info->type = WB_FILE_TYPE_FILE;
     }
 
     listing->count++;
@@ -99,11 +99,11 @@ b32 Platform_GetFileInfo(const char *path, file_info *info) {
   info->name[sizeof(info->name) - 1] = '\0';
 
   if (S_ISDIR(st.st_mode))
-    info->type = FILE_TYPE_DIRECTORY;
+    info->type = WB_FILE_TYPE_DIRECTORY;
   else if (S_ISLNK(st.st_mode))
-    info->type = FILE_TYPE_SYMLINK;
+    info->type = WB_FILE_TYPE_SYMLINK;
   else
-    info->type = FILE_TYPE_FILE;
+    info->type = WB_FILE_TYPE_FILE;
 
   info->size = st.st_size;
   info->modified_time = st.st_mtime;

@@ -181,56 +181,56 @@ static void DrawExecutableIcon(render_context *ctx, rect b, color c) {
 
 void Icon_Draw(render_context *ctx, rect bounds, file_icon_type type, color c) {
   switch (type) {
-  case FILE_ICON_DIRECTORY:
+  case WB_FILE_ICON_DIRECTORY:
     DrawFolderIcon(ctx, bounds, c);
     break;
 
-  case FILE_ICON_CODE_C:
-  case FILE_ICON_CODE_H:
-  case FILE_ICON_CODE_PY:
-  case FILE_ICON_CODE_JS:
-  case FILE_ICON_CODE_OTHER:
+  case WB_FILE_ICON_CODE_C:
+  case WB_FILE_ICON_CODE_H:
+  case WB_FILE_ICON_CODE_PY:
+  case WB_FILE_ICON_CODE_JS:
+  case WB_FILE_ICON_CODE_OTHER:
     DrawCodeIcon(ctx, bounds, c, "");
     break;
 
-  case FILE_ICON_IMAGE:
+  case WB_FILE_ICON_IMAGE:
     DrawImageIcon(ctx, bounds, c);
     break;
 
-  case FILE_ICON_DOCUMENT:
+  case WB_FILE_ICON_DOCUMENT:
     DrawFileIcon(ctx, bounds, c);
     break;
 
-  case FILE_ICON_ARCHIVE:
+  case WB_FILE_ICON_ARCHIVE:
     DrawArchiveIcon(ctx, bounds, c);
     break;
 
-  case FILE_ICON_AUDIO:
+  case WB_FILE_ICON_AUDIO:
     DrawAudioIcon(ctx, bounds, c);
     break;
 
-  case FILE_ICON_VIDEO:
+  case WB_FILE_ICON_VIDEO:
     DrawVideoIcon(ctx, bounds, c);
     break;
 
-  case FILE_ICON_CONFIG:
+  case WB_FILE_ICON_CONFIG:
     DrawConfigIcon(ctx, bounds, c);
     break;
 
-  case FILE_ICON_MARKDOWN:
+  case WB_FILE_ICON_MARKDOWN:
     DrawMarkdownIcon(ctx, bounds, c);
     break;
 
-  case FILE_ICON_SYMLINK:
+  case WB_FILE_ICON_SYMLINK:
     DrawSymlinkIcon(ctx, bounds, c);
     break;
 
-  case FILE_ICON_EXECUTABLE:
+  case WB_FILE_ICON_EXECUTABLE:
     DrawExecutableIcon(ctx, bounds, c);
     break;
 
-  case FILE_ICON_FILE:
-  case FILE_ICON_UNKNOWN:
+  case WB_FILE_ICON_FILE:
+  case WB_FILE_ICON_UNKNOWN:
   default:
     DrawFileIcon(ctx, bounds, c);
     break;
@@ -239,51 +239,51 @@ void Icon_Draw(render_context *ctx, rect bounds, file_icon_type type, color c) {
 
 color Icon_GetTypeColor(file_icon_type type, const theme *t) {
   switch (type) {
-  case FILE_ICON_DIRECTORY:
+  case WB_FILE_ICON_DIRECTORY:
     return t->accent;
 
-  case FILE_ICON_CODE_C:
-  case FILE_ICON_CODE_H:
+  case WB_FILE_ICON_CODE_C:
+  case WB_FILE_ICON_CODE_H:
     return COLOR_RGB(86, 156, 214); /* C/C++ blue */
 
-  case FILE_ICON_CODE_PY:
+  case WB_FILE_ICON_CODE_PY:
     return COLOR_RGB(55, 118, 171); /* Python blue-ish */
 
-  case FILE_ICON_CODE_JS:
+  case WB_FILE_ICON_CODE_JS:
     return COLOR_RGB(241, 224, 90); /* JavaScript yellow */
 
-  case FILE_ICON_CODE_OTHER:
+  case WB_FILE_ICON_CODE_OTHER:
     return COLOR_RGB(156, 220, 254); /* Light blue */
 
-  case FILE_ICON_IMAGE:
+  case WB_FILE_ICON_IMAGE:
     return COLOR_RGB(197, 134, 192); /* Purple-ish */
 
-  case FILE_ICON_AUDIO:
+  case WB_FILE_ICON_AUDIO:
     return COLOR_RGB(206, 145, 120); /* Orange-brown */
 
-  case FILE_ICON_VIDEO:
+  case WB_FILE_ICON_VIDEO:
     return COLOR_RGB(220, 89, 89); /* Red */
 
-  case FILE_ICON_ARCHIVE:
+  case WB_FILE_ICON_ARCHIVE:
     return COLOR_RGB(215, 186, 125); /* Tan/brown */
 
-  case FILE_ICON_MARKDOWN:
+  case WB_FILE_ICON_MARKDOWN:
     return COLOR_RGB(78, 201, 176); /* Teal */
 
-  case FILE_ICON_CONFIG:
+  case WB_FILE_ICON_CONFIG:
     return COLOR_RGB(156, 220, 254); /* Light blue */
 
-  case FILE_ICON_EXECUTABLE:
+  case WB_FILE_ICON_EXECUTABLE:
     return COLOR_RGB(78, 201, 176); /* Teal/green */
 
-  case FILE_ICON_SYMLINK:
+  case WB_FILE_ICON_SYMLINK:
     return t->text_muted;
 
-  case FILE_ICON_DOCUMENT:
+  case WB_FILE_ICON_DOCUMENT:
     return t->text;
 
-  case FILE_ICON_FILE:
-  case FILE_ICON_UNKNOWN:
+  case WB_FILE_ICON_FILE:
+  case WB_FILE_ICON_UNKNOWN:
   default:
     return t->text_muted;
   }

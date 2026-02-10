@@ -49,7 +49,7 @@ void Args_Handle(layout_state *layout, const app_args *args) {
 
   if (args->path_count >= 2) {
     /* Set dual mode first so we can navigate both panels */
-    layout->mode = LAYOUT_MODE_DUAL;
+    layout->mode = WB_LAYOUT_MODE_DUAL;
     layout->target_split_ratio = 0.5f;
     layout->split_ratio = 0.5f;
 

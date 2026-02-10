@@ -17,7 +17,7 @@ typedef struct {
 } key_repeat_state;
 
 /* Global state for all keys */
-static key_repeat_state g_key_states[KEY_COUNT] = {0};
+static key_repeat_state g_key_states[WB_KEY_COUNT] = {0};
 
 /* Current frame's repeated text input (0 if none) */
 static u32 g_repeated_text_input = 0;
@@ -31,7 +31,7 @@ void KeyRepeat_Update(b32 *key_down, b32 *key_pressed, u64 current_time_ms) {
   /* Reset repeated text input for this frame */
   g_repeated_text_input = 0;
 
-  for (i32 i = 0; i < KEY_COUNT; i++) {
+  for (i32 i = 0; i < WB_KEY_COUNT; i++) {
     key_repeat_state *state = &g_key_states[i];
 
     /* Clear fire flag from previous frame */
@@ -50,7 +50,7 @@ void KeyRepeat_Update(b32 *key_down, b32 *key_pressed, u64 current_time_ms) {
 
       if (!state->is_repeating) {
         /* Check if we should start repeating */
-        if (held_duration >= KEY_REPEAT_DELAY_MS) {
+        if (held_duration >= WB_KEY_REPEAT_DELAY_MS) {
           state->is_repeating = true;
           state->last_repeat_time = current_time_ms;
           state->fired_this_frame = true;
@@ -62,7 +62,7 @@ void KeyRepeat_Update(b32 *key_down, b32 *key_pressed, u64 current_time_ms) {
       } else {
         /* Already repeating - check if it's time for another repeat */
         u64 since_last_repeat = current_time_ms - state->last_repeat_time;
-        if (since_last_repeat >= KEY_REPEAT_RATE_MS) {
+        if (since_last_repeat >= WB_KEY_REPEAT_RATE_MS) {
           state->last_repeat_time = current_time_ms;
           state->fired_this_frame = true;
           /* Set repeated text input if this key has a character */
@@ -82,13 +82,13 @@ void KeyRepeat_Update(b32 *key_down, b32 *key_pressed, u64 current_time_ms) {
 }
 
 b32 KeyRepeat_Check(key_code key) {
-  if (key >= KEY_COUNT)
+  if (key >= WB_KEY_COUNT)
     return false;
   return g_key_states[key].fired_this_frame;
 }
 
 void KeyRepeat_SetCharacter(key_code key, u32 character) {
-  if (key >= KEY_COUNT)
+  if (key >= WB_KEY_COUNT)
     return;
   g_key_states[key].character = character;
 }
@@ -96,13 +96,13 @@ void KeyRepeat_SetCharacter(key_code key, u32 character) {
 u32 KeyRepeat_GetTextInput(void) { return g_repeated_text_input; }
 
 void KeyRepeat_Reset(key_code key) {
-  if (key >= KEY_COUNT)
+  if (key >= WB_KEY_COUNT)
     return;
   g_key_states[key].fired_this_frame = false;
 }
 
 void KeyRepeat_ResetAll(void) {
-  for (i32 i = 0; i < KEY_COUNT; i++) {
+  for (i32 i = 0; i < WB_KEY_COUNT; i++) {
     g_key_states[i].fired_this_frame = false;
   }
 }

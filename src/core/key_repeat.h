@@ -6,8 +6,8 @@
  * C99, handmade hero style.
  */
 
-#ifndef KEY_REPEAT_H
-#define KEY_REPEAT_H
+#ifndef WB_KEY_REPEAT_H
+#define WB_KEY_REPEAT_H
 
 #include "platform.h"
 #include "types.h"
@@ -15,10 +15,10 @@
 /* ===== Configuration ===== */
 
 /* Initial delay before key starts repeating (milliseconds) */
-#define KEY_REPEAT_DELAY_MS 500
+#define WB_KEY_REPEAT_DELAY_MS 500
 
 /* Interval between repeats once repeating starts (milliseconds) */
-#define KEY_REPEAT_RATE_MS 30
+#define WB_KEY_REPEAT_RATE_MS 30
 
 /* ===== API ===== */
 

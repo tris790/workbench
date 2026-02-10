@@ -17,18 +17,18 @@ void Animation_Start(animation_state *anim, f32 from, f32 to, f32 duration_ms,
   anim->current_value = from;
   anim->duration_ms = duration_ms;
   anim->elapsed_ms = 0.0f;
-  anim->status = ANIM_RUNNING;
+  anim->status = WB_ANIM_RUNNING;
   anim->easing = easing ? easing : Ease_Linear;
 }
 
 void Animation_Update(animation_state *anim, f32 dt_ms) {
-  if (anim->status != ANIM_RUNNING)
+  if (anim->status != WB_ANIM_RUNNING)
     return;
 
   if (!g_animations_enabled) {
     anim->elapsed_ms = anim->duration_ms;
     anim->current_value = anim->end_value;
-    anim->status = ANIM_FINISHED;
+    anim->status = WB_ANIM_FINISHED;
     return;
   }
 
@@ -37,7 +37,7 @@ void Animation_Update(animation_state *anim, f32 dt_ms) {
   if (anim->elapsed_ms >= anim->duration_ms) {
     anim->elapsed_ms = anim->duration_ms;
     anim->current_value = anim->end_value;
-    anim->status = ANIM_FINISHED;
+    anim->status = WB_ANIM_FINISHED;
     return;
   }
 
@@ -49,7 +49,7 @@ void Animation_Update(animation_state *anim, f32 dt_ms) {
 void Animation_Reset(animation_state *anim) {
   anim->current_value = anim->start_value;
   anim->elapsed_ms = 0.0f;
-  anim->status = ANIM_IDLE;
+  anim->status = WB_ANIM_IDLE;
 }
 
 f32 Animation_GetProgress(animation_state *anim) {
@@ -64,7 +64,7 @@ f32 Animation_GetProgress(animation_state *anim) {
 }
 
 b32 Animation_IsFinished(animation_state *anim) {
-  return anim->status == ANIM_FINISHED;
+  return anim->status == WB_ANIM_FINISHED;
 }
 
 /* ===== Smooth Value ===== */

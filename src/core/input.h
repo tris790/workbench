@@ -14,14 +14,14 @@
 /* ===== Input Targets ===== */
 
 typedef enum {
-  INPUT_TARGET_NONE = 0,
-  INPUT_TARGET_EXPLORER,        /* File explorer panel */
-  INPUT_TARGET_TERMINAL,        /* Terminal panel */
-  INPUT_TARGET_COMMAND_PALETTE, /* Command palette (modal) */
-  INPUT_TARGET_DIALOG,       /* Modal dialogs (rename, create, delete, etc.) */
-  INPUT_TARGET_QUICK_FILTER, /* Quick filter in explorer */
-  INPUT_TARGET_CONTEXT_MENU, /* Right-click context menu */
-  INPUT_TARGET_COUNT
+  WB_INPUT_TARGET_NONE = 0,
+  WB_INPUT_TARGET_EXPLORER,        /* File explorer panel */
+  WB_INPUT_TARGET_TERMINAL,        /* Terminal panel */
+  WB_INPUT_TARGET_COMMAND_PALETTE, /* Command palette (modal) */
+  WB_INPUT_TARGET_DIALOG,       /* Modal dialogs (rename, create, delete, etc.) */
+  WB_INPUT_TARGET_QUICK_FILTER, /* Quick filter in explorer */
+  WB_INPUT_TARGET_CONTEXT_MENU, /* Right-click context menu */
+  WB_INPUT_TARGET_COUNT
 } input_target;
 
 /* ===== Input State ===== */
@@ -43,13 +43,13 @@ typedef struct {
   /* Raw input from platform */
   struct {
     v2i mouse_pos;
-    b32 mouse_down[MOUSE_BUTTON_COUNT];
-    b32 mouse_pressed[MOUSE_BUTTON_COUNT];
-    b32 mouse_released[MOUSE_BUTTON_COUNT];
+    b32 mouse_down[WB_MOUSE_BUTTON_COUNT];
+    b32 mouse_pressed[WB_MOUSE_BUTTON_COUNT];
+    b32 mouse_released[WB_MOUSE_BUTTON_COUNT];
     f32 scroll_delta;
-    b32 key_down[KEY_COUNT];
-    b32 key_pressed[KEY_COUNT];
-    b32 key_released[KEY_COUNT];
+    b32 key_down[WB_KEY_COUNT];
+    b32 key_pressed[WB_KEY_COUNT];
+    b32 key_released[WB_KEY_COUNT];
     u32 modifiers;
     u32 text_input;
   } raw;

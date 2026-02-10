@@ -159,7 +159,7 @@ b32 Config_Save(void) {
 b32 Config_GetBool(const char *key, b32 default_val) {
   ConfigEntry *entry = Config_GetEntryByKey(key);
   if (entry) {
-    if (entry->type == CONFIG_TYPE_BOOL) {
+    if (entry->type == WB_CONFIG_TYPE_BOOL) {
       return entry->value.bool_val;
     } else {
       Config_AddDiagnostic("Type mismatch for key '%s': expected Bool", key);
@@ -171,7 +171,7 @@ b32 Config_GetBool(const char *key, b32 default_val) {
 i64 Config_GetI64(const char *key, i64 default_val) {
   ConfigEntry *entry = Config_GetEntryByKey(key);
   if (entry) {
-    if (entry->type == CONFIG_TYPE_I64) {
+    if (entry->type == WB_CONFIG_TYPE_I64) {
       return entry->value.i64_val;
     } else {
       Config_AddDiagnostic("Type mismatch for key '%s': expected I64", key);
@@ -183,7 +183,7 @@ i64 Config_GetI64(const char *key, i64 default_val) {
 f64 Config_GetF64(const char *key, f64 default_val) {
   ConfigEntry *entry = Config_GetEntryByKey(key);
   if (entry) {
-    if (entry->type == CONFIG_TYPE_F64) {
+    if (entry->type == WB_CONFIG_TYPE_F64) {
       return entry->value.f64_val;
     } else {
       Config_AddDiagnostic("Type mismatch for key '%s': expected F64", key);
@@ -195,7 +195,7 @@ f64 Config_GetF64(const char *key, f64 default_val) {
 const char *Config_GetString(const char *key, const char *default_val) {
   ConfigEntry *entry = Config_GetEntryByKey(key);
   if (entry) {
-    if (entry->type == CONFIG_TYPE_STRING) {
+    if (entry->type == WB_CONFIG_TYPE_STRING) {
       return entry->value.string_val;
     } else {
       Config_AddDiagnostic("Type mismatch for key '%s': expected String", key);
@@ -208,7 +208,7 @@ const char *Config_GetString(const char *key, const char *default_val) {
 void Config_SetBool(const char *key, b32 value) {
   ConfigEntry *entry = GetOrCreateEntry(key);
   if (entry) {
-    entry->type = CONFIG_TYPE_BOOL;
+    entry->type = WB_CONFIG_TYPE_BOOL;
     entry->value.bool_val = value;
   }
 }
@@ -216,7 +216,7 @@ void Config_SetBool(const char *key, b32 value) {
 void Config_SetI64(const char *key, i64 value) {
   ConfigEntry *entry = GetOrCreateEntry(key);
   if (entry) {
-    entry->type = CONFIG_TYPE_I64;
+    entry->type = WB_CONFIG_TYPE_I64;
     entry->value.i64_val = value;
   }
 }
@@ -224,7 +224,7 @@ void Config_SetI64(const char *key, i64 value) {
 void Config_SetF64(const char *key, f64 value) {
   ConfigEntry *entry = GetOrCreateEntry(key);
   if (entry) {
-    entry->type = CONFIG_TYPE_F64;
+    entry->type = WB_CONFIG_TYPE_F64;
     entry->value.f64_val = value;
   }
 }
@@ -232,7 +232,7 @@ void Config_SetF64(const char *key, f64 value) {
 void Config_SetString(const char *key, const char *value) {
   ConfigEntry *entry = GetOrCreateEntry(key);
   if (entry) {
-    entry->type = CONFIG_TYPE_STRING;
+    entry->type = WB_CONFIG_TYPE_STRING;
     if (value) {
       strncpy(entry->value.string_val, value,
               sizeof(entry->value.string_val) - 1);
@@ -275,5 +275,5 @@ const char *Config_GetEntryKey(i32 index) {
 
 ConfigValueType Config_GetEntryType(i32 index) {
   ConfigEntry *entry = Config_GetEntry(index);
-  return entry ? entry->type : CONFIG_TYPE_STRING;
+  return entry ? entry->type : WB_CONFIG_TYPE_STRING;
 }

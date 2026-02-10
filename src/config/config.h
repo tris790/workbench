@@ -4,10 +4,10 @@
 #include "../core/types.h"
 
 typedef enum {
-  CONFIG_TYPE_BOOL,
-  CONFIG_TYPE_I64,
-  CONFIG_TYPE_F64,
-  CONFIG_TYPE_STRING
+  WB_CONFIG_TYPE_BOOL,
+  WB_CONFIG_TYPE_I64,
+  WB_CONFIG_TYPE_F64,
+  WB_CONFIG_TYPE_STRING
 } ConfigValueType;
 
 /* Lifecycle */

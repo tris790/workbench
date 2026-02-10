@@ -46,182 +46,182 @@ u32 GetModifierState(void) {
 key_code VirtualKeyToKeyCode(WPARAM vk) {
   switch (vk) {
   case VK_ESCAPE:
-    return KEY_ESCAPE;
+    return WB_KEY_ESCAPE;
   case VK_RETURN:
-    return KEY_RETURN;
+    return WB_KEY_RETURN;
   case VK_TAB:
-    return KEY_TAB;
+    return WB_KEY_TAB;
   case VK_BACK:
-    return KEY_BACKSPACE;
+    return WB_KEY_BACKSPACE;
   case VK_DELETE:
-    return KEY_DELETE;
+    return WB_KEY_DELETE;
   case VK_UP:
-    return KEY_UP;
+    return WB_KEY_UP;
   case VK_DOWN:
-    return KEY_DOWN;
+    return WB_KEY_DOWN;
   case VK_LEFT:
-    return KEY_LEFT;
+    return WB_KEY_LEFT;
   case VK_RIGHT:
-    return KEY_RIGHT;
+    return WB_KEY_RIGHT;
   case VK_HOME:
-    return KEY_HOME;
+    return WB_KEY_HOME;
   case VK_END:
-    return KEY_END;
+    return WB_KEY_END;
   case VK_PRIOR:
-    return KEY_PAGE_UP;
+    return WB_KEY_PAGE_UP;
   case VK_NEXT:
-    return KEY_PAGE_DOWN;
+    return WB_KEY_PAGE_DOWN;
   case VK_SPACE:
-    return KEY_SPACE;
+    return WB_KEY_SPACE;
   case 'A':
-    return KEY_A;
+    return WB_KEY_A;
   case 'B':
-    return KEY_B;
+    return WB_KEY_B;
   case 'C':
-    return KEY_C;
+    return WB_KEY_C;
   case 'D':
-    return KEY_D;
+    return WB_KEY_D;
   case 'E':
-    return KEY_E;
+    return WB_KEY_E;
   case 'F':
-    return KEY_F;
+    return WB_KEY_F;
   case 'G':
-    return KEY_G;
+    return WB_KEY_G;
   case 'H':
-    return KEY_H;
+    return WB_KEY_H;
   case 'I':
-    return KEY_I;
+    return WB_KEY_I;
   case 'J':
-    return KEY_J;
+    return WB_KEY_J;
   case 'K':
-    return KEY_K;
+    return WB_KEY_K;
   case 'L':
-    return KEY_L;
+    return WB_KEY_L;
   case 'M':
-    return KEY_M;
+    return WB_KEY_M;
   case 'N':
-    return KEY_N;
+    return WB_KEY_N;
   case 'O':
-    return KEY_O;
+    return WB_KEY_O;
   case 'P':
-    return KEY_P;
+    return WB_KEY_P;
   case 'Q':
-    return KEY_Q;
+    return WB_KEY_Q;
   case 'R':
-    return KEY_R;
+    return WB_KEY_R;
   case 'S':
-    return KEY_S;
+    return WB_KEY_S;
   case 'T':
-    return KEY_T;
+    return WB_KEY_T;
   case 'U':
-    return KEY_U;
+    return WB_KEY_U;
   case 'V':
-    return KEY_V;
+    return WB_KEY_V;
   case 'W':
-    return KEY_W;
+    return WB_KEY_W;
   case 'X':
-    return KEY_X;
+    return WB_KEY_X;
   case 'Y':
-    return KEY_Y;
+    return WB_KEY_Y;
   case 'Z':
-    return KEY_Z;
+    return WB_KEY_Z;
   case '0':
-    return KEY_0;
+    return WB_KEY_0;
   case '1':
-    return KEY_1;
+    return WB_KEY_1;
   case '2':
-    return KEY_2;
+    return WB_KEY_2;
   case '3':
-    return KEY_3;
+    return WB_KEY_3;
   case '4':
-    return KEY_4;
+    return WB_KEY_4;
   case '5':
-    return KEY_5;
+    return WB_KEY_5;
   case '6':
-    return KEY_6;
+    return WB_KEY_6;
   case '7':
-    return KEY_7;
+    return WB_KEY_7;
   case '8':
-    return KEY_8;
+    return WB_KEY_8;
   case '9':
-    return KEY_9;
+    return WB_KEY_9;
   case VK_F1:
-    return KEY_F1;
+    return WB_KEY_F1;
   case VK_F2:
-    return KEY_F2;
+    return WB_KEY_F2;
   case VK_F3:
-    return KEY_F3;
+    return WB_KEY_F3;
   case VK_F4:
-    return KEY_F4;
+    return WB_KEY_F4;
   case VK_F5:
-    return KEY_F5;
+    return WB_KEY_F5;
   case VK_F6:
-    return KEY_F6;
+    return WB_KEY_F6;
   case VK_F7:
-    return KEY_F7;
+    return WB_KEY_F7;
   case VK_F8:
-    return KEY_F8;
+    return WB_KEY_F8;
   case VK_F9:
-    return KEY_F9;
+    return WB_KEY_F9;
   case VK_F10:
-    return KEY_F10;
+    return WB_KEY_F10;
   case VK_F11:
-    return KEY_F11;
+    return WB_KEY_F11;
   case VK_F12:
-    return KEY_F12;
+    return WB_KEY_F12;
   case VK_OEM_3:
-    return KEY_GRAVE; /* ` ~ */
+    return WB_KEY_GRAVE; /* ` ~ */
   case VK_OEM_MINUS:
-    return KEY_MINUS;
+    return WB_KEY_MINUS;
   case VK_OEM_PLUS:
-    return KEY_EQUALS;
+    return WB_KEY_EQUALS;
   case VK_OEM_4:
-    return KEY_LEFTBRACKET; /* [ { */
+    return WB_KEY_LEFTBRACKET; /* [ { */
   case VK_OEM_6:
-    return KEY_RIGHTBRACKET; /* ] } */
+    return WB_KEY_RIGHTBRACKET; /* ] } */
   case VK_OEM_5:
-    return KEY_BACKSLASH; /* \ | */
+    return WB_KEY_BACKSLASH; /* \ | */
   case VK_OEM_1:
-    return KEY_SEMICOLON; /* ; : */
+    return WB_KEY_SEMICOLON; /* ; : */
   case VK_OEM_7:
-    return KEY_APOSTROPHE; /* ' " */
+    return WB_KEY_APOSTROPHE; /* ' " */
   case VK_OEM_COMMA:
-    return KEY_COMMA;
+    return WB_KEY_COMMA;
   case VK_OEM_PERIOD:
-    return KEY_PERIOD;
+    return WB_KEY_PERIOD;
   case VK_BROWSER_BACK:
-    return KEY_BROWSER_BACK;
+    return WB_KEY_BROWSER_BACK;
   case VK_BROWSER_FORWARD:
-    return KEY_BROWSER_FORWARD;
+    return WB_KEY_BROWSER_FORWARD;
   case VK_LSHIFT:
-    return KEY_LSHIFT;
+    return WB_KEY_LSHIFT;
   case VK_RSHIFT:
-    return KEY_RSHIFT;
+    return WB_KEY_RSHIFT;
   case VK_LCONTROL:
-    return KEY_LCTRL;
+    return WB_KEY_LCTRL;
   case VK_RCONTROL:
-    return KEY_RCTRL;
+    return WB_KEY_RCTRL;
   case VK_LMENU:
-    return KEY_LALT;
+    return WB_KEY_LALT;
   case VK_RMENU:
-    return KEY_RALT;
+    return WB_KEY_RALT;
   case VK_LWIN:
-    return KEY_LSUPER;
+    return WB_KEY_LSUPER;
   case VK_RWIN:
-    return KEY_RSUPER;
+    return WB_KEY_RSUPER;
   /* Generic mappings if L/R not distinguished by windows in some cases?
      Usually windows sends L/R VKs but let's map generic just in case?
      No, VK_SHIFT is a "virtual" virtual key, usually LSHIFT/RSHIFT are sent. */
   case VK_SHIFT:
-    return KEY_LSHIFT; /* fallback */
+    return WB_KEY_LSHIFT; /* fallback */
   case VK_CONTROL:
-    return KEY_LCTRL; /* fallback */
+    return WB_KEY_LCTRL; /* fallback */
   case VK_MENU:
-    return KEY_LALT; /* fallback */
+    return WB_KEY_LALT; /* fallback */
   case VK_OEM_2:
-    return KEY_SLASH; /* / ? */
+    return WB_KEY_SLASH; /* / ? */
   default:
-    return KEY_UNKNOWN;
+    return WB_KEY_UNKNOWN;
   }
 }
 
@@ -240,7 +240,7 @@ static void HandleResize(platform_window *window, i32 width, i32 height) {
   CreateFramebuffer(window);
 
   platform_event event = {0};
-  event.type = EVENT_WINDOW_RESIZE;
+  event.type = WB_EVENT_WINDOW_RESIZE;
   event.data.resize.width = width;
   event.data.resize.height = height;
   PushEvent(window, &event);
@@ -255,7 +255,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (window) {
       window->should_close = true;
       platform_event event = {0};
-      event.type = EVENT_QUIT;
+      event.type = WB_EVENT_QUIT;
       PushEvent(window, &event);
     }
     return 0;
@@ -301,7 +301,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
        */
       if (!is_printable || (mods & (MOD_CTRL | MOD_ALT | MOD_SUPER))) {
         platform_event event = {0};
-        event.type = EVENT_KEY_DOWN;
+        event.type = WB_EVENT_KEY_DOWN;
         event.data.keyboard.key = VirtualKeyToKeyCode(wParam);
         event.data.keyboard.modifiers = mods;
         event.data.keyboard.character = 0;
@@ -321,7 +321,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   case WM_SYSKEYUP: {
     if (window) {
       platform_event event = {0};
-      event.type = EVENT_KEY_UP;
+      event.type = WB_EVENT_KEY_UP;
       event.data.keyboard.key = VirtualKeyToKeyCode(wParam);
       event.data.keyboard.modifiers = GetModifierState();
       PushEvent(window, &event);
@@ -332,7 +332,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   case WM_CHAR: {
     if (window && wParam >= 32) { /* Ignore control characters */
       platform_event event = {0};
-      event.type = EVENT_KEY_DOWN;
+      event.type = WB_EVENT_KEY_DOWN;
       /* Extract scan code from lParam and convert to virtual key.
        * This is more reliable than using last_vk when typing fast,
        * because last_vk can be overwritten by subsequent WM_KEYDOWN
@@ -362,19 +362,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (window) {
       SetCapture(hwnd);
       platform_event event = {0};
-      event.type = EVENT_MOUSE_BUTTON_DOWN;
+      event.type = WB_EVENT_MOUSE_BUTTON_DOWN;
       event.data.mouse.x = (i16)LOWORD(lParam);
       event.data.mouse.y = (i16)HIWORD(lParam);
       event.data.mouse.modifiers = GetModifierState();
       if (msg == WM_LBUTTONDOWN)
-        event.data.mouse.button = MOUSE_LEFT;
+        event.data.mouse.button = WB_MOUSE_LEFT;
       else if (msg == WM_RBUTTONDOWN)
-        event.data.mouse.button = MOUSE_RIGHT;
+        event.data.mouse.button = WB_MOUSE_RIGHT;
       else if (msg == WM_MBUTTONDOWN)
-        event.data.mouse.button = MOUSE_MIDDLE;
+        event.data.mouse.button = WB_MOUSE_MIDDLE;
       else if (msg == WM_XBUTTONDOWN) {
         event.data.mouse.button =
-            (HIWORD(wParam) == XBUTTON1) ? MOUSE_X1 : MOUSE_X2;
+            (HIWORD(wParam) == XBUTTON1) ? WB_MOUSE_X1 : WB_MOUSE_X2;
       }
       PushEvent(window, &event);
     }
@@ -388,19 +388,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (window) {
       ReleaseCapture();
       platform_event event = {0};
-      event.type = EVENT_MOUSE_BUTTON_UP;
+      event.type = WB_EVENT_MOUSE_BUTTON_UP;
       event.data.mouse.x = (i16)LOWORD(lParam);
       event.data.mouse.y = (i16)HIWORD(lParam);
       event.data.mouse.modifiers = GetModifierState();
       if (msg == WM_LBUTTONUP)
-        event.data.mouse.button = MOUSE_LEFT;
+        event.data.mouse.button = WB_MOUSE_LEFT;
       else if (msg == WM_RBUTTONUP)
-        event.data.mouse.button = MOUSE_RIGHT;
+        event.data.mouse.button = WB_MOUSE_RIGHT;
       else if (msg == WM_MBUTTONUP)
-        event.data.mouse.button = MOUSE_MIDDLE;
+        event.data.mouse.button = WB_MOUSE_MIDDLE;
       else if (msg == WM_XBUTTONUP) {
         event.data.mouse.button =
-            (HIWORD(wParam) == XBUTTON1) ? MOUSE_X1 : MOUSE_X2;
+            (HIWORD(wParam) == XBUTTON1) ? WB_MOUSE_X1 : WB_MOUSE_X2;
       }
       PushEvent(window, &event);
     }
@@ -412,7 +412,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
       window->mouse_x = (i16)LOWORD(lParam);
       window->mouse_y = (i16)HIWORD(lParam);
       platform_event event = {0};
-      event.type = EVENT_MOUSE_MOVE;
+      event.type = WB_EVENT_MOUSE_MOVE;
       event.data.mouse.x = window->mouse_x;
       event.data.mouse.y = window->mouse_y;
       event.data.mouse.modifiers = GetModifierState();
@@ -424,7 +424,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   case WM_MOUSEWHEEL: {
     if (window) {
       platform_event event = {0};
-      event.type = EVENT_MOUSE_SCROLL;
+      event.type = WB_EVENT_MOUSE_SCROLL;
       event.data.scroll.dx = 0.0f;
       event.data.scroll.dy = (f32)GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA;
       PushEvent(window, &event);
@@ -435,7 +435,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   case WM_MOUSEHWHEEL: {
     if (window) {
       platform_event event = {0};
-      event.type = EVENT_MOUSE_SCROLL;
+      event.type = WB_EVENT_MOUSE_SCROLL;
       event.data.scroll.dx = (f32)GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA;
       event.data.scroll.dy = 0.0f;
       PushEvent(window, &event);
@@ -446,7 +446,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   case WM_SETFOCUS: {
     if (window) {
       platform_event event = {0};
-      event.type = EVENT_WINDOW_FOCUS;
+      event.type = WB_EVENT_WINDOW_FOCUS;
       PushEvent(window, &event);
     }
     return 0;
@@ -455,7 +455,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   case WM_KILLFOCUS: {
     if (window) {
       platform_event event = {0};
-      event.type = EVENT_WINDOW_UNFOCUS;
+      event.type = WB_EVENT_WINDOW_UNFOCUS;
       PushEvent(window, &event);
     }
     return 0;
@@ -466,22 +466,22 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
       UINT cmd = GET_APPCOMMAND_LPARAM(lParam);
       if (cmd == APPCOMMAND_BROWSER_BACKWARD) {
         platform_event event = {0};
-        event.type = EVENT_KEY_DOWN;
-        event.data.keyboard.key = KEY_BROWSER_BACK;
+        event.type = WB_EVENT_KEY_DOWN;
+        event.data.keyboard.key = WB_KEY_BROWSER_BACK;
         event.data.keyboard.modifiers = GetModifierState();
         PushEvent(window, &event);
 
-        event.type = EVENT_KEY_UP;
+        event.type = WB_EVENT_KEY_UP;
         PushEvent(window, &event);
         return TRUE;
       } else if (cmd == APPCOMMAND_BROWSER_FORWARD) {
         platform_event event = {0};
-        event.type = EVENT_KEY_DOWN;
-        event.data.keyboard.key = KEY_BROWSER_FORWARD;
+        event.type = WB_EVENT_KEY_DOWN;
+        event.data.keyboard.key = WB_KEY_BROWSER_FORWARD;
         event.data.keyboard.modifiers = GetModifierState();
         PushEvent(window, &event);
 
-        event.type = EVENT_KEY_UP;
+        event.type = WB_EVENT_KEY_UP;
         PushEvent(window, &event);
         return TRUE;
       }
@@ -519,7 +519,7 @@ b32 Platform_PollEvent(platform_window *window, platform_event *event) {
     if (msg.message == WM_QUIT) {
       window->should_close = true;
       platform_event quit_event = {0};
-      quit_event.type = EVENT_QUIT;
+      quit_event.type = WB_EVENT_QUIT;
       PushEvent(window, &quit_event);
     }
     TranslateMessage(&msg);

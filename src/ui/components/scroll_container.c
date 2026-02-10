@@ -45,7 +45,7 @@ b32 ScrollContainer_Update(scroll_container_state *state, ui_context *ui,
         UI_GenID("ScrollContainer_Drag"); // Use a fixed ID for drag state
     ui->active = drag_id;
 
-    if (ui->input.mouse_down[MOUSE_LEFT]) {
+    if (ui->input.mouse_down[WB_MOUSE_LEFT]) {
       /* Calculate scroll based on mouse movement */
       f32 track_height =
           state->view_size.y -
@@ -94,7 +94,7 @@ b32 ScrollContainer_Update(scroll_container_state *state, ui_context *ui,
       }
 
       /* Check for scrollbar click to start drag */
-      if (ui->input.mouse_pressed[MOUSE_LEFT] &&
+      if (ui->input.mouse_pressed[WB_MOUSE_LEFT] &&
           ScrollContainer_NeedsScrollbar(state) && ui->active == UI_ID_NONE) {
         /* Calculate scrollbar bounds */
         f32 ratio = state->view_size.y / state->content_size.y;

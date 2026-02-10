@@ -43,36 +43,36 @@ void UI_PopID(void);
 
 /*
  * Style stack allows applying styles globally or by scope:
- *   UI_PushStyle(UI_STYLE_BUTTON_COLOR, some_color);
+ *   UI_PushStyle(WB_UI_STYLE_BG_COLOR, some_color);
  *   ... widgets here use the style ...
  *   UI_PopStyle();
  */
 
 typedef enum {
   /* Colors */
-  UI_STYLE_TEXT_COLOR,
-  UI_STYLE_BG_COLOR,
-  UI_STYLE_BORDER_COLOR,
-  UI_STYLE_ACCENT_COLOR,
-  UI_STYLE_HOVER_COLOR,
-  UI_STYLE_ACTIVE_COLOR,
-  UI_STYLE_FOCUS_COLOR,
+  WB_UI_STYLE_TEXT_COLOR,
+  WB_UI_STYLE_BG_COLOR,
+  WB_UI_STYLE_BORDER_COLOR,
+  WB_UI_STYLE_ACCENT_COLOR,
+  WB_UI_STYLE_HOVER_COLOR,
+  WB_UI_STYLE_ACTIVE_COLOR,
+  WB_UI_STYLE_FOCUS_COLOR,
 
   /* Dimensions */
-  UI_STYLE_PADDING,
-  UI_STYLE_SPACING,
-  UI_STYLE_BORDER_WIDTH,
-  UI_STYLE_BORDER_RADIUS,
-  UI_STYLE_FONT_SIZE,
-  UI_STYLE_SCROLLBAR_WIDTH,
+  WB_UI_STYLE_PADDING,
+  WB_UI_STYLE_SPACING,
+  WB_UI_STYLE_BORDER_WIDTH,
+  WB_UI_STYLE_BORDER_RADIUS,
+  WB_UI_STYLE_FONT_SIZE,
+  WB_UI_STYLE_SCROLLBAR_WIDTH,
 
   /* Layout */
-  UI_STYLE_MIN_WIDTH,
-  UI_STYLE_MIN_HEIGHT,
-  UI_STYLE_MAX_WIDTH,
-  UI_STYLE_MAX_HEIGHT,
+  WB_UI_STYLE_MIN_WIDTH,
+  WB_UI_STYLE_MIN_HEIGHT,
+  WB_UI_STYLE_MAX_WIDTH,
+  WB_UI_STYLE_MAX_HEIGHT,
 
-  UI_STYLE_COUNT
+  WB_UI_STYLE_COUNT
 } ui_style_property;
 
 /* Style value union */
@@ -101,8 +101,8 @@ i32 UI_GetStyleInt(ui_style_property prop);
 /* ===== Layout System ===== */
 
 typedef enum {
-  UI_LAYOUT_VERTICAL,
-  UI_LAYOUT_HORIZONTAL,
+  WB_UI_LAYOUT_VERTICAL,
+  WB_UI_LAYOUT_HORIZONTAL,
 } ui_layout_direction;
 
 typedef struct {
@@ -169,15 +169,15 @@ typedef struct {
   /* Mouse state */
   v2i mouse_pos;
   v2i mouse_delta;
-  b32 mouse_down[MOUSE_BUTTON_COUNT];
-  b32 mouse_pressed[MOUSE_BUTTON_COUNT];
-  b32 mouse_released[MOUSE_BUTTON_COUNT];
+  b32 mouse_down[WB_MOUSE_BUTTON_COUNT];
+  b32 mouse_pressed[WB_MOUSE_BUTTON_COUNT];
+  b32 mouse_released[WB_MOUSE_BUTTON_COUNT];
   f32 scroll_delta;
 
   /* Keyboard state */
-  b32 key_down[KEY_COUNT];
-  b32 key_pressed[KEY_COUNT];
-  b32 key_released[KEY_COUNT];
+  b32 key_down[WB_KEY_COUNT];
+  b32 key_pressed[WB_KEY_COUNT];
+  b32 key_released[WB_KEY_COUNT];
   u32 modifiers; /* MOD_CTRL, MOD_SHIFT, etc */
 
   /* Text input (UTF-32 codepoint) */
@@ -221,7 +221,7 @@ typedef struct ui_context_s {
     ui_style_value value;
   } style_stack[UI_MAX_STYLE_STACK];
   i32 style_depth;
-  ui_style_value style_defaults[UI_STYLE_COUNT];
+  ui_style_value style_defaults[WB_UI_STYLE_COUNT];
 
   /* Scroll container stack */
   struct {

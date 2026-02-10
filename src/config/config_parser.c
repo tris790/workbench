@@ -168,23 +168,23 @@ b32 ConfigParser_Load(void) {
     ConfigEntry *existing = Config_GetEntryByKey(key);
 
     if (strcmp(val_str, "true") == 0 || strcmp(val_str, "false") == 0) {
-      if (existing && existing->type != CONFIG_TYPE_BOOL) {
+      if (existing && existing->type != WB_CONFIG_TYPE_BOOL) {
         Config_AddDiagnostic(
             "Type mismatch at line %d: key '%s' expected %s, got Bool",
             line_number, key,
-            existing->type == CONFIG_TYPE_I64   ? "I64"
-            : existing->type == CONFIG_TYPE_F64 ? "F64"
+            existing->type == WB_CONFIG_TYPE_I64   ? "I64"
+            : existing->type == WB_CONFIG_TYPE_F64 ? "F64"
                                                 : "String");
       } else {
         Config_SetBool(key, strcmp(val_str, "true") == 0);
       }
     } else if (IsHex(val_str)) {
-      if (existing && existing->type != CONFIG_TYPE_I64) {
+      if (existing && existing->type != WB_CONFIG_TYPE_I64) {
         Config_AddDiagnostic(
             "Type mismatch at line %d: key '%s' expected %s, got I64 (Hex)",
             line_number, key,
-            existing->type == CONFIG_TYPE_BOOL  ? "Bool"
-            : existing->type == CONFIG_TYPE_F64 ? "F64"
+            existing->type == WB_CONFIG_TYPE_BOOL  ? "Bool"
+            : existing->type == WB_CONFIG_TYPE_F64 ? "F64"
                                                 : "String");
       } else {
         i64 hex_val = strtoll(val_str, NULL, 16);
@@ -192,24 +192,24 @@ b32 ConfigParser_Load(void) {
       }
     } else if (IsNumeric(val_str)) {
       if (ContainsDot(val_str)) {
-        if (existing && existing->type != CONFIG_TYPE_F64) {
+        if (existing && existing->type != WB_CONFIG_TYPE_F64) {
           Config_AddDiagnostic(
               "Type mismatch at line %d: key '%s' expected %s, got F64",
               line_number, key,
-              existing->type == CONFIG_TYPE_BOOL  ? "Bool"
-              : existing->type == CONFIG_TYPE_I64 ? "I64"
+              existing->type == WB_CONFIG_TYPE_BOOL  ? "Bool"
+              : existing->type == WB_CONFIG_TYPE_I64 ? "I64"
                                                   : "String");
         } else {
           f64 f_val = atof(val_str);
           Config_SetF64(key, f_val);
         }
       } else {
-        if (existing && existing->type != CONFIG_TYPE_I64) {
+        if (existing && existing->type != WB_CONFIG_TYPE_I64) {
           Config_AddDiagnostic(
               "Type mismatch at line %d: key '%s' expected %s, got I64",
               line_number, key,
-              existing->type == CONFIG_TYPE_BOOL  ? "Bool"
-              : existing->type == CONFIG_TYPE_F64 ? "F64"
+              existing->type == WB_CONFIG_TYPE_BOOL  ? "Bool"
+              : existing->type == WB_CONFIG_TYPE_F64 ? "F64"
                                                   : "String");
         } else {
           i64 i_val = atoll(val_str);
@@ -230,12 +230,12 @@ b32 ConfigParser_Load(void) {
         }
       }
 
-      if (existing && existing->type != CONFIG_TYPE_STRING) {
+      if (existing && existing->type != WB_CONFIG_TYPE_STRING) {
         Config_AddDiagnostic(
             "Type mismatch at line %d: key '%s' expected %s, got String",
             line_number, key,
-            existing->type == CONFIG_TYPE_BOOL  ? "Bool"
-            : existing->type == CONFIG_TYPE_I64 ? "I64"
+            existing->type == WB_CONFIG_TYPE_BOOL  ? "Bool"
+            : existing->type == WB_CONFIG_TYPE_I64 ? "I64"
                                                 : "F64");
       } else {
         Config_SetString(key, string_val);
@@ -266,10 +266,10 @@ b32 ConfigParser_Save(void) {
 
     fprintf(file, "%s = ", entry->key);
     switch (entry->type) {
-    case CONFIG_TYPE_BOOL:
+    case WB_CONFIG_TYPE_BOOL:
       fprintf(file, "%s", entry->value.bool_val ? "true" : "false");
       break;
-    case CONFIG_TYPE_I64:
+    case WB_CONFIG_TYPE_I64:
       // Check if it looks like a color (large positive hex-like value)
       // For now just output as decimal unless we want to be fancy.
       // The requirement says "hex color (parse as u32, store as i64)".
@@ -281,10 +281,10 @@ b32 ConfigParser_Save(void) {
         fprintf(file, "%lld", (long long)entry->value.i64_val);
       }
       break;
-    case CONFIG_TYPE_F64:
+    case WB_CONFIG_TYPE_F64:
       fprintf(file, "%.2f", entry->value.f64_val);
       break;
-    case CONFIG_TYPE_STRING:
+    case WB_CONFIG_TYPE_STRING:
       fprintf(file, "\"%s\"", entry->value.string_val);
       break;
     }

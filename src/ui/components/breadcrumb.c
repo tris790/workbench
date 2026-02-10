@@ -1,13 +1,14 @@
 /*
  * breadcrumb.c - Breadcrumb Navigation Component Implementation
  *
- * Interactive breadcrumb with clickable segments and double-click to copy.
+ * Interactive breadcrumb with clickable segments and click-to-edit mode.
  * C99, handmade hero style.
  */
 
 #include "breadcrumb.h"
 #include "fs.h"
 #include "theme.h"
+#include "text_input.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -19,12 +20,7 @@
 #define BREADCRUMB_DOUBLE_CLICK_MS 400
 #define BREADCRUMB_SEPARATOR "/"
 
-/* Static state for double-click detection */
-static u64 s_last_click_time = 0;
-static b32 s_was_hovered = false;
-
-/* Copy feedback state */
-static u64 s_copy_feedback_time = 0;
+/* Copy feedback duration */
 #define BREADCRUMB_COPY_FEEDBACK_MS 1200
 
 /* ===== Helper Functions ===== */
@@ -35,18 +31,28 @@ static i32 CountSegments(const char *path, const char *segments[],
   i32 count = 0;
   const char *p = path;
 
-  /* Handle root specially */
+  /* Handle root specially - Unix absolute path */
   if (p[0] == '/') {
     if (count < max_segments) {
       segments[count++] = p; /* Root segment "/" */
     }
     p++;
   }
+  /* Handle Windows drive root like C:/ */
+  else if (FS_IsWindowsDriveRoot(p)) {
+    if (count < max_segments) {
+      segments[count++] = p; /* Drive root like "C:" */
+    }
+    p += 2;
+    /* Skip the separator after the drive letter */
+    if (*p == '/' || *p == '\\')
+      p++;
+  }
 
   /* Find remaining segments */
   while (*p && count < max_segments) {
     /* Skip leading separators */
-    while (*p == '/')
+    while (FS_IsPathSeparator(*p))
       p++;
     if (!*p)
       break;
@@ -55,7 +61,7 @@ static i32 CountSegments(const char *path, const char *segments[],
     segments[count++] = p;
 
     /* Skip to next separator */
-    while (*p && *p != '/')
+    while (*p && !FS_IsPathSeparator(*p))
       p++;
   }
 
@@ -79,6 +85,34 @@ static i32 MeasureSegment(font *f, const char *segment_start,
 
 /* ===== Public API ===== */
 
+void Breadcrumb_Init(breadcrumb_state *state) {
+  memset(state, 0, sizeof(*state));
+  state->is_editing = false;
+  state->edit_buffer[0] = '\0';
+  memset(&state->text_state, 0, sizeof(state->text_state));
+  state->text_state.selection_start = -1;
+  state->last_click_time = 0;
+  state->was_hovered = false;
+  state->copy_feedback_time = 0;
+}
+
+void Breadcrumb_StartEditing(breadcrumb_state *state, const char *path) {
+  state->is_editing = true;
+  strncpy(state->edit_buffer, path, sizeof(state->edit_buffer) - 1);
+  state->edit_buffer[sizeof(state->edit_buffer) - 1] = '\0';
+  memset(&state->text_state, 0, sizeof(state->text_state));
+  state->text_state.cursor_pos = (i32)strlen(state->edit_buffer);
+  state->text_state.selection_start = -1;
+  state->text_state.has_focus = true;
+}
+
+void Breadcrumb_CancelEditing(breadcrumb_state *state) {
+  state->is_editing = false;
+  state->edit_buffer[0] = '\0';
+  memset(&state->text_state, 0, sizeof(state->text_state));
+  state->text_state.selection_start = -1;
+}
+
 b32 Breadcrumb_GetPathForSegment(const char *path, i32 segment_index,
                                   char *out_buffer, usize buffer_size) {
   if (!path || !out_buffer || buffer_size == 0)
@@ -96,7 +130,7 @@ b32 Breadcrumb_GetPathForSegment(const char *path, i32 segment_index,
     /* End at the start of next segment */
     end = segments[segment_index + 1];
     /* Don't include the leading slash of the next segment */
-    if (*end == '/')
+    if (FS_IsPathSeparator(*end))
       end++;
   } else {
     /* Last segment - use end of string */
@@ -114,8 +148,126 @@ b32 Breadcrumb_GetPathForSegment(const char *path, i32 segment_index,
   return true;
 }
 
-breadcrumb_result Breadcrumb_Render(ui_context *ui, rect bounds,
-                                     const char *path) {
+/* Render text input mode */
+static breadcrumb_result RenderEditMode(ui_context *ui, rect bounds,
+                                         breadcrumb_state *state) {
+  breadcrumb_result result = {0};
+  result.clicked_segment = -1;
+
+  render_context *ctx = ui->renderer;
+  const theme *th = ui->theme;
+  ui_input *input = &ui->input;
+
+  /* Draw background */
+  Render_DrawRect(ctx, bounds, th->panel);
+
+  /* Draw border indicating edit mode */
+  rect border = {bounds.x, bounds.y + bounds.h - 2, bounds.w, 2};
+  Render_DrawRect(ctx, border, th->accent);
+
+  i32 padding = BREADCRUMB_PADDING;
+  i32 font_height = Font_GetLineHeight(ui->font);
+
+  /* Calculate text area bounds */
+  rect text_bounds = {bounds.x + padding, bounds.y + (bounds.h - font_height) / 2,
+                      bounds.w - padding * 2, font_height};
+
+  /* Generate ID for focus management */
+  ui_id id = UI_GenID("##breadcrumb_edit");
+  UI_RegisterFocusable(id);
+
+  /* Focus management - breadcrumb edit always has focus when editing */
+  if (ui->focused != id && state->text_state.has_focus) {
+    ui->focused = id;
+  }
+
+  /* Handle mouse click in edit area to position cursor */
+  b32 hovered = UI_PointInRect(input->mouse_pos, bounds);
+
+  /* Cancel editing when clicking outside the breadcrumb */
+  if (!hovered && input->mouse_pressed[WB_MOUSE_LEFT]) {
+    result.editing_cancelled = true;
+    state->is_editing = false;
+    return result;
+  }
+
+  if (hovered && input->mouse_pressed[WB_MOUSE_LEFT]) {
+    /* Calculate cursor position from click using optimized binary search */
+    i32 click_x = input->mouse_pos.x - text_bounds.x;
+    state->text_state.cursor_pos =
+        UI_FindCursorPosFromClick(ui->font, state->edit_buffer, click_x);
+    state->text_state.selection_start = -1;
+  }
+
+  /* Process text input using shared logic */
+  if (UI_ProcessTextInput(&state->text_state, state->edit_buffer,
+                          sizeof(state->edit_buffer), input)) {
+    /* Text changed - mark for navigation and reset cursor blink */
+    result.text_changed = true;
+    state->text_state.cursor_blink = 0.0f;
+  }
+
+  /* Check for Enter (confirm) or Escape (cancel) */
+  if (input->key_pressed[WB_KEY_RETURN]) {
+    result.editing_finished = true;
+    state->is_editing = false;
+  } else if (input->key_pressed[WB_KEY_ESCAPE]) {
+    result.editing_cancelled = true;
+    state->is_editing = false;
+  }
+
+  /* Update cursor blink */
+  if (!g_animations_enabled) {
+    state->text_state.cursor_blink = 0.0f;
+  } else {
+    state->text_state.cursor_blink += ui->dt * 2.0f;
+    if (state->text_state.cursor_blink > 2.0f)
+      state->text_state.cursor_blink -= 2.0f;
+  }
+
+  /* Set clip for text */
+  rect text_clip = {bounds.x + padding, bounds.y, bounds.w - padding * 2,
+                    bounds.h};
+  Render_SetClipRect(ctx, text_clip);
+
+  /* Draw selection highlight using shared helper */
+  if (state->text_state.selection_start >= 0) {
+    i32 start, end;
+    UI_GetSelectionRange(&state->text_state, &start, &end);
+
+    color sel_color = th->accent;
+    sel_color.a = 128;
+    UI_DrawSelectionHighlight(ctx, ui->font, state->edit_buffer, start, end,
+                              text_bounds, sel_color);
+  }
+
+  /* Draw text */
+  v2i text_pos = {text_bounds.x, text_bounds.y};
+  Render_DrawText(ctx, text_pos, state->edit_buffer, ui->font, th->text);
+
+  /* Draw cursor using shared helper */
+  if (state->text_state.cursor_blink < 1.0f) {
+    UI_DrawTextCursor(ctx, ui->font, state->edit_buffer,
+                      state->text_state.cursor_pos, text_bounds, th->text, 2,
+                      bounds.h - 12);
+  }
+
+  /* Restore clip */
+  Render_ResetClipRect(ctx);
+
+  /* Bottom border (normal) */
+  {
+    rect bottom_border = {bounds.x, bounds.y + bounds.h - 1, bounds.w, 1};
+    Render_DrawRect(ctx, bottom_border, th->border);
+  }
+
+  return result;
+}
+
+/* Render normal breadcrumb mode with clickable segments */
+static breadcrumb_result RenderNormalMode(ui_context *ui, rect bounds,
+                                           const char *path,
+                                           breadcrumb_state *state) {
   render_context *ctx = ui->renderer;
   const theme *th = ui->theme;
   ui_input *input = &ui->input;
@@ -153,7 +305,7 @@ breadcrumb_result Breadcrumb_Render(ui_context *ui, rect bounds,
   for (i32 i = 0; i < segment_count; i++) {
     /* Calculate segment length (distance to next separator or end) */
     const char *p = segments[i];
-    if (*p == '/' && (i == 0 || (p > path && p[-1] != '/'))) {
+    if (FS_IsPathSeparator(*p) && (i == 0 || (p > path && !FS_IsPathSeparator(p[-1])))) {
       /* Root segment - just "/" */
       segs[i].start = "/";
       segs[i].length = 1;
@@ -280,32 +432,46 @@ breadcrumb_result Breadcrumb_Render(ui_context *ui, rect bounds,
     }
   }
 
-  /* Handle click detection (single or double) anywhere in breadcrumb */
-  b32 is_double_click = false;
-  if (is_hovered && input->mouse_pressed[MOUSE_LEFT]) {
+  /* Handle click detection */
+  b32 clicked_in_segment = false;
+  b32 started_editing = false;
+  if (is_hovered && input->mouse_pressed[WB_MOUSE_LEFT]) {
     u64 now = Platform_GetTimeMs();
-    /* Check if this is a double-click (previous click was recent) */
-    if (s_was_hovered && s_last_click_time > 0 &&
-        (now - s_last_click_time) < BREADCRUMB_DOUBLE_CLICK_MS) {
-      /* Double-click anywhere - copy full path to clipboard */
-      Platform_SetClipboard(path);
-      result.double_clicked = true;
-      result.path_copied = true;
-      s_copy_feedback_time = now;
-      s_last_click_time = 0;
-      is_double_click = true;
+
+    if (hovered_segment >= 0) {
+      /* Clicked on a segment - handle navigation */
+      result.clicked_segment = hovered_segment;
+      clicked_in_segment = true;
+      state->last_click_time = 0; /* Reset double-click timer */
     } else {
-      /* First click - start timer for potential double-click */
-      s_last_click_time = now;
+      /* Clicked in breadcrumb but not on a segment */
+      /* Check if this is a double-click (copy path) or single-click (edit) */
+      if (state->was_hovered && state->last_click_time > 0 &&
+          (now - state->last_click_time) < BREADCRUMB_DOUBLE_CLICK_MS) {
+        /* This is a double-click outside segments - copy path to clipboard */
+        Platform_SetClipboard(path);
+        result.path_copied = true;
+        state->copy_feedback_time = now;
+        state->last_click_time = 0;
+      } else {
+        /* First click - start editing mode */
+        result.editing_started = true;
+        started_editing = true;
+        Breadcrumb_StartEditing(state, path);
+        state->last_click_time = 0;
+      }
     }
   }
 
-  /* Handle single-click navigation (only if not a double-click) */
-  if (!is_double_click && hovered_segment >= 0 && input->mouse_pressed[MOUSE_LEFT]) {
-    result.clicked_segment = hovered_segment;
+  /* Only update last_click_time if we didn't start editing (editing sets it to 0)
+   * and we didn't click in a segment. This is for detecting double-clicks. */
+  if (!started_editing && !clicked_in_segment && is_hovered &&
+      input->mouse_pressed[WB_MOUSE_LEFT]) {
+    u64 now = Platform_GetTimeMs();
+    state->last_click_time = now;
   }
 
-  s_was_hovered = is_hovered;
+  state->was_hovered = is_hovered;
 
   /* Bottom border */
   {
@@ -316,8 +482,8 @@ breadcrumb_result Breadcrumb_Render(ui_context *ui, rect bounds,
   /* Show copy feedback - draw last so it appears on top */
   {
     u64 now = Platform_GetTimeMs();
-    if (s_copy_feedback_time > 0 &&
-        (now - s_copy_feedback_time) < BREADCRUMB_COPY_FEEDBACK_MS) {
+    if (state->copy_feedback_time > 0 &&
+        (now - state->copy_feedback_time) < BREADCRUMB_COPY_FEEDBACK_MS) {
       const char *feedback = "Copied!";
       i32 fb_width = Font_MeasureWidth(ui->font, feedback);
       i32 fb_x = bounds.x + bounds.w - BREADCRUMB_PADDING - fb_width;
@@ -334,4 +500,13 @@ breadcrumb_result Breadcrumb_Render(ui_context *ui, rect bounds,
   }
 
   return result;
+}
+
+breadcrumb_result Breadcrumb_Render(ui_context *ui, rect bounds, const char *path,
+                                     breadcrumb_state *state) {
+  if (state->is_editing) {
+    return RenderEditMode(ui, bounds, state);
+  } else {
+    return RenderNormalMode(ui, bounds, path, state);
+  }
 }

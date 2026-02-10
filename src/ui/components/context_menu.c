@@ -134,24 +134,24 @@ static void PopulateEmptyMenu(context_menu_state *state) {
 
 static file_icon_type GetIconTypeFromString(const char *name) {
   if (strcmp(name, "code") == 0)
-    return FILE_ICON_CODE_OTHER;
+    return WB_FILE_ICON_CODE_OTHER;
   if (strcmp(name, "terminal") == 0)
-    return FILE_ICON_EXECUTABLE;
+    return WB_FILE_ICON_EXECUTABLE;
   if (strcmp(name, "folder") == 0)
-    return FILE_ICON_DIRECTORY;
+    return WB_FILE_ICON_DIRECTORY;
   if (strcmp(name, "file") == 0)
-    return FILE_ICON_FILE;
+    return WB_FILE_ICON_FILE;
   if (strcmp(name, "image") == 0)
-    return FILE_ICON_IMAGE;
+    return WB_FILE_ICON_IMAGE;
   if (strcmp(name, "audio") == 0)
-    return FILE_ICON_AUDIO;
+    return WB_FILE_ICON_AUDIO;
   if (strcmp(name, "video") == 0)
-    return FILE_ICON_VIDEO;
+    return WB_FILE_ICON_VIDEO;
   if (strcmp(name, "config") == 0)
-    return FILE_ICON_CONFIG;
+    return WB_FILE_ICON_CONFIG;
   if (strcmp(name, "archive") == 0)
-    return FILE_ICON_ARCHIVE;
-  return FILE_ICON_UNKNOWN;
+    return WB_FILE_ICON_ARCHIVE;
+  return WB_FILE_ICON_UNKNOWN;
 }
 
 void ContextMenu_RefreshConfig(context_menu_state *state) {
@@ -184,7 +184,7 @@ void ContextMenu_RefreshConfig(context_menu_state *state) {
       /* Check if it's a file path (contains / or .) */
       if (strchr(icon_name, '/') || strchr(icon_name, '.') ||
           strchr(icon_name, '\\')) {
-        action->icon_type = FILE_ICON_IMAGE; /* Fallback type */
+        action->icon_type = WB_FILE_ICON_IMAGE; /* Fallback type */
         action->icon_img = Image_Load(icon_name);
         if (!action->icon_img) {
           /* Failed to load, fallback to generic */
@@ -196,8 +196,8 @@ void ContextMenu_RefreshConfig(context_menu_state *state) {
 
       /* Fallback to generic code icon if unknown but specified (and no image
        * loaded) */
-      if (action->icon_type == FILE_ICON_UNKNOWN && !action->icon_img) {
-        action->icon_type = FILE_ICON_CODE_OTHER;
+      if (action->icon_type == WB_FILE_ICON_UNKNOWN && !action->icon_img) {
+        action->icon_type = WB_FILE_ICON_CODE_OTHER;
       }
 
       strncpy(action->command, cmd, sizeof(action->command) - 1);
@@ -217,7 +217,7 @@ static void PopulateCustomItems(context_menu_state *state) {
   for (i32 i = 0; i < entry_count; i++) {
     const char *key = Config_GetEntryKey(i);
     if (key && strncmp(key, "context_menu.custom.", 20) == 0) {
-      if (Config_GetEntryType(i) != CONFIG_TYPE_STRING)
+      if (Config_GetEntryType(i) != WB_CONFIG_TYPE_STRING)
         continue;
 
       /* Skip the new icon actions if they accidentally get picked up */
@@ -300,13 +300,13 @@ void ContextMenu_Show(context_menu_state *state, v2i position,
 
   /* Populate menu based on context type */
   switch (type) {
-  case CONTEXT_FILE:
+  case WB_CONTEXT_FILE:
     PopulateFileMenu(state);
     break;
-  case CONTEXT_DIRECTORY:
+  case WB_CONTEXT_DIRECTORY:
     PopulateDirectoryMenu(state);
     break;
-  case CONTEXT_EMPTY:
+  case WB_CONTEXT_EMPTY:
     PopulateEmptyMenu(state);
     break;
   default:
@@ -359,7 +359,7 @@ void ContextMenu_Show(context_menu_state *state, v2i position,
   state->fade_anim.target = 1.0f;
 
   /* Push focus to context menu */
-  Input_PushFocus(INPUT_TARGET_CONTEXT_MENU);
+  Input_PushFocus(WB_INPUT_TARGET_CONTEXT_MENU);
 }
 
 void ContextMenu_Close(context_menu_state *state) {
@@ -403,19 +403,19 @@ b32 ContextMenu_Update(context_menu_state *state, ui_context *ui) {
   ui_input *input = &ui->input;
 
   /* Handle escape to close */
-  if (input->key_pressed[KEY_ESCAPE]) {
+  if (input->key_pressed[WB_KEY_ESCAPE]) {
     ContextMenu_Close(state);
     return true;
   }
 
   /* Handle enter to execute */
-  if (input->key_pressed[KEY_RETURN] && state->selected_index >= 0) {
+  if (input->key_pressed[WB_KEY_RETURN] && state->selected_index >= 0) {
     ContextMenu_ExecuteSelectedItem(state);
     return true;
   }
 
   /* Handle up/down navigation */
-  if (input->key_pressed[KEY_UP]) {
+  if (input->key_pressed[WB_KEY_UP]) {
     if (state->selected_index > 0) {
       state->selected_index--;
     } else if (state->selected_index == -1 && state->item_count > 0) {
@@ -424,7 +424,7 @@ b32 ContextMenu_Update(context_menu_state *state, ui_context *ui) {
     return true;
   }
 
-  if (input->key_pressed[KEY_DOWN]) {
+  if (input->key_pressed[WB_KEY_DOWN]) {
     if (state->selected_index < state->item_count - 1) {
       state->selected_index++;
     } else if (state->selected_index == -1 && state->item_count > 0) {
@@ -434,7 +434,7 @@ b32 ContextMenu_Update(context_menu_state *state, ui_context *ui) {
   }
 
   /* Handle mouse clicks - use adjusted position for hit testing */
-  if (input->mouse_pressed[MOUSE_LEFT] || input->mouse_pressed[MOUSE_RIGHT]) {
+  if (input->mouse_pressed[WB_MOUSE_LEFT] || input->mouse_pressed[WB_MOUSE_RIGHT]) {
     /* Use pre-calculated adjusted position for accurate hit testing */
     i32 menu_x = state->adjusted_position.x;
     i32 menu_y = state->adjusted_position.y;
@@ -444,7 +444,7 @@ b32 ContextMenu_Update(context_menu_state *state, ui_context *ui) {
 
     if (UI_PointInRect(input->mouse_pos, menu_rect)) {
       /* Click inside menu - check which item */
-      if (input->mouse_pressed[MOUSE_LEFT]) {
+      if (input->mouse_pressed[WB_MOUSE_LEFT]) {
         i32 item_y = menu_y + 4;
         for (i32 i = 0; i < state->item_count; i++) {
           rect item_rect = {menu_x + 4, item_y, state->menu_width - 8,
@@ -453,7 +453,7 @@ b32 ContextMenu_Update(context_menu_state *state, ui_context *ui) {
             state->selected_index = i;
             ContextMenu_ExecuteSelectedItem(state);
             /* Consume the click */
-            input->mouse_pressed[MOUSE_LEFT] = false;
+            input->mouse_pressed[WB_MOUSE_LEFT] = false;
             return true;
           }
           item_y += state->item_height;
@@ -471,15 +471,15 @@ b32 ContextMenu_Update(context_menu_state *state, ui_context *ui) {
             if (UI_PointInRect(input->mouse_pos, action_rect)) {
               Action_CustomCommand(state->custom_actions[i].command);
               ContextMenu_Close(state);
-              input->mouse_pressed[MOUSE_LEFT] = false;
+              input->mouse_pressed[WB_MOUSE_LEFT] = false;
               return true;
             }
           }
         }
       }
       /* Consume any click inside menu to prevent click-through */
-      input->mouse_pressed[MOUSE_LEFT] = false;
-      input->mouse_pressed[MOUSE_RIGHT] = false;
+      input->mouse_pressed[WB_MOUSE_LEFT] = false;
+      input->mouse_pressed[WB_MOUSE_RIGHT] = false;
     } else {
       /* Click outside menu - close it */
       ContextMenu_Close(state);

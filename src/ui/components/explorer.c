@@ -265,24 +265,27 @@ void Explorer_Init(explorer_state *state, memory_arena *arena) {
   /* Load sort settings */
   const char *sort_type_str = Config_GetString("explorer.sort_type", "name");
   if (strcmp(sort_type_str, "size") == 0)
-    state->fs.sort_by = SORT_BY_SIZE;
+    state->fs.sort_by = WB_SORT_BY_SIZE;
   else if (strcmp(sort_type_str, "date") == 0)
-    state->fs.sort_by = SORT_BY_DATE;
+    state->fs.sort_by = WB_SORT_BY_DATE;
   else
-    state->fs.sort_by = SORT_BY_NAME;
+    state->fs.sort_by = WB_SORT_BY_NAME;
 
   const char *sort_order_str =
       Config_GetString("explorer.sort_order", "ascending");
   if (strcmp(sort_order_str, "descending") == 0)
-    state->fs.sort_dir = SORT_DESCENDING;
+    state->fs.sort_dir = WB_SORT_DESCENDING;
   else
-    state->fs.sort_dir = SORT_ASCENDING;
+    state->fs.sort_dir = WB_SORT_ASCENDING;
 
   /* Initialize scroll container */
   ScrollContainer_Init(&state->scroll);
 
   /* Selection animation */
   state->selection_anim.speed = 600.0f;
+
+  /* Initialize breadcrumb */
+  Breadcrumb_Init(&state->breadcrumb);
 
   /* Initialize quick filter */
   QuickFilter_Init(&state->filter);
@@ -433,7 +436,7 @@ void Explorer_ToggleHidden(explorer_state *state) {
 static void Explorer_SetupInputDialog(explorer_state *state, explorer_mode mode,
                                       const char *initial_text) {
   state->mode = mode;
-  Input_PushFocus(INPUT_TARGET_DIALOG);
+  Input_PushFocus(WB_INPUT_TARGET_DIALOG);
   if (initial_text) {
     strncpy(state->input_buffer, initial_text, sizeof(state->input_buffer) - 1);
     state->input_buffer[sizeof(state->input_buffer) - 1] = '\0';
@@ -455,16 +458,16 @@ static void Explorer_GetInputPath(explorer_state *state, char *out_path,
 void Explorer_StartRename(explorer_state *state) {
   fs_entry *entry = FS_GetSelectedEntry(&state->fs);
   if (entry && strcmp(entry->name, "..") != 0) {
-    Explorer_SetupInputDialog(state, EXPLORER_MODE_RENAME, entry->name);
+    Explorer_SetupInputDialog(state, WB_EXPLORER_MODE_RENAME, entry->name);
   }
 }
 
 void Explorer_StartCreateFile(explorer_state *state) {
-  Explorer_SetupInputDialog(state, EXPLORER_MODE_CREATE_FILE, NULL);
+  Explorer_SetupInputDialog(state, WB_EXPLORER_MODE_CREATE_FILE, NULL);
 }
 
 void Explorer_StartCreateDir(explorer_state *state) {
-  Explorer_SetupInputDialog(state, EXPLORER_MODE_CREATE_DIR, NULL);
+  Explorer_SetupInputDialog(state, WB_EXPLORER_MODE_CREATE_DIR, NULL);
 }
 
 void Explorer_ConfirmDelete(explorer_state *state, ui_context *ui) {
@@ -481,8 +484,8 @@ void Explorer_ConfirmDelete(explorer_state *state, ui_context *ui) {
   if (delete_count == 0)
     return;
 
-  state->mode = EXPLORER_MODE_CONFIRM_DELETE;
-  Input_PushFocus(INPUT_TARGET_DIALOG);
+  state->mode = WB_EXPLORER_MODE_CONFIRM_DELETE;
+  Input_PushFocus(WB_INPUT_TARGET_DIALOG);
 
   /* Pre-wrap text using arena */
   const theme *th = ui->theme;
@@ -599,7 +602,7 @@ paste_result Explorer_Paste(explorer_state *state) {
 }
 
 void Explorer_Cancel(explorer_state *state) {
-  if (state->mode != EXPLORER_MODE_NORMAL) {
+  if (state->mode != WB_EXPLORER_MODE_NORMAL) {
     Input_PopFocus();
   }
 
@@ -607,7 +610,7 @@ void Explorer_Cancel(explorer_state *state) {
   state->dialog_text.lines = NULL;
   state->dialog_text.count = 0;
 
-  state->mode = EXPLORER_MODE_NORMAL;
+  state->mode = WB_EXPLORER_MODE_NORMAL;
 }
 
 void Explorer_FocusFilter(explorer_state *state) {
@@ -676,56 +679,56 @@ static void Explorer_HandleNavigationInput(explorer_state *state,
 
   /* Vim-style navigation - disabled when filter is active (j/k are printable)
    */
-  if (!filter_active && Input_KeyRepeat(KEY_J)) {
+  if (!filter_active && Input_KeyRepeat(WB_KEY_J)) {
     Explorer_MoveVisibleSelection(state, 1);
   }
 
-  if (!filter_active && Input_KeyRepeat(KEY_K)) {
+  if (!filter_active && Input_KeyRepeat(WB_KEY_K)) {
     Explorer_MoveVisibleSelection(state, -1);
   }
 
   /* Arrow key navigation - always works */
-  if (Input_KeyRepeat(KEY_DOWN) && !(input->modifiers & MOD_CTRL)) {
+  if (Input_KeyRepeat(WB_KEY_DOWN) && !(input->modifiers & MOD_CTRL)) {
     Explorer_MoveVisibleSelection(state, 1);
   }
 
-  if (Input_KeyRepeat(KEY_UP) && !(input->modifiers & MOD_CTRL)) {
+  if (Input_KeyRepeat(WB_KEY_UP) && !(input->modifiers & MOD_CTRL)) {
     Explorer_MoveVisibleSelection(state, -1);
   }
 
   /* Page navigation */
-  if (Input_KeyRepeat(KEY_PAGE_DOWN)) {
+  if (Input_KeyRepeat(WB_KEY_PAGE_DOWN)) {
     i32 visible = (i32)(state->scroll.view_size.y / state->item_height);
     Explorer_MoveVisibleSelection(state, visible);
   }
 
-  if (Input_KeyRepeat(KEY_PAGE_UP)) {
+  if (Input_KeyRepeat(WB_KEY_PAGE_UP)) {
     i32 visible = (i32)(state->scroll.view_size.y / state->item_height);
     Explorer_MoveVisibleSelection(state, -visible);
   }
 
   /* Home/End */
-  if (Input_KeyPressed(KEY_HOME)) {
+  if (Input_KeyPressed(WB_KEY_HOME)) {
     Explorer_SetSelection(state, Explorer_FindFirstVisible(state));
   }
 
-  if (Input_KeyPressed(KEY_END)) {
+  if (Input_KeyPressed(WB_KEY_END)) {
     Explorer_SetSelection(state, Explorer_FindLastVisible(state));
   }
 
   /* Go home */
-  if (Input_KeyPressed(KEY_H) && (input->modifiers & MOD_CTRL)) {
+  if (Input_KeyPressed(WB_KEY_H) && (input->modifiers & MOD_CTRL)) {
     Explorer_NavigateTo(state, FS_GetHomePath(), false);
   }
 
   /* History Navigation */
-  if ((Input_KeyPressed(KEY_LEFT) && (input->modifiers & MOD_ALT)) ||
-      Input_KeyPressed(KEY_BROWSER_BACK) || input->mouse_pressed[MOUSE_X1]) {
+  if ((Input_KeyPressed(WB_KEY_LEFT) && (input->modifiers & MOD_ALT)) ||
+      Input_KeyPressed(WB_KEY_BROWSER_BACK) || input->mouse_pressed[WB_MOUSE_X1]) {
     Explorer_GoBack(state);
   }
 
-  if ((Input_KeyPressed(KEY_RIGHT) && (input->modifiers & MOD_ALT)) ||
-      Input_KeyPressed(KEY_BROWSER_FORWARD) || input->mouse_pressed[MOUSE_X2]) {
+  if ((Input_KeyPressed(WB_KEY_RIGHT) && (input->modifiers & MOD_ALT)) ||
+      Input_KeyPressed(WB_KEY_BROWSER_FORWARD) || input->mouse_pressed[WB_MOUSE_X2]) {
     Explorer_GoForward(state);
   }
 }
@@ -735,31 +738,31 @@ static void Explorer_HandleOperationInput(explorer_state *state,
   ui_input *input = &ui->input;
 
   /* Enter directory or open file */
-  if (Input_KeyPressed(KEY_RETURN)) {
+  if (Input_KeyPressed(WB_KEY_RETURN)) {
     Explorer_OpenSelected(state);
   }
 
   /* Select all */
-  if (Input_KeyPressed(KEY_A) && (input->modifiers & MOD_CTRL)) {
+  if (Input_KeyPressed(WB_KEY_A) && (input->modifiers & MOD_CTRL)) {
     FS_SelectAll(&state->fs);
   }
 
   /* Toggle hidden files */
-  if (Input_KeyPressed(KEY_PERIOD) && (input->modifiers & MOD_CTRL)) {
+  if (Input_KeyPressed(WB_KEY_PERIOD) && (input->modifiers & MOD_CTRL)) {
     Explorer_ToggleHidden(state);
   }
 
   /* File operations */
-  if (Input_KeyPressed(KEY_R) && (input->modifiers & MOD_CTRL)) {
+  if (Input_KeyPressed(WB_KEY_R) && (input->modifiers & MOD_CTRL)) {
     Explorer_Refresh(state);
   }
 
-  if (Input_KeyPressed(KEY_F2) ||
-      (Input_KeyPressed(KEY_R) && !(input->modifiers & MOD_CTRL))) {
+  if (Input_KeyPressed(WB_KEY_F2) ||
+      (Input_KeyPressed(WB_KEY_R) && !(input->modifiers & MOD_CTRL))) {
     Explorer_StartRename(state);
   }
 
-  if (Input_KeyPressed(KEY_N) && (input->modifiers & MOD_CTRL)) {
+  if (Input_KeyPressed(WB_KEY_N) && (input->modifiers & MOD_CTRL)) {
     if (input->modifiers & MOD_SHIFT) {
       Explorer_StartCreateDir(state);
     } else {
@@ -767,7 +770,7 @@ static void Explorer_HandleOperationInput(explorer_state *state,
     }
   }
 
-  if (Input_KeyPressed(KEY_DELETE)) {
+  if (Input_KeyPressed(WB_KEY_DELETE)) {
     Explorer_ConfirmDelete(state, ui);
   }
 }
@@ -777,15 +780,15 @@ static void Explorer_HandleClipboardInput(explorer_state *state,
   ui_input *input = &ui->input;
 
   if (input->modifiers & MOD_CTRL) {
-    if (Input_KeyPressed(KEY_C)) {
+    if (Input_KeyPressed(WB_KEY_C)) {
       Explorer_Copy(state);
     }
 
-    if (Input_KeyPressed(KEY_X)) {
+    if (Input_KeyPressed(WB_KEY_X)) {
       Explorer_Cut(state);
     }
 
-    if (Input_KeyPressed(KEY_V)) {
+    if (Input_KeyPressed(WB_KEY_V)) {
       Explorer_Paste(state);
     }
   }
@@ -801,7 +804,7 @@ static void HandleNormalInput(explorer_state *state, ui_context *ui) {
 
 static void Explorer_OnConfirm(explorer_state *state) {
   switch (state->mode) {
-  case EXPLORER_MODE_RENAME: {
+  case WB_EXPLORER_MODE_RENAME: {
     fs_entry *entry = FS_GetSelectedEntry(&state->fs);
     if (entry && state->input_buffer[0] != '\0') {
       char new_path[FS_MAX_PATH];
@@ -810,10 +813,10 @@ static void Explorer_OnConfirm(explorer_state *state) {
         Explorer_Refresh(state);
       }
     }
-    state->mode = EXPLORER_MODE_NORMAL;
+    state->mode = WB_EXPLORER_MODE_NORMAL;
   } break;
 
-  case EXPLORER_MODE_CREATE_FILE: {
+  case WB_EXPLORER_MODE_CREATE_FILE: {
     if (state->input_buffer[0] != '\0') {
       char new_path[FS_MAX_PATH];
       Explorer_GetInputPath(state, new_path, sizeof(new_path));
@@ -821,10 +824,10 @@ static void Explorer_OnConfirm(explorer_state *state) {
         Explorer_Refresh(state);
       }
     }
-    state->mode = EXPLORER_MODE_NORMAL;
+    state->mode = WB_EXPLORER_MODE_NORMAL;
   } break;
 
-  case EXPLORER_MODE_CREATE_DIR: {
+  case WB_EXPLORER_MODE_CREATE_DIR: {
     if (state->input_buffer[0] != '\0') {
       char new_path[FS_MAX_PATH];
       Explorer_GetInputPath(state, new_path, sizeof(new_path));
@@ -832,10 +835,10 @@ static void Explorer_OnConfirm(explorer_state *state) {
         Explorer_Refresh(state);
       }
     }
-    state->mode = EXPLORER_MODE_NORMAL;
+    state->mode = WB_EXPLORER_MODE_NORMAL;
   } break;
 
-  case EXPLORER_MODE_CONFIRM_DELETE: {
+  case WB_EXPLORER_MODE_CONFIRM_DELETE: {
     /* Delete all selected items (skip "..") */
     for (i32 idx = FS_GetFirstSelected(&state->fs); idx >= 0;
          idx = FS_GetNextSelected(&state->fs, idx)) {
@@ -850,14 +853,14 @@ static void Explorer_OnConfirm(explorer_state *state) {
     state->dialog_text.lines = NULL;
     state->dialog_text.count = 0;
 
-    state->mode = EXPLORER_MODE_NORMAL;
+    state->mode = WB_EXPLORER_MODE_NORMAL;
   } break;
 
   default:
     break;
   }
 
-  if (state->mode == EXPLORER_MODE_NORMAL) {
+  if (state->mode == WB_EXPLORER_MODE_NORMAL) {
     Input_PopFocus();
     UI_EndModal();
   }
@@ -866,13 +869,13 @@ static void Explorer_OnConfirm(explorer_state *state) {
 static void HandleDialogInput(explorer_state *state, ui_context *ui) {
   ui_input *input = &ui->input;
 
-  if (input->key_pressed[KEY_ESCAPE]) {
+  if (input->key_pressed[WB_KEY_ESCAPE]) {
     Explorer_Cancel(state);
     UI_EndModal();
     return;
   }
 
-  if (input->key_pressed[KEY_RETURN]) {
+  if (input->key_pressed[WB_KEY_RETURN]) {
     Explorer_OnConfirm(state);
   }
 }
@@ -893,7 +896,7 @@ void Explorer_Update(explorer_state *state, ui_context *ui,
    * state where we're waiting to see if the user drags or just clicks.
    * Blocking clicks in PENDING state would break trackpad double-taps. */
   if (DragDrop_IsDragging(drag)) {
-    if (input->key_pressed[KEY_ESCAPE]) {
+    if (input->key_pressed[WB_KEY_ESCAPE]) {
       DragDrop_Cancel(drag);
     }
 
@@ -944,7 +947,7 @@ void Explorer_Update(explorer_state *state, ui_context *ui,
           context_menu_open &&
           ContextMenu_IsMouseOver(state->context_menu, input->mouse_pos);
 
-      if (input->mouse_pressed[MOUSE_LEFT] && !mouse_over_menu) {
+      if (input->mouse_pressed[WB_MOUSE_LEFT] && !mouse_over_menu) {
         i32 click_y = input->mouse_pos.y - state->list_bounds.y +
                       (i32)state->scroll.offset.y;
         i32 clicked_visible_index = click_y / state->item_height;
@@ -1013,7 +1016,7 @@ void Explorer_Update(explorer_state *state, ui_context *ui,
       }
 
       /* Handle right-click for context menu */
-      if (input->mouse_pressed[MOUSE_RIGHT] && state->context_menu) {
+      if (input->mouse_pressed[WB_MOUSE_RIGHT] && state->context_menu) {
         i32 click_y = input->mouse_pos.y - state->list_bounds.y +
                       (i32)state->scroll.offset.y;
         i32 clicked_visible_index = click_y / state->item_height;
@@ -1032,24 +1035,28 @@ void Explorer_Update(explorer_state *state, ui_context *ui,
           fs_entry *entry = FS_GetEntry(&state->fs, actual_index);
           if (entry) {
             context_type type =
-                entry->is_directory ? CONTEXT_DIRECTORY : CONTEXT_FILE;
+                entry->is_directory ? WB_CONTEXT_DIRECTORY : WB_CONTEXT_FILE;
             ContextMenu_Show(state->context_menu, input->mouse_pos, type,
                              entry->path, state, ui);
           }
         } else {
           /* Right-click on empty space */
-          ContextMenu_Show(state->context_menu, input->mouse_pos, CONTEXT_EMPTY,
+          ContextMenu_Show(state->context_menu, input->mouse_pos, WB_CONTEXT_EMPTY,
                            state->fs.current_path, state, ui);
         }
       }
     }
   }
 
-  if (state->mode == EXPLORER_MODE_NORMAL) {
+  if (state->mode == WB_EXPLORER_MODE_NORMAL) {
     /* Update quick filter first - it may consume input */
+    /* Skip quick filter when breadcrumb is being edited */
     b32 filter_was_active = state->filter_was_active;
-    QuickFilter_Update(&state->filter, ui);
-    b32 filter_is_active = QuickFilter_IsActive(&state->filter);
+    b32 filter_is_active = state->filter_was_active;
+    if (!state->breadcrumb.is_editing) {
+      QuickFilter_Update(&state->filter, ui);
+      filter_is_active = QuickFilter_IsActive(&state->filter);
+    }
 
     state->filter_was_active = filter_is_active;
 
@@ -1058,8 +1065,9 @@ void Explorer_Update(explorer_state *state, ui_context *ui,
       strncpy(state->search_start_path, state->fs.current_path,
               FS_MAX_PATH - 1);
       state->search_start_path[FS_MAX_PATH - 1] = '\0';
-    } else if (filter_is_active) {
+    } else if (filter_is_active && !state->breadcrumb.is_editing) {
       /* Filter is active - handle folder traversal */
+      /* Skip when breadcrumb is editing to avoid conflicts */
       const char *query = QuickFilter_GetQuery(&state->filter);
       if (query) {
         /* Check for special root/home navigation triggers */
@@ -1172,7 +1180,10 @@ void Explorer_Update(explorer_state *state, ui_context *ui,
       }
     }
 
-    HandleNormalInput(state, ui);
+    /* Skip normal explorer input when breadcrumb is being edited */
+    if (!state->breadcrumb.is_editing) {
+      HandleNormalInput(state, ui);
+    }
   } else {
     UI_BeginModal("ExplorerDialog");
     HandleDialogInput(state, ui);
@@ -1186,32 +1197,32 @@ static void RenderDialog(explorer_state *state, ui_context *ui, rect bounds) {
   dialog_config config = {0};
 
   switch (state->mode) {
-  case EXPLORER_MODE_RENAME:
-    config.type = DIALOG_TYPE_INPUT;
+  case WB_EXPLORER_MODE_RENAME:
+    config.type = WB_DIALOG_TYPE_INPUT;
     config.title = "Rename";
     config.input_buffer = state->input_buffer;
     config.input_buffer_size = sizeof(state->input_buffer);
     config.input_state = &state->input_state;
     config.placeholder = "Enter new name...";
     break;
-  case EXPLORER_MODE_CREATE_FILE:
-    config.type = DIALOG_TYPE_INPUT;
+  case WB_EXPLORER_MODE_CREATE_FILE:
+    config.type = WB_DIALOG_TYPE_INPUT;
     config.title = "New File";
     config.input_buffer = state->input_buffer;
     config.input_buffer_size = sizeof(state->input_buffer);
     config.input_state = &state->input_state;
     config.placeholder = "Enter filename...";
     break;
-  case EXPLORER_MODE_CREATE_DIR:
-    config.type = DIALOG_TYPE_INPUT;
+  case WB_EXPLORER_MODE_CREATE_DIR:
+    config.type = WB_DIALOG_TYPE_INPUT;
     config.title = "New Folder";
     config.input_buffer = state->input_buffer;
     config.input_buffer_size = sizeof(state->input_buffer);
     config.input_state = &state->input_state;
     config.placeholder = "Enter folder name...";
     break;
-  case EXPLORER_MODE_CONFIRM_DELETE:
-    config.type = DIALOG_TYPE_CONFIRM;
+  case WB_EXPLORER_MODE_CONFIRM_DELETE:
+    config.type = WB_DIALOG_TYPE_CONFIRM;
     config.title = "Delete?";
     config.is_danger = true;
     config.message = state->dialog_text;
@@ -1224,9 +1235,9 @@ static void RenderDialog(explorer_state *state, ui_context *ui, rect bounds) {
 
   dialog_result result = Dialog_Render(ui, bounds, &config);
 
-  if (result == DIALOG_RESULT_CONFIRM) {
+  if (result == WB_DIALOG_RESULT_CONFIRM) {
     Explorer_OnConfirm(state);
-  } else if (result == DIALOG_RESULT_CANCEL) {
+  } else if (result == WB_DIALOG_RESULT_CANCEL) {
     Explorer_Cancel(state);
     UI_EndModal();
   }
@@ -1259,7 +1270,7 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
   /* Breadcrumb at top */
   rect breadcrumb = {bounds.x, bounds.y, bounds.w, EXPLORER_BREADCRUMB_HEIGHT};
   breadcrumb_result bc_result =
-      Breadcrumb_Render(ui, breadcrumb, state->fs.current_path);
+      Breadcrumb_Render(ui, breadcrumb, state->fs.current_path, &state->breadcrumb);
 
   /* Handle breadcrumb navigation */
   if (bc_result.clicked_segment >= 0) {
@@ -1270,6 +1281,28 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
       Explorer_NavigateTo(state, target_path,
                           QuickFilter_IsActive(&state->filter));
     }
+  }
+
+  /* Handle breadcrumb editing results - navigate on text change (once per
+   * character) or when Enter is pressed */
+  if (bc_result.text_changed || bc_result.editing_finished) {
+    /* Resolve the path (handle ~ expansion, etc.) */
+    char resolved_path[FS_MAX_PATH];
+    if (FS_ResolvePath(state->breadcrumb.edit_buffer, resolved_path,
+                       sizeof(resolved_path))) {
+      /* Try to navigate to the path. If it fails, find the deepest valid
+       * parent directory using the FS helper. */
+      if (!Explorer_NavigateTo(state, resolved_path, false)) {
+        /* Path doesn't exist - find the deepest valid parent directory */
+        char deepest_valid[FS_MAX_PATH];
+        if (FS_FindDeepestValidDirectory(resolved_path, deepest_valid,
+                                          sizeof(deepest_valid))) {
+          Explorer_NavigateTo(state, deepest_valid, false);
+        }
+      }
+    }
+  } else if (bc_result.editing_cancelled) {
+    /* User pressed Escape - just exit edit mode, no navigation */
   }
 
   /* File list area */
@@ -1317,8 +1350,8 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
   /* Check focus state to disable hover when modals are active */
   input_target focus = Input_GetFocus();
   b32 modal_active =
-      (focus == INPUT_TARGET_COMMAND_PALETTE || focus == INPUT_TARGET_DIALOG ||
-       focus == INPUT_TARGET_CONTEXT_MENU);
+      (focus == WB_INPUT_TARGET_COMMAND_PALETTE || focus == WB_INPUT_TARGET_DIALOG ||
+       focus == WB_INPUT_TARGET_CONTEXT_MENU);
 
   /* Draw visible items - iterate only through items in the viewport using
    * cached indices */
@@ -1350,7 +1383,7 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
       DragDrop_CheckTarget(drag, entry, item_bounds, panel_idx);
 
       /* Render highlight if this is the current target */
-      if (drag->target_type != DROP_TARGET_NONE &&
+      if (drag->target_type != WB_DROP_TARGET_NONE &&
           drag->target_panel_idx == panel_idx &&
           drag->target_bounds.x == item_bounds.x &&
           drag->target_bounds.y == item_bounds.y) {
@@ -1370,7 +1403,7 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
 
   /* Check panel itself as drop target (empty area) */
   DragDrop_CheckPanelTarget(drag, state->fs.current_path, list_area, panel_idx);
-  if (drag->target_type == DROP_TARGET_PANEL &&
+  if (drag->target_type == WB_DROP_TARGET_PANEL &&
       drag->target_panel_idx == panel_idx) {
     DragDrop_RenderTargetHighlight(drag, ui, list_area);
   }
@@ -1385,7 +1418,7 @@ void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
   QuickFilter_Render(&state->filter, ui, list_area);
 
   /* Draw dialog overlay if in a mode */
-  if (state->mode != EXPLORER_MODE_NORMAL) {
+  if (state->mode != WB_EXPLORER_MODE_NORMAL) {
     RenderDialog(state, ui, bounds);
   }
 }

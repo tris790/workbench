@@ -18,7 +18,7 @@ static ui_id g_splitter_id = 0;
 
 void Layout_Init(layout_state *layout, memory_arena *arena) {
   layout->arena = arena;
-  layout->mode = LAYOUT_MODE_SINGLE;
+  layout->mode = WB_LAYOUT_MODE_SINGLE;
   layout->active_panel_idx = 0;
   layout->split_ratio = 0.5f;
   layout->target_split_ratio = 0.5f;
@@ -79,13 +79,13 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
   }
 
   /* Handle splitter interaction in dual mode */
-  if (layout->mode == LAYOUT_MODE_DUAL) {
+  if (layout->mode == WB_LAYOUT_MODE_DUAL) {
     /* Focus Switching */
-    if (ui->input.key_pressed[KEY_LEFT] && (ui->input.modifiers & MOD_CTRL) &&
+    if (ui->input.key_pressed[WB_KEY_LEFT] && (ui->input.modifiers & MOD_CTRL) &&
         (ui->input.modifiers & MOD_SHIFT)) {
       Layout_SetActivePanel(layout, 0);
     }
-    if (ui->input.key_pressed[KEY_RIGHT] && (ui->input.modifiers & MOD_CTRL) &&
+    if (ui->input.key_pressed[WB_KEY_RIGHT] && (ui->input.modifiers & MOD_CTRL) &&
         (ui->input.modifiers & MOD_SHIFT)) {
       Layout_SetActivePanel(layout, 1);
     }
@@ -107,7 +107,7 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
 
     /* Start drag */
     if (ui->active == UI_ID_NONE && hover &&
-        ui->input.mouse_pressed[MOUSE_LEFT]) {
+        ui->input.mouse_pressed[WB_MOUSE_LEFT]) {
       ui->active = g_splitter_id;
       layout->dragging = true;
       layout->drag_start_x = (f32)ui->input.mouse_pos.x;
@@ -116,7 +116,7 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
 
     /* Continue drag */
     if (ui->active == g_splitter_id) {
-      if (ui->input.mouse_down[MOUSE_LEFT]) {
+      if (ui->input.mouse_down[WB_MOUSE_LEFT]) {
         f32 dx = (f32)ui->input.mouse_pos.x - layout->drag_start_x;
         f32 d_ratio = dx / available_width;
         layout->target_split_ratio = layout->drag_start_ratio + d_ratio;
@@ -135,8 +135,8 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
     }
 
     /* Handle panel activation (click to focus, but not on splitter) */
-    if (!layout->dragging && (ui->input.mouse_pressed[MOUSE_LEFT] ||
-                              ui->input.mouse_pressed[MOUSE_RIGHT])) {
+    if (!layout->dragging && (ui->input.mouse_pressed[WB_MOUSE_LEFT] ||
+                              ui->input.mouse_pressed[WB_MOUSE_RIGHT])) {
       rect left_bounds = {bounds.x, bounds.y, split_x - bounds.x, bounds.h};
       rect right_bounds = {split_x + SPLITTER_WIDTH, bounds.y,
                            bounds.w - (split_x - bounds.x) - SPLITTER_WIDTH,
@@ -148,25 +148,25 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
         if (!TerminalPanel_IsVisible(&layout->panels[0].terminal) ||
             !UI_PointInRect(ui->input.mouse_pos,
                             layout->panels[0].terminal.last_bounds)) {
-          Input_SetFocus(INPUT_TARGET_EXPLORER);
+          Input_SetFocus(WB_INPUT_TARGET_EXPLORER);
         }
       } else if (UI_PointInRect(ui->input.mouse_pos, right_bounds)) {
         Layout_SetActivePanel(layout, 1);
         if (!TerminalPanel_IsVisible(&layout->panels[1].terminal) ||
             !UI_PointInRect(ui->input.mouse_pos,
                             layout->panels[1].terminal.last_bounds)) {
-          Input_SetFocus(INPUT_TARGET_EXPLORER);
+          Input_SetFocus(WB_INPUT_TARGET_EXPLORER);
         }
       }
     }
   } else {
     /* Single panel mode: handle click-to-focus for explorer */
-    if (ui->input.mouse_pressed[MOUSE_LEFT] ||
-        ui->input.mouse_pressed[MOUSE_RIGHT]) {
+    if (ui->input.mouse_pressed[WB_MOUSE_LEFT] ||
+        ui->input.mouse_pressed[WB_MOUSE_RIGHT]) {
       if (!TerminalPanel_IsVisible(&layout->panels[0].terminal) ||
           !UI_PointInRect(ui->input.mouse_pos,
                           layout->panels[0].terminal.last_bounds)) {
-        Input_SetFocus(INPUT_TARGET_EXPLORER);
+        Input_SetFocus(WB_INPUT_TARGET_EXPLORER);
       }
     }
   }
@@ -184,21 +184,21 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
 
   /* Update explorer only if it has focus (keys not consumed by terminal or
    * modal) */
-  /* Note: INPUT_TARGET_DIALOG means explorer dialogs (rename, delete), not
+  /* Note: WB_INPUT_TARGET_DIALOG means explorer dialogs (rename, delete), not
    * global modals */
   input_target focus = Input_GetFocus();
   b32 config_modal_open = layout->show_config_diagnostics;
   if (!config_modal_open &&
-      (focus == INPUT_TARGET_EXPLORER || focus == INPUT_TARGET_DIALOG ||
-       focus == INPUT_TARGET_CONTEXT_MENU)) {
+      (focus == WB_INPUT_TARGET_EXPLORER || focus == WB_INPUT_TARGET_DIALOG ||
+       focus == WB_INPUT_TARGET_CONTEXT_MENU)) {
     Explorer_Update(&layout->panels[layout->active_panel_idx].explorer, ui,
                     &layout->drag_drop, layout->active_panel_idx);
   }
 
   /* Handle global config diagnostic modal */
   if (layout->show_config_diagnostics) {
-    if (ui->input.key_pressed[KEY_ESCAPE] ||
-        ui->input.key_pressed[KEY_RETURN]) {
+    if (ui->input.key_pressed[WB_KEY_ESCAPE] ||
+        ui->input.key_pressed[WB_KEY_RETURN]) {
       layout->show_config_diagnostics = false;
       UI_EndModal();
       Input_PopFocus();
@@ -207,12 +207,12 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
 }
 
 static void DrawSplitter(ui_context *ui, rect bounds, bool hot, bool active) {
-  color c = UI_GetStyleColor(UI_STYLE_BORDER_COLOR);
+  color c = UI_GetStyleColor(WB_UI_STYLE_BORDER_COLOR);
 
   if (active) {
-    c = UI_GetStyleColor(UI_STYLE_ACTIVE_COLOR);
+    c = UI_GetStyleColor(WB_UI_STYLE_ACTIVE_COLOR);
   } else if (hot) {
-    c = UI_GetStyleColor(UI_STYLE_HOVER_COLOR);
+    c = UI_GetStyleColor(WB_UI_STYLE_HOVER_COLOR);
   }
 
   Render_DrawRect(ui->renderer, bounds, c);
@@ -245,7 +245,7 @@ static void RenderPanelWithTerminal(layout_state *layout, ui_context *ui,
 }
 
 void Layout_Render(layout_state *layout, ui_context *ui, rect bounds) {
-  if (layout->mode == LAYOUT_MODE_SINGLE) {
+  if (layout->mode == WB_LAYOUT_MODE_SINGLE) {
     RenderPanelWithTerminal(layout, ui, bounds, 0);
   } else {
     f32 available_width = bounds.w;
@@ -272,7 +272,7 @@ void Layout_Render(layout_state *layout, ui_context *ui, rect bounds) {
 }
 
 void Layout_SetMode(layout_state *layout, layout_mode mode) {
-  if (mode == LAYOUT_MODE_DUAL) {
+  if (mode == WB_LAYOUT_MODE_DUAL) {
     layout->target_split_ratio = 0.5f;
 
     /* Clone state from active panel to inactive panel */
@@ -301,16 +301,16 @@ void Layout_SetMode(layout_state *layout, layout_mode mode) {
 
   layout->mode = mode;
 
-  if (mode == LAYOUT_MODE_SINGLE && layout->active_panel_idx == 1) {
+  if (mode == WB_LAYOUT_MODE_SINGLE && layout->active_panel_idx == 1) {
     layout->active_panel_idx = 0;
   }
 }
 
 void Layout_ToggleMode(layout_state *layout) {
-  if (layout->mode == LAYOUT_MODE_SINGLE) {
-    Layout_SetMode(layout, LAYOUT_MODE_DUAL);
+  if (layout->mode == WB_LAYOUT_MODE_SINGLE) {
+    Layout_SetMode(layout, WB_LAYOUT_MODE_DUAL);
   } else {
-    Layout_SetMode(layout, LAYOUT_MODE_SINGLE);
+    Layout_SetMode(layout, WB_LAYOUT_MODE_SINGLE);
   }
 }
 

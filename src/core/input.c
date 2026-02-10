@@ -14,7 +14,7 @@ static input_state g_input = {0};
 
 void Input_Init(void) {
   memset(&g_input, 0, sizeof(g_input));
-  g_input.focus = INPUT_TARGET_EXPLORER; /* Default focus */
+  g_input.focus = WB_INPUT_TARGET_EXPLORER; /* Default focus */
   g_input.focus_stack_depth = 0;
 }
 
@@ -23,7 +23,7 @@ input_state *Input_GetState(void) { return &g_input; }
 /* ===== Focus Management ===== */
 
 void Input_SetFocus(input_target target) {
-  if (target < INPUT_TARGET_COUNT) {
+  if (target < WB_INPUT_TARGET_COUNT) {
     g_input.focus = target;
   }
 }
@@ -46,7 +46,7 @@ void Input_PopFocus(void) {
     g_input.focus = g_input.focus_stack[g_input.focus_stack_depth];
   } else {
     /* No saved focus, default to explorer */
-    g_input.focus = INPUT_TARGET_EXPLORER;
+    g_input.focus = WB_INPUT_TARGET_EXPLORER;
   }
 }
 
@@ -100,19 +100,19 @@ void Input_ConsumeScroll(void) { g_input.scroll_consumed = true; }
 b32 Input_KeyPressed(key_code key) {
   if (g_input.key_consumed)
     return false;
-  if (key >= KEY_COUNT)
+  if (key >= WB_KEY_COUNT)
     return false;
   return g_input.raw.key_pressed[key];
 }
 
 b32 Input_KeyPressedRaw(key_code key) {
-  if (key >= KEY_COUNT)
+  if (key >= WB_KEY_COUNT)
     return false;
   return g_input.raw.key_pressed[key];
 }
 
 b32 Input_KeyDown(key_code key) {
-  if (key >= KEY_COUNT)
+  if (key >= WB_KEY_COUNT)
     return false;
   return g_input.raw.key_down[key];
 }
@@ -140,13 +140,13 @@ u32 Input_GetModifiers(void) { return g_input.raw.modifiers; }
 b32 Input_MousePressed(mouse_button button) {
   if (g_input.mouse_consumed)
     return false;
-  if (button >= MOUSE_BUTTON_COUNT)
+  if (button >= WB_MOUSE_BUTTON_COUNT)
     return false;
   return g_input.raw.mouse_pressed[button];
 }
 
 b32 Input_MouseDown(mouse_button button) {
-  if (button >= MOUSE_BUTTON_COUNT)
+  if (button >= WB_MOUSE_BUTTON_COUNT)
     return false;
   return g_input.raw.mouse_down[button];
 }
@@ -154,7 +154,7 @@ b32 Input_MouseDown(mouse_button button) {
 b32 Input_MouseReleased(mouse_button button) {
   if (g_input.mouse_consumed)
     return false;
-  if (button >= MOUSE_BUTTON_COUNT)
+  if (button >= WB_MOUSE_BUTTON_COUNT)
     return false;
   return g_input.raw.mouse_released[button];
 }

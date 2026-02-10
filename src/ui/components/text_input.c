@@ -70,10 +70,10 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
       (i32)strlen(buffer); /* Assumes UTF-8 well-formedness for length */
 
   /* Handle cursor blink reset on input */
-  if (input->text_input || input->key_pressed[KEY_LEFT] ||
-      input->key_pressed[KEY_RIGHT] || input->key_pressed[KEY_BACKSPACE] ||
-      input->key_pressed[KEY_DELETE] || input->key_pressed[KEY_HOME] ||
-      input->key_pressed[KEY_END]) {
+  if (input->text_input || input->key_pressed[WB_KEY_LEFT] ||
+      input->key_pressed[WB_KEY_RIGHT] || input->key_pressed[WB_KEY_BACKSPACE] ||
+      input->key_pressed[WB_KEY_DELETE] || input->key_pressed[WB_KEY_HOME] ||
+      input->key_pressed[WB_KEY_END]) {
     state->cursor_blink = 0.0f;
   }
 
@@ -81,14 +81,14 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
   b32 shift = (input->modifiers & MOD_SHIFT) != 0;
 
   /* Ctrl+A - Select all */
-  if (ctrl && input->key_pressed[KEY_A]) {
+  if (ctrl && input->key_pressed[WB_KEY_A]) {
     state->selection_start = 0;
     state->selection_end = Text_UTF8Length(buffer); /* CHARS */
     state->cursor_pos = state->selection_end;
   }
 
   /* Ctrl+C - Copy */
-  if (ctrl && input->key_pressed[KEY_C]) {
+  if (ctrl && input->key_pressed[WB_KEY_C]) {
     if (state->selection_start >= 0) {
       i32 start, end;
       UI_GetSelectionRange(state, &start, &end);
@@ -106,7 +106,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
   }
 
   /* Ctrl+X - Cut */
-  if (ctrl && input->key_pressed[KEY_X]) {
+  if (ctrl && input->key_pressed[WB_KEY_X]) {
     if (state->selection_start >= 0) {
       i32 start, end;
       UI_GetSelectionRange(state, &start, &end);
@@ -131,7 +131,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
   }
 
   /* Ctrl+V - Paste */
-  if (ctrl && input->key_pressed[KEY_V]) {
+  if (ctrl && input->key_pressed[WB_KEY_V]) {
     char clipboard[UI_MAX_TEXT_INPUT_SIZE];
     if (Platform_GetClipboard(clipboard, sizeof(clipboard))) {
       /* Delete selection first if any */
@@ -158,7 +158,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
   }
 
   /* Ctrl+Z - Undo */
-  if (ctrl && input->key_pressed[KEY_Z]) {
+  if (ctrl && input->key_pressed[WB_KEY_Z]) {
     if (UI_TextInputPopUndo(state, buffer, buffer_size)) {
       changed = true;
       text_len = (i32)strlen(buffer);
@@ -166,7 +166,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
   }
 
   /* Arrow keys for cursor movement */
-  if (input->key_pressed[KEY_LEFT] || Input_KeyRepeat(KEY_LEFT)) {
+  if (input->key_pressed[WB_KEY_LEFT] || Input_KeyRepeat(WB_KEY_LEFT)) {
     if (shift && state->selection_start < 0) {
       state->selection_start = state->cursor_pos;
     }
@@ -187,7 +187,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
     }
   }
 
-  if (input->key_pressed[KEY_RIGHT] || Input_KeyRepeat(KEY_RIGHT)) {
+  if (input->key_pressed[WB_KEY_RIGHT] || Input_KeyRepeat(WB_KEY_RIGHT)) {
     if (shift && state->selection_start < 0) {
       state->selection_start = state->cursor_pos;
     }
@@ -209,7 +209,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
   }
 
   /* Home/End */
-  if (input->key_pressed[KEY_HOME] || Input_KeyRepeat(KEY_HOME)) {
+  if (input->key_pressed[WB_KEY_HOME] || Input_KeyRepeat(WB_KEY_HOME)) {
     if (shift && state->selection_start < 0) {
       state->selection_start = state->cursor_pos;
     }
@@ -221,7 +221,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
     }
   }
 
-  if (input->key_pressed[KEY_END] || Input_KeyRepeat(KEY_END)) {
+  if (input->key_pressed[WB_KEY_END] || Input_KeyRepeat(WB_KEY_END)) {
     if (shift && state->selection_start < 0) {
       state->selection_start = state->cursor_pos;
     }
@@ -234,7 +234,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
   }
 
   /* Backspace - check both local key_pressed and global key repeat */
-  if (input->key_pressed[KEY_BACKSPACE] || Input_KeyRepeat(KEY_BACKSPACE)) {
+  if (input->key_pressed[WB_KEY_BACKSPACE] || Input_KeyRepeat(WB_KEY_BACKSPACE)) {
     if (state->selection_start >= 0) {
       /* Delete selection */
       UI_DeleteSelection(state, buffer, &text_len);
@@ -262,7 +262,7 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
   }
 
   /* Delete - check both local key_pressed and global key repeat */
-  if (input->key_pressed[KEY_DELETE] || Input_KeyRepeat(KEY_DELETE)) {
+  if (input->key_pressed[WB_KEY_DELETE] || Input_KeyRepeat(WB_KEY_DELETE)) {
     if (state->selection_start >= 0) {
       /* Same as backspace with selection */
       UI_DeleteSelection(state, buffer, &text_len);
@@ -320,7 +320,7 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
 
   UI_RegisterFocusable(id);
 
-  i32 padding = UI_GetStyleInt(UI_STYLE_PADDING);
+  i32 padding = UI_GetStyleInt(WB_UI_STYLE_PADDING);
   i32 font_height = Font_GetLineHeight(g_ui_ctx->font);
   i32 height = font_height + padding * 2;
 
@@ -331,7 +331,7 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
   b32 hovered = UI_PointInRect(g_ui_ctx->input.mouse_pos, bounds);
   b32 changed = false;
 
-  if (hovered && g_ui_ctx->input.mouse_pressed[MOUSE_LEFT]) {
+  if (hovered && g_ui_ctx->input.mouse_pressed[WB_MOUSE_LEFT]) {
     g_ui_ctx->focused = id;
     state->has_focus = true;
 
@@ -390,13 +390,13 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
 
   /* Drawing */
   color bg = g_ui_ctx->theme->panel_alt;
-  color text_color = UI_GetStyleColor(UI_STYLE_TEXT_COLOR);
-  color border_color = UI_GetStyleColor(UI_STYLE_BORDER_COLOR);
-  f32 radius = UI_GetStyleFloat(UI_STYLE_BORDER_RADIUS);
+  color text_color = UI_GetStyleColor(WB_UI_STYLE_TEXT_COLOR);
+  color border_color = UI_GetStyleColor(WB_UI_STYLE_BORDER_COLOR);
+  f32 radius = UI_GetStyleFloat(WB_UI_STYLE_BORDER_RADIUS);
 
   /* Focus highlight */
   if (g_ui_ctx->focused == id) {
-    border_color = UI_GetStyleColor(UI_STYLE_ACCENT_COLOR);
+    border_color = UI_GetStyleColor(WB_UI_STYLE_ACCENT_COLOR);
   }
 
   /* Draw border first */
@@ -434,7 +434,7 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
       i32 end_x = text_pos.x + Font_MeasureWidth(g_ui_ctx->font, temp);
 
       rect sel_rect = {start_x, bounds.y + 2, end_x - start_x, bounds.h - 4};
-      color sel_color = UI_GetStyleColor(UI_STYLE_ACCENT_COLOR);
+      color sel_color = UI_GetStyleColor(WB_UI_STYLE_ACCENT_COLOR);
       sel_color.a = 128;
       Render_DrawRect(g_ui_ctx->renderer, sel_rect, sel_color);
     }
@@ -462,4 +462,138 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
   UI_AdvanceLayout(bounds.w, height);
 
   return changed;
+}
+
+/* ===== Shared Text Rendering Helpers ===== */
+
+/* Internal helper: measure text width incrementally.
+ * Measures from prev_pos to new_pos, reusing prev_width.
+ * This is O(1) per call, making total cursor positioning O(n) instead of O(n²). */
+static i32 MeasureTextIncremental(font *f, const char *text,
+                                  i32 prev_char_pos, i32 prev_width,
+                                  i32 target_char_pos) {
+  if (target_char_pos <= prev_char_pos)
+    return prev_width;
+
+  /* Get byte offsets */
+  i32 start_byte = Text_UTF8ByteOffset(text, prev_char_pos);
+  i32 end_byte = Text_UTF8ByteOffset(text, target_char_pos);
+
+  /* Create temp substring and measure */
+  char temp[256];
+  i32 len = end_byte - start_byte;
+  if (len >= (i32)sizeof(temp))
+    len = (i32)sizeof(temp) - 1;
+
+  if (len > 0) {
+    memcpy(temp, text + start_byte, len);
+    temp[len] = '\0';
+    return prev_width + Font_MeasureWidth(f, temp);
+  }
+  return prev_width;
+}
+
+i32 UI_MeasureTextWidthUpToPos(font *f, const char *text, i32 char_pos) {
+  if (!text || char_pos <= 0)
+    return 0;
+
+  i32 text_len = Text_UTF8Length(text);
+  if (char_pos > text_len)
+    char_pos = text_len;
+
+  i32 byte_offset = Text_UTF8ByteOffset(text, char_pos);
+
+  /* Use stack buffer for small strings to avoid large stack allocations */
+  if (byte_offset < 256) {
+    char temp[256];
+    memcpy(temp, text, byte_offset);
+    temp[byte_offset] = '\0';
+    return Font_MeasureWidth(f, temp);
+  }
+
+  /* For longer strings, use incremental measurement */
+  /* Process in chunks to avoid large temp buffers */
+  i32 width = 0;
+  i32 chunk_size = 64; /* chars per chunk */
+  i32 current_pos = 0;
+
+  while (current_pos < char_pos) {
+    i32 next_pos = current_pos + chunk_size;
+    if (next_pos > char_pos)
+      next_pos = char_pos;
+
+    width = MeasureTextIncremental(f, text, current_pos, width, next_pos);
+    current_pos = next_pos;
+  }
+
+  return width;
+}
+
+i32 UI_FindCursorPosFromClick(font *f, const char *text, i32 click_x_offset) {
+  if (!text || click_x_offset <= 0)
+    return 0;
+
+  i32 text_len = Text_UTF8Length(text);
+  if (text_len == 0)
+    return 0;
+
+  /* Binary search for the closest character position */
+  i32 low = 0;
+  i32 high = text_len;
+  i32 best_pos = 0;
+  i32 best_dist = click_x_offset;
+
+  /* Track width incrementally to avoid O(n²) behavior */
+  i32 mid_width = 0;
+
+  while (low <= high) {
+    i32 mid = (low + high) / 2;
+    mid_width = UI_MeasureTextWidthUpToPos(f, text, mid);
+
+    i32 dist = click_x_offset > mid_width ? click_x_offset - mid_width
+                                          : mid_width - click_x_offset;
+
+    if (dist < best_dist) {
+      best_dist = dist;
+      best_pos = mid;
+    }
+
+    if (mid_width < click_x_offset) {
+      low = mid + 1;
+    } else if (mid_width > click_x_offset) {
+      high = mid - 1;
+    } else {
+      /* Exact match */
+      return mid;
+    }
+  }
+
+  return best_pos;
+}
+
+void UI_DrawSelectionHighlight(render_context *ctx, font *f, const char *text,
+                               i32 sel_start, i32 sel_end, rect bounds,
+                               color sel_color) {
+  if (sel_start >= sel_end)
+    return;
+
+  i32 start_x =
+      bounds.x + UI_MeasureTextWidthUpToPos(f, text, sel_start);
+  i32 end_x = bounds.x + UI_MeasureTextWidthUpToPos(f, text, sel_end);
+
+  rect sel_rect = {start_x, bounds.y + 4, end_x - start_x, bounds.h - 8};
+  Render_DrawRect(ctx, sel_rect, sel_color);
+}
+
+void UI_DrawTextCursor(render_context *ctx, font *f, const char *text,
+                       i32 cursor_pos, rect bounds, color cursor_color,
+                       i32 cursor_width, i32 cursor_height) {
+  i32 cursor_x = bounds.x + UI_MeasureTextWidthUpToPos(f, text, cursor_pos);
+
+  i32 cw = cursor_width > 0 ? cursor_width : 2;
+  i32 ch = cursor_height > 0 ? cursor_height : bounds.h - 6;
+  i32 cy = bounds.y + (bounds.h - ch) / 2;
+
+  rect cursor_rect = {cursor_x, cy, cw, ch};
+  Render_DrawRect(ctx, cursor_rect, cursor_color);
 }

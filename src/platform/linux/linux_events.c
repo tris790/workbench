@@ -22,89 +22,89 @@ void PushEvent(platform_window *window, platform_event *event) {
 static key_code LinuxKeyToKeyCode(u32 key) {
   /* Linux evdev key codes */
   switch (key) {
-  case 1: return KEY_ESCAPE;
-  case 28: return KEY_RETURN;
-  case 15: return KEY_TAB;
-  case 14: return KEY_BACKSPACE;
-  case 111: return KEY_DELETE;
-  case 103: return KEY_UP;
-  case 108: return KEY_DOWN;
-  case 105: return KEY_LEFT;
-  case 106: return KEY_RIGHT;
-  case 102: return KEY_HOME;
-  case 107: return KEY_END;
-  case 104: return KEY_PAGE_UP;
-  case 109: return KEY_PAGE_DOWN;
-  case 57: return KEY_SPACE;
-  case 41: return KEY_GRAVE;
+  case 1: return WB_KEY_ESCAPE;
+  case 28: return WB_KEY_RETURN;
+  case 15: return WB_KEY_TAB;
+  case 14: return WB_KEY_BACKSPACE;
+  case 111: return WB_KEY_DELETE;
+  case 103: return WB_KEY_UP;
+  case 108: return WB_KEY_DOWN;
+  case 105: return WB_KEY_LEFT;
+  case 106: return WB_KEY_RIGHT;
+  case 102: return WB_KEY_HOME;
+  case 107: return WB_KEY_END;
+  case 104: return WB_KEY_PAGE_UP;
+  case 109: return WB_KEY_PAGE_DOWN;
+  case 57: return WB_KEY_SPACE;
+  case 41: return WB_KEY_GRAVE;
 
   /* Letters */
-  case 30: return KEY_A;
-  case 48: return KEY_B;
-  case 46: return KEY_C;
-  case 32: return KEY_D;
-  case 18: return KEY_E;
-  case 33: return KEY_F;
-  case 34: return KEY_G;
-  case 35: return KEY_H;
-  case 23: return KEY_I;
-  case 36: return KEY_J;
-  case 37: return KEY_K;
-  case 38: return KEY_L;
-  case 50: return KEY_M;
-  case 49: return KEY_N;
-  case 24: return KEY_O;
-  case 25: return KEY_P;
-  case 16: return KEY_Q;
-  case 19: return KEY_R;
-  case 31: return KEY_S;
-  case 20: return KEY_T;
-  case 22: return KEY_U;
-  case 47: return KEY_V;
-  case 17: return KEY_W;
-  case 45: return KEY_X;
-  case 21: return KEY_Y;
-  case 44: return KEY_Z;
+  case 30: return WB_KEY_A;
+  case 48: return WB_KEY_B;
+  case 46: return WB_KEY_C;
+  case 32: return WB_KEY_D;
+  case 18: return WB_KEY_E;
+  case 33: return WB_KEY_F;
+  case 34: return WB_KEY_G;
+  case 35: return WB_KEY_H;
+  case 23: return WB_KEY_I;
+  case 36: return WB_KEY_J;
+  case 37: return WB_KEY_K;
+  case 38: return WB_KEY_L;
+  case 50: return WB_KEY_M;
+  case 49: return WB_KEY_N;
+  case 24: return WB_KEY_O;
+  case 25: return WB_KEY_P;
+  case 16: return WB_KEY_Q;
+  case 19: return WB_KEY_R;
+  case 31: return WB_KEY_S;
+  case 20: return WB_KEY_T;
+  case 22: return WB_KEY_U;
+  case 47: return WB_KEY_V;
+  case 17: return WB_KEY_W;
+  case 45: return WB_KEY_X;
+  case 21: return WB_KEY_Y;
+  case 44: return WB_KEY_Z;
 
   /* Numbers */
-  case 11: return KEY_0;
-  case 2: return KEY_1;
-  case 3: return KEY_2;
-  case 4: return KEY_3;
-  case 5: return KEY_4;
-  case 6: return KEY_5;
-  case 7: return KEY_6;
-  case 8: return KEY_7;
-  case 9: return KEY_8;
-  case 10: return KEY_9;
+  case 11: return WB_KEY_0;
+  case 2: return WB_KEY_1;
+  case 3: return WB_KEY_2;
+  case 4: return WB_KEY_3;
+  case 5: return WB_KEY_4;
+  case 6: return WB_KEY_5;
+  case 7: return WB_KEY_6;
+  case 8: return WB_KEY_7;
+  case 9: return WB_KEY_8;
+  case 10: return WB_KEY_9;
 
   /* Function keys */
-  case 59: return KEY_F1;
-  case 60: return KEY_F2;
-  case 61: return KEY_F3;
-  case 62: return KEY_F4;
-  case 63: return KEY_F5;
-  case 64: return KEY_F6;
-  case 65: return KEY_F7;
-  case 66: return KEY_F8;
-  case 67: return KEY_F9;
-  case 68: return KEY_F10;
-  case 87: return KEY_F11;
-  case 88: return KEY_F12;
+  case 59: return WB_KEY_F1;
+  case 60: return WB_KEY_F2;
+  case 61: return WB_KEY_F3;
+  case 62: return WB_KEY_F4;
+  case 63: return WB_KEY_F5;
+  case 64: return WB_KEY_F6;
+  case 65: return WB_KEY_F7;
+  case 66: return WB_KEY_F8;
+  case 67: return WB_KEY_F9;
+  case 68: return WB_KEY_F10;
+  case 87: return WB_KEY_F11;
+  case 88: return WB_KEY_F12;
 
   /* Punctuation */
-  case 12: return KEY_MINUS;
-  case 13: return KEY_EQUALS;
-  case 26: return KEY_LEFTBRACKET;
-  case 27: return KEY_RIGHTBRACKET;
-  case 43: return KEY_BACKSLASH;
-  case 39: return KEY_SEMICOLON;
-  case 40: return KEY_APOSTROPHE;
-  case 51: return KEY_COMMA;
-  case 52: return KEY_PERIOD;
-  case 53: return KEY_SLASH;
+  case 12: return WB_KEY_MINUS;
+  case 13: return WB_KEY_EQUALS;
+  case 26: return WB_KEY_LEFTBRACKET;
+  case 27: return WB_KEY_RIGHTBRACKET;
+  case 43: return WB_KEY_BACKSLASH;
+  case 39: return WB_KEY_SEMICOLON;
+  case 40: return WB_KEY_APOSTROPHE;
+  case 51: return WB_KEY_COMMA;
+  case 52: return WB_KEY_PERIOD;
+  case 53: return WB_KEY_SLASH;
 
-  default: return KEY_UNKNOWN;
+  default: return WB_KEY_UNKNOWN;
   }
 }
 
@@ -114,33 +114,33 @@ static u32 KeyCodeToChar(key_code key, u32 modifiers) {
   }
   b32 shift = (modifiers & MOD_SHIFT) != 0;
 
-  if (key >= KEY_A && key <= KEY_Z) {
+  if (key >= WB_KEY_A && key <= WB_KEY_Z) {
     if (shift)
-      return 'A' + (key - KEY_A);
-    return 'a' + (key - KEY_A);
+      return 'A' + (key - WB_KEY_A);
+    return 'a' + (key - WB_KEY_A);
   }
 
-  if (key >= KEY_0 && key <= KEY_9) {
+  if (key >= WB_KEY_0 && key <= WB_KEY_9) {
     if (shift) {
       const char *syms = ")!@#$%^&*(";
-      return syms[key - KEY_0];
+      return syms[key - WB_KEY_0];
     }
-    return '0' + (key - KEY_0);
+    return '0' + (key - WB_KEY_0);
   }
 
   switch (key) {
-  case KEY_SPACE: return ' ';
-  case KEY_GRAVE: return shift ? '~' : '`';
-  case KEY_MINUS: return shift ? '_' : '-';
-  case KEY_EQUALS: return shift ? '+' : '=';
-  case KEY_LEFTBRACKET: return shift ? '{' : '[';
-  case KEY_RIGHTBRACKET: return shift ? '}' : ']';
-  case KEY_BACKSLASH: return shift ? '|' : '\\';
-  case KEY_SEMICOLON: return shift ? ':' : ';';
-  case KEY_APOSTROPHE: return shift ? '"' : '\'';
-  case KEY_COMMA: return shift ? '<' : ',';
-  case KEY_PERIOD: return shift ? '>' : '.';
-  case KEY_SLASH: return shift ? '?' : '/';
+  case WB_KEY_SPACE: return ' ';
+  case WB_KEY_GRAVE: return shift ? '~' : '`';
+  case WB_KEY_MINUS: return shift ? '_' : '-';
+  case WB_KEY_EQUALS: return shift ? '+' : '=';
+  case WB_KEY_LEFTBRACKET: return shift ? '{' : '[';
+  case WB_KEY_RIGHTBRACKET: return shift ? '}' : ']';
+  case WB_KEY_BACKSLASH: return shift ? '|' : '\\';
+  case WB_KEY_SEMICOLON: return shift ? ':' : ';';
+  case WB_KEY_APOSTROPHE: return shift ? '"' : '\'';
+  case WB_KEY_COMMA: return shift ? '<' : ',';
+  case WB_KEY_PERIOD: return shift ? '>' : '.';
+  case WB_KEY_SLASH: return shift ? '?' : '/';
   default: return 0;
   }
 }
@@ -160,7 +160,7 @@ static void KeyboardEnter(void *data, struct wl_keyboard *keyboard, u32 serial,
   platform_window *window = (platform_window *)data;
   
   platform_event event = {0};
-  event.type = EVENT_WINDOW_FOCUS;
+  event.type = WB_EVENT_WINDOW_FOCUS;
   PushEvent(window, &event);
 }
 
@@ -170,7 +170,7 @@ static void KeyboardLeave(void *data, struct wl_keyboard *keyboard, u32 serial,
   platform_window *window = (platform_window *)data;
   
   platform_event event = {0};
-  event.type = EVENT_WINDOW_UNFOCUS;
+  event.type = WB_EVENT_WINDOW_UNFOCUS;
   PushEvent(window, &event);
 }
 
@@ -182,7 +182,7 @@ static void KeyboardKey(void *data, struct wl_keyboard *keyboard, u32 serial,
 
   platform_event event = {0};
   event.type =
-      (state == WL_KEYBOARD_KEY_STATE_PRESSED) ? EVENT_KEY_DOWN : EVENT_KEY_UP;
+      (state == WL_KEYBOARD_KEY_STATE_PRESSED) ? WB_EVENT_KEY_DOWN : WB_EVENT_KEY_UP;
   event.data.keyboard.key = LinuxKeyToKeyCode(key);
   event.data.keyboard.modifiers = window->modifiers;
   if (state == WL_KEYBOARD_KEY_STATE_PRESSED) {
@@ -244,7 +244,7 @@ static void PointerMotion(void *data, struct wl_pointer *pointer, u32 time,
   window->mouse_y = wl_fixed_to_int(sy);
 
   platform_event event = {0};
-  event.type = EVENT_MOUSE_MOVE;
+  event.type = WB_EVENT_MOUSE_MOVE;
   event.data.mouse.x = window->mouse_x;
   event.data.mouse.y = window->mouse_y;
   event.data.mouse.modifiers = window->modifiers;
@@ -259,15 +259,15 @@ static void PointerButton(void *data, struct wl_pointer *pointer, u32 serial,
 
   platform_event event = {0};
   event.type = (state == WL_POINTER_BUTTON_STATE_PRESSED)
-                   ? EVENT_MOUSE_BUTTON_DOWN
-                   : EVENT_MOUSE_BUTTON_UP;
+                   ? WB_EVENT_MOUSE_BUTTON_DOWN
+                   : WB_EVENT_MOUSE_BUTTON_UP;
 
   /* Linux button codes: 272=left, 273=right, 274=middle, 275=side, 276=extra */
-  if (button == 272) event.data.mouse.button = MOUSE_LEFT;
-  else if (button == 273) event.data.mouse.button = MOUSE_RIGHT;
-  else if (button == 274) event.data.mouse.button = MOUSE_MIDDLE;
-  else if (button == 275) event.data.mouse.button = MOUSE_X1;
-  else if (button == 276) event.data.mouse.button = MOUSE_X2;
+  if (button == 272) event.data.mouse.button = WB_MOUSE_LEFT;
+  else if (button == 273) event.data.mouse.button = WB_MOUSE_RIGHT;
+  else if (button == 274) event.data.mouse.button = WB_MOUSE_MIDDLE;
+  else if (button == 275) event.data.mouse.button = WB_MOUSE_X1;
+  else if (button == 276) event.data.mouse.button = WB_MOUSE_X2;
 
   event.data.mouse.x = window->mouse_x;
   event.data.mouse.y = window->mouse_y;
@@ -281,7 +281,7 @@ static void PointerAxis(void *data, struct wl_pointer *pointer, u32 time,
   platform_window *window = (platform_window *)data;
 
   platform_event event = {0};
-  event.type = EVENT_MOUSE_SCROLL;
+  event.type = WB_EVENT_MOUSE_SCROLL;
   if (axis == WL_POINTER_AXIS_VERTICAL_SCROLL) {
     event.data.scroll.dy = -wl_fixed_to_double(value) / 10.0f;
   } else {

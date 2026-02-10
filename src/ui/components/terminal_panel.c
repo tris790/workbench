@@ -80,10 +80,10 @@ void TerminalPanel_Init(terminal_panel_state *state) {
   /* Initialize suggestion engine */
 #ifdef _WIN32
   state->shell_mode =
-      SHELL_EMULATED; /* Enable fish emulation on Windows by default */
+      WB_SHELL_EMULATED; /* Enable fish emulation on Windows by default */
 #else
   state->shell_mode =
-      SHELL_FISH; /* Default to fish shell on Linux per user request */
+      WB_SHELL_FISH; /* Default to fish shell on Linux per user request */
 #endif
   state->suggestions = Suggestion_Create(NULL); /* Default history path */
   state->selection_scroll_accumulator = 0.0f;
@@ -114,7 +114,7 @@ void TerminalPanel_Toggle(terminal_panel_state *state, const char *cwd) {
     /* Opening terminal */
     SmoothValue_SetTarget(&state->anim, 1.0f);
     state->has_focus = true;
-    Input_SetFocus(INPUT_TARGET_TERMINAL);
+    Input_SetFocus(WB_INPUT_TARGET_TERMINAL);
 
     /* Create terminal if needed, or respawn if CWD changed significantly */
     if (!state->terminal) {
@@ -122,7 +122,7 @@ void TerminalPanel_Toggle(terminal_panel_state *state, const char *cwd) {
           Terminal_Create(TERMINAL_DEFAULT_COLS, TERMINAL_DEFAULT_ROWS);
       if (state->terminal) {
         const char *shell = NULL;
-        if (state->shell_mode == SHELL_FISH) {
+        if (state->shell_mode == WB_SHELL_FISH) {
           shell = "fish";
         }
         Terminal_Spawn(state->terminal, shell, cwd);
@@ -135,7 +135,7 @@ void TerminalPanel_Toggle(terminal_panel_state *state, const char *cwd) {
     /* Closing terminal (keep session alive) */
     SmoothValue_SetTarget(&state->anim, 0.0f);
     state->has_focus = false;
-    Input_SetFocus(INPUT_TARGET_EXPLORER);
+    Input_SetFocus(WB_INPUT_TARGET_EXPLORER);
   }
 }
 
@@ -150,7 +150,7 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
 
   /* Sync has_focus with global input focus AND panel activity */
   state->has_focus =
-      Input_HasFocus(INPUT_TARGET_TERMINAL) && state->visible && is_active;
+      Input_HasFocus(WB_INPUT_TARGET_TERMINAL) && state->visible && is_active;
 
   /* Update cursor blink */
   if (state->visible && state->has_focus) {
@@ -181,7 +181,7 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
     v2i mouse_pos = Input_GetMousePos();
     b32 hover = UI_PointInRect(mouse_pos, resize_handle);
 
-    if (!state->dragging && hover && Input_MousePressed(MOUSE_LEFT) &&
+    if (!state->dragging && hover && Input_MousePressed(WB_MOUSE_LEFT) &&
         ui->active == UI_ID_NONE) {
       state->dragging = true;
       ui->active = state->resizer_id;
@@ -193,7 +193,7 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
   }
 
   if (state->dragging) {
-    if (Input_MouseDown(MOUSE_LEFT)) {
+    if (Input_MouseDown(WB_MOUSE_LEFT)) {
       v2i mouse_pos = Input_GetMousePos();
       f32 dy = state->drag_start_y - (f32)mouse_pos.y;
       f32 h = (state->drag_avail_height > 1.0f) ? state->drag_avail_height
@@ -221,8 +221,8 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
     v2i mouse_pos = Input_GetMousePos();
     b32 in_bounds = UI_PointInRect(mouse_pos, state->last_bounds);
 
-    if (Input_MousePressed(MOUSE_LEFT) && in_bounds) {
-      Input_SetFocus(INPUT_TARGET_TERMINAL);
+    if (Input_MousePressed(WB_MOUSE_LEFT) && in_bounds) {
+      Input_SetFocus(WB_INPUT_TARGET_TERMINAL);
       state->has_focus = true;
 
       /* Start selection */
@@ -265,7 +265,7 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
       Input_ConsumeMouse();
     }
 
-    if (Input_MouseDown(MOUSE_LEFT) && state->terminal &&
+    if (Input_MouseDown(WB_MOUSE_LEFT) && state->terminal &&
         state->terminal->is_selecting) {
       rect content = {
           .x = state->last_bounds.x + 4,
@@ -329,7 +329,7 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
       Terminal_MoveSelection(state->terminal, tx, ty);
     }
 
-    if (Input_MouseReleased(MOUSE_LEFT) && state->terminal &&
+    if (Input_MouseReleased(WB_MOUSE_LEFT) && state->terminal &&
         state->terminal->is_selecting) {
       Terminal_EndSelection(state->terminal);
     }
@@ -347,26 +347,26 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
   /* Handle keyboard input when focused */
   if (state->has_focus && state->terminal &&
       Terminal_IsAlive(state->terminal) &&
-      Input_HasFocus(INPUT_TARGET_TERMINAL)) {
+      Input_HasFocus(WB_INPUT_TARGET_TERMINAL)) {
 
     u32 mods = Input_GetModifiers();
     b32 at_eol = Terminal_IsCursorAtEOL(state->terminal);
 
     /* ===== Suggestion Acceptance ===== */
     /* Ctrl+F or Right Arrow (at EOL): Accept full suggestion */
-    if ((Input_KeyPressed(KEY_RIGHT) && at_eol) ||
-        (Input_KeyPressed(KEY_F) && (mods & MOD_CTRL))) {
+    if ((Input_KeyPressed(WB_KEY_RIGHT) && at_eol) ||
+        (Input_KeyPressed(WB_KEY_F) && (mods & MOD_CTRL))) {
       const char *suffix = Suggestion_GetSuffix(&state->current_suggestion);
       if (suffix && suffix[0] != '\0') {
         Terminal_Write(state->terminal, suffix, (u32)strlen(suffix));
         state->current_suggestion.valid = false;
-      } else if (Input_KeyPressed(KEY_RIGHT)) {
+      } else if (Input_KeyPressed(WB_KEY_RIGHT)) {
         /* No suggestion, pass through normal right arrow */
         Terminal_Write(state->terminal, "\x1b[C", 3);
       }
     }
     /* Alt+F or Alt+Right: Accept first word of suggestion */
-    else if ((Input_KeyPressed(KEY_RIGHT) || Input_KeyPressed(KEY_F)) &&
+    else if ((Input_KeyPressed(WB_KEY_RIGHT) || Input_KeyPressed(WB_KEY_F)) &&
              (mods & MOD_ALT)) {
       char first_word[256];
       Suggestion_GetFirstWord(&state->current_suggestion, first_word,
@@ -378,64 +378,64 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
     }
     /* ===== Word Navigation & Deletion (Ctrl/Alt modifiers) ===== */
     /* Ctrl+Backspace: Delete word backward (send Ctrl+W) */
-    else if (Input_KeyRepeat(KEY_BACKSPACE) && (mods & MOD_CTRL)) {
+    else if (Input_KeyRepeat(WB_KEY_BACKSPACE) && (mods & MOD_CTRL)) {
       Terminal_Write(state->terminal, "\x17",
                      1); /* Ctrl+W = backward-kill-word */
     }
     /* Alt+Backspace: Delete word backward (send ESC + DEL) */
-    else if (Input_KeyRepeat(KEY_BACKSPACE) && (mods & MOD_ALT)) {
+    else if (Input_KeyRepeat(WB_KEY_BACKSPACE) && (mods & MOD_ALT)) {
       Terminal_Write(state->terminal, "\x1b\x7f", 2);
     }
     /* Ctrl+Delete: Delete word forward */
-    else if (Input_KeyRepeat(KEY_DELETE) && (mods & MOD_CTRL)) {
+    else if (Input_KeyRepeat(WB_KEY_DELETE) && (mods & MOD_CTRL)) {
       Terminal_Write(state->terminal, "\x1b[3;5~", 6);
     }
     /* Ctrl+Left: Move word backward */
-    else if (Input_KeyRepeat(KEY_LEFT) && (mods & MOD_CTRL)) {
+    else if (Input_KeyRepeat(WB_KEY_LEFT) && (mods & MOD_CTRL)) {
       Terminal_Write(state->terminal, "\x1b[1;5D", 6);
     }
     /* Ctrl+Right: Move word forward */
-    else if (Input_KeyRepeat(KEY_RIGHT) && (mods & MOD_CTRL)) {
+    else if (Input_KeyRepeat(WB_KEY_RIGHT) && (mods & MOD_CTRL)) {
       Terminal_Write(state->terminal, "\x1b[1;5C", 6);
     }
     /* Alt+Left: Move word backward (alternate) */
-    else if (Input_KeyRepeat(KEY_LEFT) && (mods & MOD_ALT)) {
+    else if (Input_KeyRepeat(WB_KEY_LEFT) && (mods & MOD_ALT)) {
       Terminal_Write(state->terminal, "\x1b[1;3D", 6);
     }
     /* Alt+Right: Move word forward (alternate) */
-    else if (Input_KeyRepeat(KEY_RIGHT) && (mods & MOD_ALT)) {
+    else if (Input_KeyRepeat(WB_KEY_RIGHT) && (mods & MOD_ALT)) {
       Terminal_Write(state->terminal, "\x1b[1;3C", 6);
     }
     /* Ctrl+Home: Move to beginning of line/input */
-    else if (Input_KeyRepeat(KEY_HOME) && (mods & MOD_CTRL)) {
+    else if (Input_KeyRepeat(WB_KEY_HOME) && (mods & MOD_CTRL)) {
       Terminal_Write(state->terminal, "\x1b[1;5H", 6);
     }
     /* Ctrl+End: Move to end of line/input */
-    else if (Input_KeyRepeat(KEY_END) && (mods & MOD_CTRL)) {
+    else if (Input_KeyRepeat(WB_KEY_END) && (mods & MOD_CTRL)) {
       Terminal_Write(state->terminal, "\x1b[1;5F", 6);
     }
     /* ===== Standard Key Handling ===== */
-    else if (Input_KeyRepeat(KEY_UP)) {
+    else if (Input_KeyRepeat(WB_KEY_UP)) {
       Terminal_Write(state->terminal, "\x1b[A", 3);
-    } else if (Input_KeyRepeat(KEY_DOWN)) {
+    } else if (Input_KeyRepeat(WB_KEY_DOWN)) {
       Terminal_Write(state->terminal, "\x1b[B", 3);
-    } else if (Input_KeyRepeat(KEY_RIGHT)) {
+    } else if (Input_KeyRepeat(WB_KEY_RIGHT)) {
       Terminal_Write(state->terminal, "\x1b[C", 3);
-    } else if (Input_KeyRepeat(KEY_LEFT)) {
+    } else if (Input_KeyRepeat(WB_KEY_LEFT)) {
       Terminal_Write(state->terminal, "\x1b[D", 3);
     }
 
-    if (Input_KeyRepeat(KEY_HOME)) {
+    if (Input_KeyRepeat(WB_KEY_HOME)) {
       if (!(mods & MOD_CTRL)) { /* Already handled Ctrl+Home above */
         Terminal_Write(state->terminal, "\x1b[H", 3);
       }
     }
-    if (Input_KeyRepeat(KEY_END)) {
+    if (Input_KeyRepeat(WB_KEY_END)) {
       if (!(mods & MOD_CTRL)) { /* Already handled Ctrl+End above */
         Terminal_Write(state->terminal, "\x1b[F", 3);
       }
     }
-    if (Input_KeyRepeat(KEY_PAGE_UP)) {
+    if (Input_KeyRepeat(WB_KEY_PAGE_UP)) {
       if (mods & MOD_SHIFT) {
         /* Shift+PageUp = scroll terminal history */
         Terminal_Scroll(state->terminal, 10);
@@ -443,19 +443,19 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
         Terminal_Write(state->terminal, "\x1b[5~", 4);
       }
     }
-    if (Input_KeyRepeat(KEY_PAGE_DOWN)) {
+    if (Input_KeyRepeat(WB_KEY_PAGE_DOWN)) {
       if (mods & MOD_SHIFT) {
         Terminal_Scroll(state->terminal, -10);
       } else {
         Terminal_Write(state->terminal, "\x1b[6~", 4);
       }
     }
-    if (Input_KeyRepeat(KEY_DELETE)) {
+    if (Input_KeyRepeat(WB_KEY_DELETE)) {
       if (!(mods & MOD_CTRL)) { /* Already handled Ctrl+Delete above */
         Terminal_Write(state->terminal, "\x1b[3~", 4);
       }
     }
-    if (Input_KeyRepeat(KEY_BACKSPACE)) {
+    if (Input_KeyRepeat(WB_KEY_BACKSPACE)) {
       if (!(mods & (MOD_CTRL |
                     MOD_ALT))) { /* Already handled Ctrl/Alt+Backspace above */
         Terminal_Write(state->terminal, "\x7f", 1);
@@ -463,10 +463,10 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
     }
     /* Handle tab completion override only if emulated mode AND suggestion is
      * active */
-    if (Input_KeyPressed(KEY_TAB)) {
+    if (Input_KeyPressed(WB_KEY_TAB)) {
       b32 accepted = false;
 
-      if (state->shell_mode == SHELL_EMULATED &&
+      if (state->shell_mode == WB_SHELL_EMULATED &&
           state->current_suggestion.valid && at_eol) {
         const char *suffix = Suggestion_GetSuffix(&state->current_suggestion);
         if (suffix && suffix[0] != '\0') {
@@ -480,7 +480,7 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
         Terminal_Write(state->terminal, "\t", 1);
       }
     }
-    if (Input_KeyPressed(KEY_RETURN)) {
+    if (Input_KeyPressed(WB_KEY_RETURN)) {
       /* Record command to history before executing */
       const char *cmd = Terminal_GetCurrentLine(state->terminal);
       if (cmd && cmd[0] != '\0' && state->suggestions) {
@@ -489,14 +489,14 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
       Terminal_Write(state->terminal, "\r", 1);
       state->current_suggestion.valid = false;
     }
-    if (Input_KeyPressed(KEY_ESCAPE)) {
+    if (Input_KeyPressed(WB_KEY_ESCAPE)) {
       Terminal_Write(state->terminal, "\x1b", 1);
     }
 
     /* ===== Copy/Paste Shortcuts ===== */
     if (mods & MOD_CTRL) {
       /* Ctrl+C or Ctrl+Shift+C: Copy */
-      if (Input_KeyPressed(KEY_C)) {
+      if (Input_KeyPressed(WB_KEY_C)) {
         if (state->terminal->has_selection) {
           char *text = Terminal_GetSelectionText(state->terminal);
           if (text) {
@@ -513,7 +513,7 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
         }
       }
       /* Ctrl+V or Ctrl+Shift+V: Paste */
-      if (Input_KeyPressed(KEY_V)) {
+      if (Input_KeyPressed(WB_KEY_V)) {
         char buffer[4096];
         char *text = Platform_GetClipboard(buffer, sizeof(buffer));
         if (text) {
@@ -526,11 +526,11 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
 
     /* Ctrl+key combinations (except Ctrl+F which is handled above) */
     if (mods & MOD_CTRL) {
-      for (int k = KEY_A; k <= KEY_Z; k++) {
-        if (k == KEY_F)
+      for (int k = WB_KEY_A; k <= WB_KEY_Z; k++) {
+        if (k == WB_KEY_F)
           continue; /* Already handled for suggestion */
         if (Input_KeyPressed((key_code)k)) {
-          char ctrl_char = (char)((k - KEY_A) + 1); /* Ctrl+A = 0x01, etc. */
+          char ctrl_char = (char)((k - WB_KEY_A) + 1); /* Ctrl+A = 0x01, etc. */
           Terminal_Write(state->terminal, &ctrl_char, 1);
         }
       }
@@ -577,7 +577,7 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
         state->last_input[sizeof(state->last_input) - 1] = '\0';
 
         /* Get new suggestion only if in EMULATED mode */
-        if (state->shell_mode == SHELL_EMULATED) {
+        if (state->shell_mode == WB_SHELL_EMULATED) {
           state->current_suggestion =
               Suggestion_Get(state->suggestions, current_input);
         } else {

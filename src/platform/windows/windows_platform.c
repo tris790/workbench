@@ -14,25 +14,25 @@ windows_platform g_platform = {0};
 void Platform_SetCursor(cursor_type cursor) {
   HCURSOR hc = NULL;
   switch (cursor) {
-  case CURSOR_DEFAULT:
+  case WB_CURSOR_DEFAULT:
     hc = LoadCursor(NULL, IDC_ARROW);
     break;
-  case CURSOR_POINTER:
+  case WB_CURSOR_POINTER:
     hc = LoadCursor(NULL, IDC_HAND);
     break;
-  case CURSOR_TEXT:
+  case WB_CURSOR_TEXT:
     hc = LoadCursor(NULL, IDC_IBEAM);
     break;
-  case CURSOR_GRAB:
+  case WB_CURSOR_GRAB:
     hc = LoadCursor(NULL, IDC_HAND);
     break;
-  case CURSOR_GRABBING:
+  case WB_CURSOR_GRABBING:
     hc = LoadCursor(NULL, IDC_SIZEALL);
     break;
-  case CURSOR_NO_DROP:
+  case WB_CURSOR_NO_DROP:
     hc = LoadCursor(NULL, IDC_NO);
     break;
-  case CURSOR_COPY:
+  case WB_CURSOR_COPY:
     hc =
         LoadCursor(NULL, IDC_ARROW); /* IDC_COPY doesn't exist in system cursors
                                       */

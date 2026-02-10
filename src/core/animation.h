@@ -65,7 +65,7 @@ static inline f32 Ease_OutExpo(f32 t) {
 
 /* ===== Animation State ===== */
 
-typedef enum { ANIM_IDLE = 0, ANIM_RUNNING, ANIM_FINISHED } animation_status;
+typedef enum { WB_ANIM_IDLE = 0, WB_ANIM_RUNNING, WB_ANIM_FINISHED } animation_status;
 
 typedef struct {
   f32 start_value;

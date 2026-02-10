@@ -163,7 +163,7 @@ int main(int argc, char **argv) {
 
   if (Config_HasErrors()) {
     layout.show_config_diagnostics = true;
-    Input_PushFocus(INPUT_TARGET_DIALOG);
+    Input_PushFocus(WB_INPUT_TARGET_DIALOG);
   }
 
   KeyRepeat_Init();
@@ -192,33 +192,33 @@ int main(int argc, char **argv) {
     /* Process all pending events */
     while (Platform_PollEvent(window, &event)) {
       switch (event.type) {
-      case EVENT_QUIT:
+      case WB_EVENT_QUIT:
         printf("Quit event received\n");
         break;
 
-      case EVENT_KEY_DOWN: {
+      case WB_EVENT_KEY_DOWN: {
         bool consumed = false;
 
         /* Command palette keybindings */
-        if (event.data.keyboard.key == KEY_P &&
+        if (event.data.keyboard.key == WB_KEY_P &&
             (event.data.keyboard.modifiers & MOD_CTRL)) {
           if (event.data.keyboard.modifiers & MOD_SHIFT) {
-            CommandPalette_Open(&palette, PALETTE_MODE_COMMAND);
+            CommandPalette_Open(&palette, WB_PALETTE_MODE_COMMAND);
           } else {
-            CommandPalette_Open(&palette, PALETTE_MODE_FILE);
+            CommandPalette_Open(&palette, WB_PALETTE_MODE_FILE);
           }
           consumed = true;
         }
 
-        if (event.data.keyboard.key == KEY_ESCAPE) {
+        if (event.data.keyboard.key == WB_KEY_ESCAPE) {
           /* Let CommandPalette_Update handle ESC if palette is open */
           if (!CommandPalette_IsOpen(&palette)) {
             /* Only handle ESC at main level if explorer has focus and not in
              * dialog */
             input_target focus = Input_GetFocus();
-            if (focus == INPUT_TARGET_EXPLORER) {
+            if (focus == WB_INPUT_TARGET_EXPLORER) {
               panel *p = Layout_GetActivePanel(&layout);
-              if (p && p->explorer.mode != EXPLORER_MODE_NORMAL) {
+              if (p && p->explorer.mode != WB_EXPLORER_MODE_NORMAL) {
                 Explorer_Cancel(&p->explorer);
               }
             }
@@ -227,14 +227,14 @@ int main(int argc, char **argv) {
           consumed = true;
         }
         /* Toggle Dual Panel Mode with Ctrl + / */
-        if (event.data.keyboard.key == KEY_SLASH &&
+        if (event.data.keyboard.key == WB_KEY_SLASH &&
             (event.data.keyboard.modifiers & MOD_CTRL)) {
           Layout_ToggleMode(&layout);
           consumed = true;
         }
 
         /* Toggle Terminal with ` (backtick) */
-        if (event.data.keyboard.key == KEY_GRAVE &&
+        if (event.data.keyboard.key == WB_KEY_GRAVE &&
             !(event.data.keyboard.modifiers &
               (MOD_CTRL | MOD_ALT | MOD_SHIFT))) {
           Layout_ToggleTerminal(&layout);
@@ -242,26 +242,26 @@ int main(int argc, char **argv) {
         }
 
         /* Toggle Fullscreen with F11 */
-        if (event.data.keyboard.key == KEY_F11) {
+        if (event.data.keyboard.key == WB_KEY_F11) {
           Platform_SetFullscreen(window, !Platform_IsFullscreen(window));
           consumed = true;
         }
 
         /* Focus Split 1 (Alt + 1) */
-        if (event.data.keyboard.key == KEY_1 &&
+        if (event.data.keyboard.key == WB_KEY_1 &&
             (event.data.keyboard.modifiers & MOD_ALT)) {
           Layout_SetActivePanel(&layout, 0);
           consumed = true;
         }
 
         /* Focus Split 2 (Alt + 2) */
-        if (event.data.keyboard.key == KEY_2 &&
+        if (event.data.keyboard.key == WB_KEY_2 &&
             (event.data.keyboard.modifiers & MOD_ALT)) {
           Layout_SetActivePanel(&layout, 1);
           consumed = true;
         }
 
-        if (event.data.keyboard.key < KEY_COUNT) {
+        if (event.data.keyboard.key < WB_KEY_COUNT) {
           if (!input.key_down[event.data.keyboard.key]) {
             input.key_pressed[event.data.keyboard.key] = true;
             /* Store character for key repeat */
@@ -281,16 +281,16 @@ int main(int argc, char **argv) {
         break;
       }
 
-      case EVENT_KEY_UP:
-        if (event.data.keyboard.key < KEY_COUNT) {
+      case WB_EVENT_KEY_UP:
+        if (event.data.keyboard.key < WB_KEY_COUNT) {
           input.key_released[event.data.keyboard.key] = true;
           input.key_down[event.data.keyboard.key] = false;
         }
         input.modifiers = event.data.keyboard.modifiers;
         break;
 
-      case EVENT_MOUSE_BUTTON_DOWN:
-        if (event.data.mouse.button < MOUSE_BUTTON_COUNT) {
+      case WB_EVENT_MOUSE_BUTTON_DOWN:
+        if (event.data.mouse.button < WB_MOUSE_BUTTON_COUNT) {
           if (!input.mouse_down[event.data.mouse.button]) {
             input.mouse_pressed[event.data.mouse.button] = true;
           }
@@ -301,8 +301,8 @@ int main(int argc, char **argv) {
         input.modifiers = event.data.mouse.modifiers;
         break;
 
-      case EVENT_MOUSE_BUTTON_UP:
-        if (event.data.mouse.button < MOUSE_BUTTON_COUNT) {
+      case WB_EVENT_MOUSE_BUTTON_UP:
+        if (event.data.mouse.button < WB_MOUSE_BUTTON_COUNT) {
           input.mouse_released[event.data.mouse.button] = true;
           input.mouse_down[event.data.mouse.button] = false;
         }
@@ -311,25 +311,25 @@ int main(int argc, char **argv) {
         input.modifiers = event.data.mouse.modifiers;
         break;
 
-      case EVENT_MOUSE_MOVE:
+      case WB_EVENT_MOUSE_MOVE:
         input.mouse_pos.x = event.data.mouse.x;
         input.mouse_pos.y = event.data.mouse.y;
         break;
 
-      case EVENT_MOUSE_SCROLL:
+      case WB_EVENT_MOUSE_SCROLL:
         input.scroll_delta += event.data.scroll.dy;
         break;
 
-      case EVENT_WINDOW_RESIZE:
+      case WB_EVENT_WINDOW_RESIZE:
         win_width = event.data.resize.width;
         win_height = event.data.resize.height;
         break;
 
-      case EVENT_WINDOW_FOCUS:
+      case WB_EVENT_WINDOW_FOCUS:
         ui.window_focused = true;
         break;
 
-      case EVENT_WINDOW_UNFOCUS:
+      case WB_EVENT_WINDOW_UNFOCUS:
         ui.window_focused = false;
         break;
 

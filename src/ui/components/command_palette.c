@@ -71,7 +71,7 @@ static void FillItemFromCommand(palette_item *item, palette_command *cmd,
   snprintf(item->category, sizeof(item->category), "%s",
            category_override ? category_override : cmd->category);
   snprintf(item->tags, sizeof(item->tags), "%s", cmd->tags);
-  item->icon = FILE_ICON_UNKNOWN;
+  item->icon = WB_FILE_ICON_UNKNOWN;
   item->is_file = false;
   item->callback = cmd->callback;
   item->user_data = cmd->user_data;
@@ -219,7 +219,7 @@ static void CommandPalette_ExecuteSelectedItem(command_palette_state *state) {
 void CommandPalette_Init(command_palette_state *state, fs_state *fs) {
   memset(state, 0, sizeof(*state));
   state->fs = fs;
-  state->mode = PALETTE_MODE_CLOSED;
+  state->mode = WB_PALETTE_MODE_CLOSED;
   state->item_height = 28;
   state->selected_index = 0;
 
@@ -268,7 +268,7 @@ void CommandPalette_Open(command_palette_state *state, palette_mode mode) {
   memset(&state->input_state, 0, sizeof(state->input_state));
   state->input_state.selection_start = -1; /* -1 means no selection */
 
-  if (mode == PALETTE_MODE_COMMAND) {
+  if (mode == WB_PALETTE_MODE_COMMAND) {
     state->input_buffer[0] = '>';
     state->input_buffer[1] = ' ';
     state->input_state.cursor_pos = 2;
@@ -278,7 +278,7 @@ void CommandPalette_Open(command_palette_state *state, palette_mode mode) {
   state->fade_anim.target = 1.0f;
 
   /* Push focus to command palette */
-  Input_PushFocus(INPUT_TARGET_COMMAND_PALETTE);
+  Input_PushFocus(WB_INPUT_TARGET_COMMAND_PALETTE);
 
   /* Reset scroll position (preserve speed) */
   state->scroll.offset = (v2f){0, 0};
@@ -287,7 +287,7 @@ void CommandPalette_Open(command_palette_state *state, palette_mode mode) {
   state->scroll.scroll_v.target = 0;
 
   /* Populate initial items */
-  if (mode == PALETTE_MODE_FILE) {
+  if (mode == WB_PALETTE_MODE_FILE) {
     PopulateFileItems(state);
   } else {
     PopulateCommandItems(state);
@@ -295,13 +295,13 @@ void CommandPalette_Open(command_palette_state *state, palette_mode mode) {
 }
 
 void CommandPalette_Close(command_palette_state *state) {
-  state->mode = PALETTE_MODE_CLOSED;
+  state->mode = WB_PALETTE_MODE_CLOSED;
   state->fade_anim.target = 0.0f;
   Input_PopFocus();
 }
 
 b32 CommandPalette_IsOpen(command_palette_state *state) {
-  return state->mode != PALETTE_MODE_CLOSED;
+  return state->mode != WB_PALETTE_MODE_CLOSED;
 }
 
 b32 CommandPalette_Update(command_palette_state *state, ui_context *ui) {
@@ -317,14 +317,14 @@ b32 CommandPalette_Update(command_palette_state *state, ui_context *ui) {
   ui_input *input = &ui->input;
 
   /* Handle escape to close */
-  if (input->key_pressed[KEY_ESCAPE]) {
+  if (input->key_pressed[WB_KEY_ESCAPE]) {
     CommandPalette_Close(state);
     UI_EndModal();
     return true;
   }
 
   /* Handle enter to execute */
-  if (input->key_pressed[KEY_RETURN]) {
+  if (input->key_pressed[WB_KEY_RETURN]) {
     CommandPalette_ExecuteSelectedItem(state);
     return true;
   }
@@ -333,7 +333,7 @@ b32 CommandPalette_Update(command_palette_state *state, ui_context *ui) {
   b32 ctrl = (input->modifiers & MOD_CTRL) != 0;
 
   /* Handle up/down navigation (only when not holding ctrl for text editing) */
-  if (Input_KeyRepeat(KEY_UP) && !ctrl) {
+  if (Input_KeyRepeat(WB_KEY_UP) && !ctrl) {
     if (state->selected_index > 0) {
       state->selected_index--;
       state->scroll_to_selection = true;
@@ -341,7 +341,7 @@ b32 CommandPalette_Update(command_palette_state *state, ui_context *ui) {
     return true;
   }
 
-  if (Input_KeyRepeat(KEY_DOWN) && !ctrl) {
+  if (Input_KeyRepeat(WB_KEY_DOWN) && !ctrl) {
     if (state->selected_index < state->item_count - 1) {
       state->selected_index++;
       state->scroll_to_selection = true;
@@ -355,7 +355,7 @@ b32 CommandPalette_Update(command_palette_state *state, ui_context *ui) {
   /* Up/Down are NOT handled by ProcessTextInput so list nav still works */
   if (UI_ProcessTextInput(&state->input_state, state->input_buffer,
                           PALETTE_MAX_INPUT, input)) {
-    if (state->mode == PALETTE_MODE_FILE) {
+    if (state->mode == WB_PALETTE_MODE_FILE) {
       PopulateFileItems(state);
     } else {
       PopulateCommandItems(state);
@@ -426,7 +426,7 @@ void CommandPalette_Render(command_palette_state *state, ui_context *ui,
                      input_height - 4};
 
   /* Draw text input */
-  UI_BeginLayout(UI_LAYOUT_HORIZONTAL, input_rect);
+  UI_BeginLayout(WB_UI_LAYOUT_HORIZONTAL, input_rect);
 
   /* Draw input prefix/icon based on mode */
   color text_color = th->text;
@@ -474,7 +474,7 @@ void CommandPalette_Render(command_palette_state *state, ui_context *ui,
     /* Placeholder */
     color placeholder = th->text_muted;
     placeholder.a = (u8)(placeholder.a * fade);
-    const char *hint = state->mode == PALETTE_MODE_FILE ? "Search files..."
+    const char *hint = state->mode == WB_PALETTE_MODE_FILE ? "Search files..."
                                                         : "Type a command...";
     Render_DrawText(renderer, text_pos, hint, f, placeholder);
   }
@@ -595,7 +595,7 @@ void CommandPalette_Render(command_palette_state *state, ui_context *ui,
         Render_DrawRect(renderer, item_rect, hover_bg);
       }
       /* Click to select and execute */
-      if (ui->input.mouse_pressed[MOUSE_LEFT]) {
+      if (ui->input.mouse_pressed[WB_MOUSE_LEFT]) {
         state->selected_index = i;
         CommandPalette_ExecuteSelectedItem(state);
       }

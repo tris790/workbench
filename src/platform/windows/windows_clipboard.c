@@ -7,6 +7,7 @@
  */
 
 #include "windows_internal.h"
+#include <shlobj.h>
 
 /* ===== Clipboard API ===== */
 

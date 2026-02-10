@@ -29,19 +29,19 @@ struct layout_state_s;
 /* ===== Drag State Enum ===== */
 
 typedef enum {
-  DRAG_STATE_IDLE,     /* Not dragging */
-  DRAG_STATE_PENDING,  /* Mouse down, waiting for threshold */
-  DRAG_STATE_DRAGGING, /* Actively dragging, preview visible */
-  DRAG_STATE_DROPPING, /* Drop animation playing */
+  WB_DRAG_STATE_IDLE,     /* Not dragging */
+  WB_DRAG_STATE_PENDING,  /* Mouse down, waiting for threshold */
+  WB_DRAG_STATE_DRAGGING, /* Actively dragging, preview visible */
+  WB_DRAG_STATE_DROPPING, /* Drop animation playing */
 } drag_state_type;
 
 /* ===== Drop Target Type ===== */
 
 typedef enum {
-  DROP_TARGET_NONE,    /* No valid target */
-  DROP_TARGET_FOLDER,  /* Hovering over a folder */
-  DROP_TARGET_PANEL,   /* Dropping into panel's current directory */
-  DROP_TARGET_INVALID, /* Invalid target (e.g., folder into itself) */
+  WB_DROP_TARGET_NONE,    /* No valid target */
+  WB_DROP_TARGET_FOLDER,  /* Hovering over a folder */
+  WB_DROP_TARGET_PANEL,   /* Dropping into panel's current directory */
+  WB_DROP_TARGET_INVALID, /* Invalid target (e.g., folder into itself) */
 } drop_target_type;
 
 /* ===== Drag Item Info ===== */

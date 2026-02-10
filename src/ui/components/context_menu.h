@@ -22,10 +22,10 @@ struct explorer_state_s;
 /* ===== Types ===== */
 
 typedef enum {
-  CONTEXT_NONE = 0,
-  CONTEXT_FILE,      /* Right-click on file */
-  CONTEXT_DIRECTORY, /* Right-click on folder */
-  CONTEXT_EMPTY,     /* Right-click on empty space */
+  WB_CONTEXT_NONE = 0,
+  WB_CONTEXT_FILE,      /* Right-click on file */
+  WB_CONTEXT_DIRECTORY, /* Right-click on folder */
+  WB_CONTEXT_EMPTY,     /* Right-click on empty space */
 } context_type;
 
 /* Command callback for menu items */

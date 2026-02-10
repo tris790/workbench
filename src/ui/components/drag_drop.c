@@ -50,9 +50,9 @@ static b32 IsAncestorPath(const char *ancestor, const char *descendant) {
 
 void DragDrop_Init(drag_drop_state *state) {
   memset(state, 0, sizeof(*state));
-  state->state = DRAG_STATE_IDLE;
+  state->state = WB_DRAG_STATE_IDLE;
   state->item_count = 0;
-  state->target_type = DROP_TARGET_NONE;
+  state->target_type = WB_DROP_TARGET_NONE;
 
   /* Initialize animation values */
   state->pickup_anim.current = 0.0f;
@@ -82,7 +82,7 @@ void DragDrop_BeginPotential(drag_drop_state *state, fs_state *fs,
     return;
   }
 
-  state->state = DRAG_STATE_PENDING;
+  state->state = WB_DRAG_STATE_PENDING;
   state->start_mouse_pos = mouse_pos;
   state->current_mouse_pos = mouse_pos;
   state->start_time_ms = time_ms;
@@ -115,7 +115,7 @@ void DragDrop_BeginPotential(drag_drop_state *state, fs_state *fs,
   }
 
   /* Reset target */
-  state->target_type = DROP_TARGET_NONE;
+  state->target_type = WB_DROP_TARGET_NONE;
   state->target_path[0] = '\0';
 }
 
@@ -132,16 +132,16 @@ void DragDrop_Update(drag_drop_state *state, ui_context *ui,
 
   /* State machine */
   switch (state->state) {
-  case DRAG_STATE_IDLE:
+  case WB_DRAG_STATE_IDLE:
     /* Nothing to do */
     break;
 
-  case DRAG_STATE_PENDING: {
+  case WB_DRAG_STATE_PENDING: {
     state->current_mouse_pos = input->mouse_pos;
 
     /* Check if mouse released before threshold */
-    if (!input->mouse_down[MOUSE_LEFT]) {
-      state->state = DRAG_STATE_IDLE;
+    if (!input->mouse_down[WB_MOUSE_LEFT]) {
+      state->state = WB_DRAG_STATE_IDLE;
       break;
     }
 
@@ -150,13 +150,13 @@ void DragDrop_Update(drag_drop_state *state, ui_context *ui,
 
     if (dist >= DRAG_THRESHOLD_DISTANCE) {
       /* Transition to dragging */
-      state->state = DRAG_STATE_DRAGGING;
+      state->state = WB_DRAG_STATE_DRAGGING;
       SmoothValue_SetTarget(&state->pickup_anim, 1.0f);
     }
     break;
   }
 
-  case DRAG_STATE_DRAGGING: {
+  case WB_DRAG_STATE_DRAGGING: {
     state->current_mouse_pos = input->mouse_pos;
 
     /* Check for window focus loss */
@@ -166,18 +166,18 @@ void DragDrop_Update(drag_drop_state *state, ui_context *ui,
     }
 
     /* Check for cancel (Escape) */
-    if (input->key_pressed[KEY_ESCAPE]) {
+    if (input->key_pressed[WB_KEY_ESCAPE]) {
       DragDrop_Cancel(state);
       break;
     }
 
     /* Check for drop (mouse release) */
     /* Note: We use target_type from previous frame's render pass */
-    if (!input->mouse_down[MOUSE_LEFT]) {
-      if (state->target_type == DROP_TARGET_FOLDER ||
-          state->target_type == DROP_TARGET_PANEL) {
+    if (!input->mouse_down[WB_MOUSE_LEFT]) {
+      if (state->target_type == WB_DROP_TARGET_FOLDER ||
+          state->target_type == WB_DROP_TARGET_PANEL) {
         /* Valid drop - execute move */
-        state->state = DRAG_STATE_DROPPING;
+        state->state = WB_DRAG_STATE_DROPPING;
         SmoothValue_SetTarget(&state->drop_anim, 1.0f);
       } else {
         /* Invalid or no target - cancel */
@@ -188,11 +188,11 @@ void DragDrop_Update(drag_drop_state *state, ui_context *ui,
 
     /* Reset target for current frame - will be re-populated by CheckTarget
      * calls during Render pass */
-    state->target_type = DROP_TARGET_NONE;
+    state->target_type = WB_DROP_TARGET_NONE;
     break;
   }
 
-  case DRAG_STATE_DROPPING: {
+  case WB_DRAG_STATE_DROPPING: {
     /* Wait for drop animation */
     if (state->drop_anim.current >= 0.95f) {
       /* Execute the file move operations */
@@ -217,32 +217,32 @@ void DragDrop_Update(drag_drop_state *state, ui_context *ui,
 
       /* Refresh both panels */
       Explorer_Refresh(&layout->panels[0].explorer);
-      if (layout->mode == LAYOUT_MODE_DUAL) {
+      if (layout->mode == WB_LAYOUT_MODE_DUAL) {
         Explorer_Refresh(&layout->panels[1].explorer);
       }
 
       /* Reset to idle */
       DragDrop_Init(state);
-      Platform_SetCursor(CURSOR_DEFAULT);
+      Platform_SetCursor(WB_CURSOR_DEFAULT);
     }
     break;
   }
   }
 
   /* Update hover glow pulse when over valid target */
-  if (state->state == DRAG_STATE_DRAGGING) {
-    if (state->target_type == DROP_TARGET_FOLDER ||
-        state->target_type == DROP_TARGET_PANEL) {
+  if (state->state == WB_DRAG_STATE_DRAGGING) {
+    if (state->target_type == WB_DROP_TARGET_FOLDER ||
+        state->target_type == WB_DROP_TARGET_PANEL) {
       /* Oscillate between 0.15 and 0.25 */
       f32 pulse = 0.20f + 0.05f * sinf((f32)time_ms * 0.003f);
       state->hover_glow.current = pulse;
-      Platform_SetCursor(CURSOR_GRABBING);
-    } else if (state->target_type == DROP_TARGET_INVALID) {
+      Platform_SetCursor(WB_CURSOR_GRABBING);
+    } else if (state->target_type == WB_DROP_TARGET_INVALID) {
       state->hover_glow.current = 0.0f;
-      Platform_SetCursor(CURSOR_NO_DROP);
+      Platform_SetCursor(WB_CURSOR_NO_DROP);
     } else {
       state->hover_glow.current = 0.0f;
-      Platform_SetCursor(CURSOR_GRABBING);
+      Platform_SetCursor(WB_CURSOR_GRABBING);
     }
   }
 }
@@ -251,7 +251,7 @@ void DragDrop_Update(drag_drop_state *state, ui_context *ui,
 
 void DragDrop_CheckTarget(drag_drop_state *state, const fs_entry *entry,
                           rect item_bounds, u32 panel_idx) {
-  if (state->state != DRAG_STATE_DRAGGING)
+  if (state->state != WB_DRAG_STATE_DRAGGING)
     return;
   if (!entry->is_directory)
     return;
@@ -286,7 +286,7 @@ void DragDrop_CheckTarget(drag_drop_state *state, const fs_entry *entry,
 
   /* Check for invalid targets (folder into self or subfolder) */
   if (DragDrop_IsInvalidTarget(state, target_path)) {
-    state->target_type = DROP_TARGET_INVALID;
+    state->target_type = WB_DROP_TARGET_INVALID;
     state->target_bounds = item_bounds;
     state->target_panel_idx = panel_idx;
     strncpy(state->target_path, target_path, FS_MAX_PATH - 1);
@@ -294,7 +294,7 @@ void DragDrop_CheckTarget(drag_drop_state *state, const fs_entry *entry,
   }
 
   /* Valid folder target */
-  state->target_type = DROP_TARGET_FOLDER;
+  state->target_type = WB_DROP_TARGET_FOLDER;
   state->target_bounds = item_bounds;
   state->target_panel_idx = panel_idx;
   strncpy(state->target_path, target_path, FS_MAX_PATH - 1);
@@ -303,11 +303,11 @@ void DragDrop_CheckTarget(drag_drop_state *state, const fs_entry *entry,
 
 void DragDrop_CheckPanelTarget(drag_drop_state *state, const char *panel_path,
                                rect panel_bounds, u32 panel_idx) {
-  if (state->state != DRAG_STATE_DRAGGING)
+  if (state->state != WB_DRAG_STATE_DRAGGING)
     return;
 
   /* Only set panel as target if no folder target is set */
-  if (state->target_type == DROP_TARGET_FOLDER)
+  if (state->target_type == WB_DROP_TARGET_FOLDER)
     return;
 
   /* Check if mouse is in panel bounds */
@@ -334,7 +334,7 @@ void DragDrop_CheckPanelTarget(drag_drop_state *state, const char *panel_path,
   }
 
   /* Valid panel target */
-  state->target_type = DROP_TARGET_PANEL;
+  state->target_type = WB_DROP_TARGET_PANEL;
   state->target_bounds = panel_bounds;
   state->target_panel_idx = panel_idx;
   strncpy(state->target_path, panel_path, FS_MAX_PATH - 1);
@@ -344,22 +344,22 @@ void DragDrop_CheckPanelTarget(drag_drop_state *state, const char *panel_path,
 /* ===== Control ===== */
 
 void DragDrop_Cancel(drag_drop_state *state) {
-  state->state = DRAG_STATE_IDLE;
+  state->state = WB_DRAG_STATE_IDLE;
   state->item_count = 0;
-  state->target_type = DROP_TARGET_NONE;
+  state->target_type = WB_DROP_TARGET_NONE;
   SmoothValue_SetImmediate(&state->pickup_anim, 0.0f);
   SmoothValue_SetImmediate(&state->drop_anim, 0.0f);
-  Platform_SetCursor(CURSOR_DEFAULT);
+  Platform_SetCursor(WB_CURSOR_DEFAULT);
 }
 
 /* ===== Query Functions ===== */
 
 b32 DragDrop_IsActive(drag_drop_state *state) {
-  return state->state != DRAG_STATE_IDLE;
+  return state->state != WB_DRAG_STATE_IDLE;
 }
 
 b32 DragDrop_IsDragging(drag_drop_state *state) {
-  return state->state == DRAG_STATE_DRAGGING;
+  return state->state == WB_DRAG_STATE_DRAGGING;
 }
 
 u32 DragDrop_GetSourcePanel(drag_drop_state *state) {
@@ -409,8 +409,8 @@ static void DrawRectOutline(ui_context *ui, rect r, color c, i32 thickness) {
 #define PREVIEW_OPACITY 0.75f
 
 void DragDrop_RenderPreview(drag_drop_state *state, ui_context *ui) {
-  if (state->state != DRAG_STATE_DRAGGING &&
-      state->state != DRAG_STATE_DROPPING)
+  if (state->state != WB_DRAG_STATE_DRAGGING &&
+      state->state != WB_DRAG_STATE_DROPPING)
     return;
   if (state->item_count == 0)
     return;
@@ -420,7 +420,7 @@ void DragDrop_RenderPreview(drag_drop_state *state, ui_context *ui) {
   i32 base_y = state->current_mouse_pos.y + state->preview_offset.y;
 
   /* Drop animation: move toward target */
-  if (state->state == DRAG_STATE_DROPPING) {
+  if (state->state == WB_DRAG_STATE_DROPPING) {
     f32 t = state->drop_anim.current;
     if (t > 1.0f)
       t = 1.0f;
@@ -509,15 +509,15 @@ void DragDrop_RenderPreview(drag_drop_state *state, ui_context *ui) {
 
 void DragDrop_RenderTargetHighlight(drag_drop_state *state, ui_context *ui,
                                     rect bounds) {
-  if (state->state != DRAG_STATE_DRAGGING)
+  if (state->state != WB_DRAG_STATE_DRAGGING)
     return;
 
-  if (state->target_type == DROP_TARGET_INVALID) {
+  if (state->target_type == WB_DROP_TARGET_INVALID) {
     color tint = Color_WithAlpha(ui->theme->error, 40);
     Render_DrawRect(ui->renderer, bounds, tint);
     DrawRectOutline(ui, bounds, ui->theme->error, 2);
-  } else if (state->target_type == DROP_TARGET_FOLDER ||
-             state->target_type == DROP_TARGET_PANEL) {
+  } else if (state->target_type == WB_DROP_TARGET_FOLDER ||
+             state->target_type == WB_DROP_TARGET_PANEL) {
     color bg = Color_WithAlpha(ui->theme->accent,
                                (u8)(state->hover_glow.current * 255.0f));
     Render_DrawRectRounded(ui->renderer, bounds, 4.0f, bg);

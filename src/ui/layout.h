@@ -17,8 +17,8 @@
 #include "ui.h"
 
 typedef enum {
-  LAYOUT_MODE_SINGLE,
-  LAYOUT_MODE_DUAL,
+  WB_LAYOUT_MODE_SINGLE,
+  WB_LAYOUT_MODE_DUAL,
 } layout_mode;
 
 /* Forward declaration */

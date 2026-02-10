@@ -82,12 +82,12 @@ void ConfigDiagnostics_Render(ui_context *ui, rect bounds,
                          scroll_rect.w - SCROLL_SCROLLBAR_GUTTER,
                          scroll_rect.h * 10}; /* Large height for content */
 
-  UI_BeginLayout(UI_LAYOUT_VERTICAL, content_bounds);
+  UI_BeginLayout(WB_UI_LAYOUT_VERTICAL, content_bounds);
 
   /* Errors Section */
   i32 diag_count = Config_GetDiagnosticCount();
   if (diag_count > 0) {
-    UI_PushStyleColor(UI_STYLE_TEXT_COLOR, th->error);
+    UI_PushStyleColor(WB_UI_STYLE_TEXT_COLOR, th->error);
     UI_Label("Errors:");
 
     for (i32 i = 0; i < diag_count; i++) {
@@ -101,7 +101,7 @@ void ConfigDiagnostics_Render(ui_context *ui, rect bounds,
   }
 
   /* Loaded Values Section */
-  UI_PushStyleColor(UI_STYLE_TEXT_COLOR, th->accent);
+  UI_PushStyleColor(WB_UI_STYLE_TEXT_COLOR, th->accent);
   UI_Label("Loaded Values:");
   UI_PopStyle();
   UI_Spacer(4);
@@ -117,21 +117,21 @@ void ConfigDiagnostics_Render(ui_context *ui, rect bounds,
     char val_buf[2048];
 
     switch (entry->type) {
-    case CONFIG_TYPE_BOOL:
+    case WB_CONFIG_TYPE_BOOL:
       type_str = "bool";
       snprintf(val_buf, sizeof(val_buf), "%s",
                entry->value.bool_val ? "true" : "false");
       break;
-    case CONFIG_TYPE_I64:
+    case WB_CONFIG_TYPE_I64:
       type_str = "i64";
       snprintf(val_buf, sizeof(val_buf), "%lld",
                (long long)entry->value.i64_val);
       break;
-    case CONFIG_TYPE_F64:
+    case WB_CONFIG_TYPE_F64:
       type_str = "f64";
       snprintf(val_buf, sizeof(val_buf), "%.2f", entry->value.f64_val);
       break;
-    case CONFIG_TYPE_STRING:
+    case WB_CONFIG_TYPE_STRING:
       type_str = "string";
       snprintf(val_buf, sizeof(val_buf), "\"%s\"", entry->value.string_val);
       break;
@@ -177,7 +177,7 @@ void ConfigDiagnostics_Render(ui_context *ui, rect bounds,
   /* Close Button */
   current_x -= close_w;
   rect close_rect = {current_x, btn_y, close_w, btn_h};
-  UI_BeginLayout(UI_LAYOUT_HORIZONTAL, close_rect);
+  UI_BeginLayout(WB_UI_LAYOUT_HORIZONTAL, close_rect);
   if (UI_Button("Close")) {
     layout->show_config_diagnostics = false;
     UI_EndModal();
@@ -188,7 +188,7 @@ void ConfigDiagnostics_Render(ui_context *ui, rect bounds,
   /* Open File Button */
   current_x -= (open_w + th->spacing_md);
   rect open_rect = {current_x, btn_y, open_w, btn_h};
-  UI_BeginLayout(UI_LAYOUT_HORIZONTAL, open_rect);
+  UI_BeginLayout(WB_UI_LAYOUT_HORIZONTAL, open_rect);
   if (UI_Button("Open Config File")) {
     const char *path = Config_GetPath();
     if (path) {
@@ -200,14 +200,14 @@ void ConfigDiagnostics_Render(ui_context *ui, rect bounds,
   /* Reload Button */
   current_x -= (reload_w + th->spacing_md);
   rect reload_rect = {current_x, btn_y, reload_w, btn_h};
-  UI_BeginLayout(UI_LAYOUT_HORIZONTAL, reload_rect);
+  UI_BeginLayout(WB_UI_LAYOUT_HORIZONTAL, reload_rect);
   if (UI_Button("Reload")) {
     Config_Reload();
   }
   UI_EndLayout();
 
   /* Handle Escape / Return to close */
-  if (ui->input.key_pressed[KEY_ESCAPE] || ui->input.key_pressed[KEY_RETURN]) {
+  if (ui->input.key_pressed[WB_KEY_ESCAPE] || ui->input.key_pressed[WB_KEY_RETURN]) {
     layout->show_config_diagnostics = false;
     UI_EndModal();
     Input_PopFocus();

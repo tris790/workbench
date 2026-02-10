@@ -11,7 +11,7 @@ dialog_result Dialog_Render(ui_context *ui, rect bounds,
                             const dialog_config *config) {
   render_context *ctx = ui->renderer;
   const theme *th = ui->theme;
-  dialog_result result = DIALOG_RESULT_NONE;
+  dialog_result result = WB_DIALOG_RESULT_NONE;
 
   /* Dim background */
   color dim = Color_WithAlpha(th->background, 200);
@@ -21,7 +21,7 @@ dialog_result Dialog_Render(ui_context *ui, rect bounds,
   i32 content_base_h = 140; /* Header + Footer + padding */
   i32 text_h = 0;
 
-  if (config->type == DIALOG_TYPE_CONFIRM) {
+  if (config->type == WB_DIALOG_TYPE_CONFIRM) {
     if (config->message.lines) {
       text_h = Text_GetWrappedHeight(config->message.count, ui->font) + 20;
     } else {
@@ -61,7 +61,7 @@ dialog_result Dialog_Render(ui_context *ui, rect bounds,
   i32 content_y = dialog.y + header_h + th->spacing_lg;
   i32 content_w = dialog.w - (th->spacing_lg * 2);
 
-  if (config->type == DIALOG_TYPE_CONFIRM) {
+  if (config->type == WB_DIALOG_TYPE_CONFIRM) {
     /* Warning Icon */
     i32 icon_size = 20;
     rect icon_rect = {dialog.x + th->spacing_lg, content_y, icon_size,
@@ -91,8 +91,8 @@ dialog_result Dialog_Render(ui_context *ui, rect bounds,
   } else {
     /* Text input area */
     rect input_rect = {dialog.x + th->spacing_lg, content_y, content_w, 36};
-    UI_PushStyleInt(UI_STYLE_PADDING, 8);
-    UI_BeginLayout(UI_LAYOUT_VERTICAL, input_rect);
+    UI_PushStyleInt(WB_UI_STYLE_PADDING, 8);
+    UI_BeginLayout(WB_UI_LAYOUT_VERTICAL, input_rect);
     if (config->input_buffer && config->input_state) {
       UI_TextInput(config->input_buffer, config->input_buffer_size,
                    config->placeholder ? config->placeholder : "Enter text...",
@@ -115,10 +115,10 @@ dialog_result Dialog_Render(ui_context *ui, rect bounds,
   rect cancel_rect = {footer_rect.x + footer_rect.w - (btn_w * 2) -
                           (th->spacing_lg * 2),
                       btn_y, btn_w, btn_h};
-  UI_BeginLayout(UI_LAYOUT_HORIZONTAL, cancel_rect);
-  UI_PushStyleColor(UI_STYLE_BG_COLOR, Color_WithAlpha(th->panel_alt, 150));
+  UI_BeginLayout(WB_UI_LAYOUT_HORIZONTAL, cancel_rect);
+  UI_PushStyleColor(WB_UI_STYLE_BG_COLOR, Color_WithAlpha(th->panel_alt, 150));
   if (UI_Button(config->cancel_label ? config->cancel_label : "Cancel")) {
-    result = DIALOG_RESULT_CANCEL;
+    result = WB_DIALOG_RESULT_CANCEL;
   }
   UI_PopStyle();
   UI_EndLayout();
@@ -126,12 +126,12 @@ dialog_result Dialog_Render(ui_context *ui, rect bounds,
   /* Confirm Button */
   rect confirm_rect = {footer_rect.x + footer_rect.w - btn_w - th->spacing_lg,
                        btn_y, btn_w, btn_h};
-  UI_BeginLayout(UI_LAYOUT_HORIZONTAL, confirm_rect);
+  UI_BeginLayout(WB_UI_LAYOUT_HORIZONTAL, confirm_rect);
   if (config->is_danger) {
-    UI_PushStyleColor(UI_STYLE_BG_COLOR, th->error);
-    UI_PushStyleColor(UI_STYLE_HOVER_COLOR, Color_Lighten(th->error, 0.1f));
+    UI_PushStyleColor(WB_UI_STYLE_BG_COLOR, th->error);
+    UI_PushStyleColor(WB_UI_STYLE_HOVER_COLOR, Color_Lighten(th->error, 0.1f));
   } else {
-    UI_PushStyleColor(UI_STYLE_BG_COLOR, th->accent);
+    UI_PushStyleColor(WB_UI_STYLE_BG_COLOR, th->accent);
   }
 
   const char *confirm_label = config->confirm_label;
@@ -140,7 +140,7 @@ dialog_result Dialog_Render(ui_context *ui, rect bounds,
   }
 
   if (UI_Button(confirm_label)) {
-    result = DIALOG_RESULT_CONFIRM;
+    result = WB_DIALOG_RESULT_CONFIRM;
   }
   UI_PopStyle();
   if (config->is_danger)

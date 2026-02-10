@@ -12,14 +12,14 @@ b32 UI_Button(const char *label) {
   UI_RegisterFocusable(id);
 
   /* Calculate size */
-  i32 padding = UI_GetStyleInt(UI_STYLE_PADDING);
+  i32 padding = UI_GetStyleInt(WB_UI_STYLE_PADDING);
   v2i text_size = UI_MeasureText(label, g_ui_ctx->font);
   i32 width = text_size.x + padding * 2;
   i32 height = text_size.y + padding * 2;
 
   /* Apply min/max */
-  i32 min_w = UI_GetStyleInt(UI_STYLE_MIN_WIDTH);
-  i32 min_h = UI_GetStyleInt(UI_STYLE_MIN_HEIGHT);
+  i32 min_w = UI_GetStyleInt(WB_UI_STYLE_MIN_WIDTH);
+  i32 min_h = UI_GetStyleInt(WB_UI_STYLE_MIN_HEIGHT);
   if (width < min_w)
     width = min_w;
   if (height < min_h)
@@ -32,15 +32,15 @@ b32 UI_Button(const char *label) {
   b32 clicked = UI_UpdateInteraction(id, bounds);
 
   /* Determine colors based on state */
-  color bg = UI_GetStyleColor(UI_STYLE_BG_COLOR);
-  color text_color = UI_GetStyleColor(UI_STYLE_TEXT_COLOR);
-  f32 radius = UI_GetStyleFloat(UI_STYLE_BORDER_RADIUS);
+  color bg = UI_GetStyleColor(WB_UI_STYLE_BG_COLOR);
+  color text_color = UI_GetStyleColor(WB_UI_STYLE_TEXT_COLOR);
+  f32 radius = UI_GetStyleFloat(WB_UI_STYLE_BORDER_RADIUS);
 
   if (g_ui_ctx->active == id) {
-    bg = UI_GetStyleColor(UI_STYLE_ACTIVE_COLOR);
+    bg = UI_GetStyleColor(WB_UI_STYLE_ACTIVE_COLOR);
     text_color = g_ui_ctx->theme->background;
   } else if (g_ui_ctx->hot == id) {
-    bg = UI_GetStyleColor(UI_STYLE_HOVER_COLOR);
+    bg = UI_GetStyleColor(WB_UI_STYLE_HOVER_COLOR);
     text_color = g_ui_ctx->theme->background;
   }
 
@@ -49,7 +49,7 @@ b32 UI_Button(const char *label) {
 
   /* Focus ring */
   if (g_ui_ctx->focused == id) {
-    color focus = UI_GetStyleColor(UI_STYLE_FOCUS_COLOR);
+    color focus = UI_GetStyleColor(WB_UI_STYLE_FOCUS_COLOR);
     focus.a = 128;
     rect focus_rect = {bounds.x - 2, bounds.y - 2, bounds.w + 4, bounds.h + 4};
     Render_DrawRectRounded(g_ui_ctx->renderer, focus_rect, radius + 1, focus);
@@ -74,7 +74,7 @@ void UI_Label(const char *text) {
   rect avail = UI_GetAvailableRect();
   v2i pos = {avail.x, avail.y};
 
-  color text_color = UI_GetStyleColor(UI_STYLE_TEXT_COLOR);
+  color text_color = UI_GetStyleColor(WB_UI_STYLE_TEXT_COLOR);
   Render_DrawText(g_ui_ctx->renderer, pos, text, g_ui_ctx->font, text_color);
 
   UI_AdvanceLayout(text_size.x, text_size.y);
@@ -87,7 +87,7 @@ b32 UI_Selectable(const char *label, b32 selected) {
   UI_RegisterFocusable(id);
 
   /* Calculate size */
-  i32 padding = UI_GetStyleInt(UI_STYLE_PADDING);
+  i32 padding = UI_GetStyleInt(WB_UI_STYLE_PADDING);
   v2i text_size = UI_MeasureText(label, g_ui_ctx->font);
   rect avail = UI_GetAvailableRect();
 
@@ -99,11 +99,11 @@ b32 UI_Selectable(const char *label, b32 selected) {
 
   /* Determine colors */
   color bg = (color){0, 0, 0, 0}; /* Transparent by default */
-  color text_color = UI_GetStyleColor(UI_STYLE_TEXT_COLOR);
-  f32 radius = UI_GetStyleFloat(UI_STYLE_BORDER_RADIUS);
+  color text_color = UI_GetStyleColor(WB_UI_STYLE_TEXT_COLOR);
+  f32 radius = UI_GetStyleFloat(WB_UI_STYLE_BORDER_RADIUS);
 
   if (selected || g_ui_ctx->focused == id) {
-    bg = UI_GetStyleColor(UI_STYLE_ACCENT_COLOR);
+    bg = UI_GetStyleColor(WB_UI_STYLE_ACCENT_COLOR);
     text_color = g_ui_ctx->theme->background;
   } else if (g_ui_ctx->hot == id) {
     bg = g_ui_ctx->theme->panel_alt;
@@ -128,10 +128,10 @@ b32 UI_Selectable(const char *label, b32 selected) {
 void UI_Separator(void) {
   rect avail = UI_GetAvailableRect();
 
-  i32 spacing = UI_GetStyleInt(UI_STYLE_SPACING);
+  i32 spacing = UI_GetStyleInt(WB_UI_STYLE_SPACING);
   rect line = {avail.x, avail.y + spacing / 2, avail.w, 1};
 
-  color border = UI_GetStyleColor(UI_STYLE_BORDER_COLOR);
+  color border = UI_GetStyleColor(WB_UI_STYLE_BORDER_COLOR);
   Render_DrawRect(g_ui_ctx->renderer, line, border);
 
   UI_AdvanceLayout(avail.w, spacing);

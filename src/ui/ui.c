@@ -137,7 +137,7 @@ void UI_BeginLayout(ui_layout_direction dir, rect bounds) {
   layout->direction = dir;
   layout->bounds = bounds;
   layout->cursor = (v2i){bounds.x, bounds.y};
-  layout->spacing = UI_GetStyleInt(UI_STYLE_SPACING);
+  layout->spacing = UI_GetStyleInt(WB_UI_STYLE_SPACING);
   layout->max_cross = 0;
   layout->item_count = 0;
 }
@@ -150,7 +150,7 @@ void UI_EndLayout(void) {
 
 void UI_BeginHorizontal(void) {
   rect avail = UI_GetAvailableRect();
-  UI_BeginLayout(UI_LAYOUT_HORIZONTAL, avail);
+  UI_BeginLayout(WB_UI_LAYOUT_HORIZONTAL, avail);
 }
 
 void UI_EndHorizontal(void) {
@@ -168,7 +168,7 @@ void UI_EndHorizontal(void) {
 
 void UI_BeginVertical(void) {
   rect avail = UI_GetAvailableRect();
-  UI_BeginLayout(UI_LAYOUT_VERTICAL, avail);
+  UI_BeginLayout(WB_UI_LAYOUT_VERTICAL, avail);
 }
 
 void UI_EndVertical(void) {
@@ -189,7 +189,7 @@ void UI_Spacer(i32 size) {
   if (!layout)
     return;
 
-  if (layout->direction == UI_LAYOUT_HORIZONTAL) {
+  if (layout->direction == WB_UI_LAYOUT_HORIZONTAL) {
     layout->cursor.x += size;
   } else {
     layout->cursor.y += size;
@@ -206,7 +206,7 @@ rect UI_GetAvailableRect(void) {
 
   ui_layout *layout = UI_GetCurrentLayout();
 
-  if (layout->direction == UI_LAYOUT_HORIZONTAL) {
+  if (layout->direction == WB_UI_LAYOUT_HORIZONTAL) {
     return (rect){layout->cursor.x, layout->cursor.y,
                   layout->bounds.x + layout->bounds.w - layout->cursor.x,
                   layout->bounds.h};
@@ -221,7 +221,7 @@ void UI_AdvanceLayout(i32 width, i32 height) {
   if (!layout)
     return;
 
-  if (layout->direction == UI_LAYOUT_HORIZONTAL) {
+  if (layout->direction == WB_UI_LAYOUT_HORIZONTAL) {
     layout->cursor.x += width;
     if (layout->item_count > 0) {
       layout->cursor.x += layout->spacing;
@@ -287,11 +287,11 @@ void UI_BeginScroll(v2i size, ui_scroll_state *state) {
   Render_SetClipRect(ctx->renderer, view);
 
   /* Start nested layout with scroll offset */
-  i32 scrollbar_w = UI_GetStyleInt(UI_STYLE_SCROLLBAR_WIDTH);
+  i32 scrollbar_w = UI_GetStyleInt(WB_UI_STYLE_SCROLLBAR_WIDTH);
   rect content_bounds = {view.x, view.y - (i32)state->offset.y,
                          view.w - scrollbar_w, /* Leave space for scrollbar */
                          100000};              /* Large height for content */
-  UI_BeginLayout(UI_LAYOUT_VERTICAL, content_bounds);
+  UI_BeginLayout(WB_UI_LAYOUT_VERTICAL, content_bounds);
 }
 
 void UI_EndScroll(void) {
@@ -327,7 +327,7 @@ void UI_EndScroll(void) {
     f32 scroll_ratio = max_scroll > 0 ? state->offset.y / max_scroll : 0;
     i32 bar_y = view.y + (i32)((view.h - bar_height) * scroll_ratio);
 
-    i32 scrollbar_w = UI_GetStyleInt(UI_STYLE_SCROLLBAR_WIDTH);
+    i32 scrollbar_w = UI_GetStyleInt(WB_UI_STYLE_SCROLLBAR_WIDTH);
     rect scrollbar = {view.x + view.w - scrollbar_w, bar_y, scrollbar_w,
                       bar_height};
 
@@ -354,25 +354,25 @@ void UI_Init(ui_context *ctx, render_context *renderer, const theme *th,
   ctx->mono_font = mono_font;
 
   /* Initialize default styles from theme */
-  ctx->style_defaults[UI_STYLE_TEXT_COLOR].c = th->text;
-  ctx->style_defaults[UI_STYLE_BG_COLOR].c = th->panel;
-  ctx->style_defaults[UI_STYLE_BORDER_COLOR].c = th->border;
-  ctx->style_defaults[UI_STYLE_ACCENT_COLOR].c = th->accent;
-  ctx->style_defaults[UI_STYLE_HOVER_COLOR].c = th->accent_hover;
-  ctx->style_defaults[UI_STYLE_ACTIVE_COLOR].c = th->accent_active;
-  ctx->style_defaults[UI_STYLE_FOCUS_COLOR].c = th->accent;
+  ctx->style_defaults[WB_UI_STYLE_TEXT_COLOR].c = th->text;
+  ctx->style_defaults[WB_UI_STYLE_BG_COLOR].c = th->panel;
+  ctx->style_defaults[WB_UI_STYLE_BORDER_COLOR].c = th->border;
+  ctx->style_defaults[WB_UI_STYLE_ACCENT_COLOR].c = th->accent;
+  ctx->style_defaults[WB_UI_STYLE_HOVER_COLOR].c = th->accent_hover;
+  ctx->style_defaults[WB_UI_STYLE_ACTIVE_COLOR].c = th->accent_active;
+  ctx->style_defaults[WB_UI_STYLE_FOCUS_COLOR].c = th->accent;
 
-  ctx->style_defaults[UI_STYLE_PADDING].i = th->spacing_sm;
-  ctx->style_defaults[UI_STYLE_SPACING].i = th->spacing_sm;
-  ctx->style_defaults[UI_STYLE_BORDER_WIDTH].f = 1.0f;
-  ctx->style_defaults[UI_STYLE_BORDER_RADIUS].f = th->radius_sm;
-  ctx->style_defaults[UI_STYLE_FONT_SIZE].i = th->font_size_md;
-  ctx->style_defaults[UI_STYLE_SCROLLBAR_WIDTH].i = 10;
+  ctx->style_defaults[WB_UI_STYLE_PADDING].i = th->spacing_sm;
+  ctx->style_defaults[WB_UI_STYLE_SPACING].i = th->spacing_sm;
+  ctx->style_defaults[WB_UI_STYLE_BORDER_WIDTH].f = 1.0f;
+  ctx->style_defaults[WB_UI_STYLE_BORDER_RADIUS].f = th->radius_sm;
+  ctx->style_defaults[WB_UI_STYLE_FONT_SIZE].i = th->font_size_md;
+  ctx->style_defaults[WB_UI_STYLE_SCROLLBAR_WIDTH].i = 10;
 
-  ctx->style_defaults[UI_STYLE_MIN_WIDTH].i = 0;
-  ctx->style_defaults[UI_STYLE_MIN_HEIGHT].i = 0;
-  ctx->style_defaults[UI_STYLE_MAX_WIDTH].i = 10000;
-  ctx->style_defaults[UI_STYLE_MAX_HEIGHT].i = 10000;
+  ctx->style_defaults[WB_UI_STYLE_MIN_WIDTH].i = 0;
+  ctx->style_defaults[WB_UI_STYLE_MIN_HEIGHT].i = 0;
+  ctx->style_defaults[WB_UI_STYLE_MAX_WIDTH].i = 10000;
+  ctx->style_defaults[WB_UI_STYLE_MAX_HEIGHT].i = 10000;
 
   /* Initialize hover animation */
   ctx->hover_anim.speed = 400.0f;
@@ -399,7 +399,7 @@ void UI_BeginFrame(ui_context *ctx, ui_input *input, f32 dt) {
 
   /* Start with root layout */
   rect screen = {0, 0, ctx->renderer->width, ctx->renderer->height};
-  UI_BeginLayout(UI_LAYOUT_VERTICAL, screen);
+  UI_BeginLayout(WB_UI_LAYOUT_VERTICAL, screen);
 
   /* Store last frame's focus */
   ctx->last_focused = ctx->focused;
@@ -426,13 +426,13 @@ void UI_EndFrame(ui_context *ctx) {
      ones getting focus.
   */
 
-  if (ctx->input.key_pressed[KEY_DOWN]) {
+  if (ctx->input.key_pressed[WB_KEY_DOWN]) {
     /* Move focus forward */
     if (ctx->focus_count > 0) {
       ctx->focus_index = (ctx->focus_index + 1) % ctx->focus_count;
       ctx->focused = ctx->focus_order[ctx->focus_index];
     }
-  } else if (ctx->input.key_pressed[KEY_UP]) {
+  } else if (ctx->input.key_pressed[WB_KEY_UP]) {
     /* Move focus backward */
     if (ctx->focus_count > 0) {
       ctx->focus_index =
@@ -527,14 +527,14 @@ b32 UI_UpdateInteraction(ui_id id, rect bounds) {
 
   if (hovered) {
     ctx->hot = id;
-    if (ctx->input.mouse_pressed[MOUSE_LEFT]) {
+    if (ctx->input.mouse_pressed[WB_MOUSE_LEFT]) {
       ctx->active = id;
       ctx->focused = id;
     }
   }
 
   if (ctx->active == id) {
-    if (ctx->input.mouse_released[MOUSE_LEFT]) {
+    if (ctx->input.mouse_released[WB_MOUSE_LEFT]) {
       if (hovered) {
         clicked = true;
       }
@@ -544,8 +544,8 @@ b32 UI_UpdateInteraction(ui_id id, rect bounds) {
 
   /* Keyboard activation */
   if (ctx->focused == id) {
-    if (ctx->input.key_pressed[KEY_RETURN] ||
-        ctx->input.key_pressed[KEY_SPACE]) {
+    if (ctx->input.key_pressed[WB_KEY_RETURN] ||
+        ctx->input.key_pressed[WB_KEY_SPACE]) {
       clicked = true;
     }
   }
