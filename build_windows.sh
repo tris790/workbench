@@ -49,7 +49,7 @@ CFLAGS="$CFLAGS -Wno-unknown-pragmas -Wno-unused-parameter -Wno-cast-function-ty
 CFLAGS="$CFLAGS $INCLUDES"
 
 # Libraries
-LDFLAGS="-luser32 -lgdi32 -lshell32 -lshlwapi -ldwrite -luuid -lopengl32"
+LDFLAGS="-luser32 -lgdi32 -lshell32 -lshlwapi -ldwrite -luuid -lole32 -lopengl32"
 
 # Mode-specific flags
 if [ "$BUILD_MODE" = "release" ]; then

@@ -21,7 +21,7 @@
 
 /* ===== File Clipboard Support ===== */
 
-#define CLIPBOARD_MAX_FILES 64
+#define CLIPBOARD_MAX_FILES 256
 
 typedef struct {
   char paths[CLIPBOARD_MAX_FILES][FS_MAX_PATH];
@@ -44,13 +44,16 @@ typedef struct {
   struct wl_data_device_manager *data_device_manager;
   struct wl_data_device *data_device;
   struct wl_data_source *clipboard_source;
+  struct wl_data_source *drag_source;
   char *clipboard_content;
   struct wl_data_offer *selection_offer;
   u32 last_serial;
+  u32 last_pointer_serial;
   b32 initialized;
   
   /* File clipboard state */
   clipboard_files file_clipboard;
+  clipboard_files drag_files;
 } linux_platform;
 
 extern linux_platform g_platform;

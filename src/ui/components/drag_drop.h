@@ -125,7 +125,8 @@ void DragDrop_BeginPotential(drag_drop_state *state, fs_state *fs,
  * @param dt       Delta time for animations
  */
 void DragDrop_Update(drag_drop_state *state, struct ui_context_s *ui,
-                     struct layout_state_s *layout, u64 time_ms, f32 dt);
+                     struct layout_state_s *layout, rect window_bounds,
+                     u64 time_ms, f32 dt);
 
 /* ===== Drop Target Detection ===== */
 

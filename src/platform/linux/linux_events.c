@@ -255,6 +255,7 @@ static void PointerButton(void *data, struct wl_pointer *pointer, u32 serial,
                           u32 time, u32 button, u32 state) {
   (void)pointer; (void)time;
   g_platform.last_serial = serial;
+  g_platform.last_pointer_serial = serial;
   platform_window *window = (platform_window *)data;
 
   platform_event event = {0};

@@ -66,7 +66,8 @@ void Layout_RefreshConfig(layout_state *layout) {
 
 void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
   /* Update drag and drop system */
-  DragDrop_Update(&layout->drag_drop, ui, layout, Platform_GetTimeMs(), ui->dt);
+  DragDrop_Update(&layout->drag_drop, ui, layout, bounds, Platform_GetTimeMs(),
+                  ui->dt);
 
   /* Animate split ratio towards target */
   f32 diff = layout->target_split_ratio - layout->split_ratio;

@@ -26,6 +26,7 @@
 
 typedef struct {
   HINSTANCE instance;
+  b32 ole_initialized;
   b32 initialized;
 } windows_platform;
 

@@ -243,6 +243,14 @@ b32 Platform_ClipboardSetFiles(const char **paths, i32 count, b32 is_cut);
  * Returns: number of paths retrieved (0 if no files on clipboard). */
 i32 Platform_ClipboardGetFiles(char **paths_out, i32 max_paths, b32 *is_cut_out);
 
+/* ===== External Drag-and-Drop API =====
+ * Start dragging files from Workbench to other applications.
+ * copy_only: true for copy-only semantics.
+ * Returns true if native drag session started successfully.
+ */
+b32 Platform_StartExternalFileDrag(const char **paths, i32 count,
+                                   b32 copy_only);
+
 /* ===== Process API ===== */
 
 typedef struct platform_process platform_process;

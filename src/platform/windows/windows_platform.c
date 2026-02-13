@@ -54,6 +54,12 @@ b32 Platform_Init(void) {
     return false;
   }
 
+  HRESULT hr = OleInitialize(NULL);
+  if (FAILED(hr)) {
+    return false;
+  }
+  g_platform.ole_initialized = true;
+
   g_platform.initialized = true;
   return true;
 }
@@ -61,6 +67,10 @@ b32 Platform_Init(void) {
 void Platform_Shutdown(void) {
   if (!g_platform.initialized)
     return;
+
+  if (g_platform.ole_initialized) {
+    OleUninitialize();
+  }
 
   memset(&g_platform, 0, sizeof(g_platform));
 }

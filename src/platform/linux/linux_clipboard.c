@@ -4,6 +4,8 @@
 
 #include "linux_internal.h"
 
+extern platform_window *g_current_window;
+
 /* ===== Clipboard Callbacks ===== */
 
 static void DataSourceTarget(void *data, struct wl_data_source *source,
@@ -13,7 +15,7 @@ static void DataSourceTarget(void *data, struct wl_data_source *source,
 
 static void DataSourceSend(void *data, struct wl_data_source *source,
                            const char *mime_type, i32 fd) {
-  (void)data; (void)source;
+  (void)data;
   if (strcmp(mime_type, "text/plain;charset=utf-8") == 0 ||
       strcmp(mime_type, "text/plain") == 0) {
     if (g_platform.clipboard_content) {
@@ -23,6 +25,9 @@ static void DataSourceSend(void *data, struct wl_data_source *source,
   } else if (strcmp(mime_type, "text/uri-list") == 0) {
     /* Send file URIs */
     clipboard_files *files = &g_platform.file_clipboard;
+    if (source == g_platform.drag_source) {
+      files = &g_platform.drag_files;
+    }
     if (files->count > 0) {
       char uri[FS_MAX_PATH + 16];
       for (i32 i = 0; i < files->count; i++) {
@@ -45,8 +50,15 @@ static void DataSourceCancelled(void *data, struct wl_data_source *source) {
   (void)data;
   if (g_platform.clipboard_source == source) {
     g_platform.clipboard_source = NULL;
+    wl_data_source_destroy(source);
+    return;
   }
-  wl_data_source_destroy(source);
+  if (g_platform.drag_source == source) {
+    g_platform.drag_source = NULL;
+    g_platform.drag_files.count = 0;
+    wl_data_source_destroy(source);
+    return;
+  }
 }
 
 static void DataSourceDndDropPerformed(void *data, struct wl_data_source *source) {
@@ -54,7 +66,12 @@ static void DataSourceDndDropPerformed(void *data, struct wl_data_source *source
 }
 
 static void DataSourceDndFinished(void *data, struct wl_data_source *source) {
-  (void)data; (void)source;
+  (void)data;
+  if (g_platform.drag_source == source) {
+    g_platform.drag_source = NULL;
+    g_platform.drag_files.count = 0;
+    wl_data_source_destroy(source);
+  }
 }
 
 static void DataSourceAction(void *data, struct wl_data_source *source, u32 dnd_action) {
@@ -338,4 +355,55 @@ i32 Platform_ClipboardGetFiles(char **paths_out, i32 max_paths, b32 *is_cut_out)
   }
   
   return count;
+}
+
+b32 Platform_StartExternalFileDrag(const char **paths, i32 count,
+                                   b32 copy_only) {
+  if (!paths || count <= 0 || count > CLIPBOARD_MAX_FILES) {
+    return false;
+  }
+
+  if (!g_platform.data_device_manager || !g_platform.data_device ||
+      !g_current_window || !g_current_window->surface ||
+      g_platform.last_pointer_serial == 0) {
+    return false;
+  }
+
+  /* Replace any stale drag source. */
+  if (g_platform.drag_source) {
+    wl_data_source_destroy(g_platform.drag_source);
+    g_platform.drag_source = NULL;
+  }
+
+  g_platform.drag_files.count = count;
+  g_platform.drag_files.is_cut = false;
+  for (i32 i = 0; i < count; i++) {
+    strncpy(g_platform.drag_files.paths[i], paths[i], FS_MAX_PATH - 1);
+    g_platform.drag_files.paths[i][FS_MAX_PATH - 1] = '\0';
+  }
+
+  g_platform.drag_source =
+      wl_data_device_manager_create_data_source(g_platform.data_device_manager);
+  if (!g_platform.drag_source) {
+    g_platform.drag_files.count = 0;
+    return false;
+  }
+
+  wl_data_source_add_listener(g_platform.drag_source, &data_source_listener,
+                              NULL);
+  wl_data_source_offer(g_platform.drag_source, "text/uri-list");
+
+  if (copy_only &&
+      wl_proxy_get_version((struct wl_proxy *)g_platform.data_device_manager) >=
+          3) {
+    wl_data_source_set_actions(g_platform.drag_source,
+                               WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY);
+  }
+
+  wl_data_device_start_drag(g_platform.data_device, g_platform.drag_source,
+                            g_current_window->surface, NULL,
+                            g_platform.last_pointer_serial);
+
+  wl_display_flush(g_platform.display);
+  return true;
 }

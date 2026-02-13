@@ -122,7 +122,8 @@ void DragDrop_BeginPotential(drag_drop_state *state, fs_state *fs,
 /* ===== Update ===== */
 
 void DragDrop_Update(drag_drop_state *state, ui_context *ui,
-                     layout_state *layout, u64 time_ms, f32 dt) {
+                     layout_state *layout, rect window_bounds, u64 time_ms,
+                     f32 dt) {
   ui_input *input = &ui->input;
 
   /* Update animations */
@@ -169,6 +170,20 @@ void DragDrop_Update(drag_drop_state *state, ui_context *ui,
     if (input->key_pressed[WB_KEY_ESCAPE]) {
       DragDrop_Cancel(state);
       break;
+    }
+
+    /* If dragging leaves the app window, start native OS drag-out. */
+    if (input->mouse_down[WB_MOUSE_LEFT] &&
+        !PointInRect(state->current_mouse_pos, window_bounds)) {
+      const char *paths[DRAG_MAX_ITEMS];
+      for (i32 i = 0; i < state->item_count; i++) {
+        paths[i] = state->items[i].path;
+      }
+
+      if (Platform_StartExternalFileDrag(paths, state->item_count, true)) {
+        DragDrop_Cancel(state);
+        break;
+      }
     }
 
     /* Check for drop (mouse release) */

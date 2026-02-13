@@ -18,6 +18,7 @@
 
 /* === Platform (Windows) === */
 #include "platform/windows/windows_clipboard.c"
+#include "platform/windows/windows_dragdrop.c"
 #include "platform/windows/windows_events.c"
 #include "platform/windows/windows_filesystem.c"
 #include "platform/windows/windows_font.c"
