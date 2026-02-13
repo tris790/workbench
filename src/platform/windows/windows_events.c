@@ -409,6 +409,20 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
   case WM_MOUSEMOVE: {
     if (window) {
+      if (!window->mouse_in_window) {
+        TRACKMOUSEEVENT tme = {0};
+        tme.cbSize = sizeof(tme);
+        tme.dwFlags = TME_LEAVE;
+        tme.hwndTrack = hwnd;
+        TrackMouseEvent(&tme);
+
+        window->mouse_in_window = true;
+        /* Reset cursor on re-entry so external cursor shapes (e.g. I-beam
+         * from text selection in another app) do not persist in Workbench.
+         */
+        Platform_SetCursor(WB_CURSOR_DEFAULT);
+      }
+
       window->mouse_x = (i16)LOWORD(lParam);
       window->mouse_y = (i16)HIWORD(lParam);
       platform_event event = {0};
@@ -417,6 +431,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
       event.data.mouse.y = window->mouse_y;
       event.data.mouse.modifiers = GetModifierState();
       PushEvent(window, &event);
+    }
+    return 0;
+  }
+
+  case WM_MOUSELEAVE: {
+    if (window) {
+      window->mouse_in_window = false;
     }
     return 0;
   }

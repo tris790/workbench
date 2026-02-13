@@ -18,6 +18,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <wayland-client.h>
+#include <wayland-cursor.h>
 
 /* ===== File Clipboard Support ===== */
 
@@ -47,6 +48,9 @@ typedef struct {
   struct wl_data_source *drag_source;
   char *clipboard_content;
   struct wl_data_offer *selection_offer;
+  struct wl_cursor_theme *cursor_theme;
+  struct wl_surface *cursor_surface;
+  cursor_type current_cursor;
   u32 last_serial;
   u32 last_pointer_serial;
   b32 initialized;

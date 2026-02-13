@@ -79,6 +79,83 @@ static const struct xdg_wm_base_listener xdg_wm_base_listener = {
 extern const struct wl_seat_listener seat_listener;
 extern const struct wl_data_device_listener data_device_listener;
 
+static struct wl_cursor *FindCursor(const char *const *names, usize name_count) {
+  if (!g_platform.cursor_theme) {
+    return NULL;
+  }
+
+  for (usize i = 0; i < name_count; i++) {
+    struct wl_cursor *cursor =
+        wl_cursor_theme_get_cursor(g_platform.cursor_theme, names[i]);
+    if (cursor) {
+      return cursor;
+    }
+  }
+
+  return NULL;
+}
+
+static struct wl_cursor *GetCursorForType(cursor_type cursor) {
+  static const char *default_names[] = {"default", "left_ptr", "arrow"};
+  static const char *pointer_names[] = {"pointer", "hand2", "hand1"};
+  static const char *text_names[] = {"text", "xterm", "ibeam"};
+  static const char *grab_names[] = {"grab", "openhand", "hand1"};
+  static const char *grabbing_names[] = {"grabbing", "closedhand", "move"};
+  static const char *no_drop_names[] = {"no-drop", "not-allowed"};
+  static const char *copy_names[] = {"copy", "dnd-copy", "alias"};
+
+  struct wl_cursor *result = NULL;
+
+  switch (cursor) {
+  case WB_CURSOR_DEFAULT:
+    result = FindCursor(default_names, ArrayCount(default_names));
+    break;
+  case WB_CURSOR_POINTER:
+    result = FindCursor(pointer_names, ArrayCount(pointer_names));
+    break;
+  case WB_CURSOR_TEXT:
+    result = FindCursor(text_names, ArrayCount(text_names));
+    break;
+  case WB_CURSOR_GRAB:
+    result = FindCursor(grab_names, ArrayCount(grab_names));
+    break;
+  case WB_CURSOR_GRABBING:
+    result = FindCursor(grabbing_names, ArrayCount(grabbing_names));
+    break;
+  case WB_CURSOR_NO_DROP:
+    result = FindCursor(no_drop_names, ArrayCount(no_drop_names));
+    break;
+  case WB_CURSOR_COPY:
+    result = FindCursor(copy_names, ArrayCount(copy_names));
+    break;
+  }
+
+  if (!result) {
+    result = FindCursor(default_names, ArrayCount(default_names));
+  }
+
+  return result;
+}
+
+static void InitCursorTheme(void) {
+  i32 cursor_size = 24;
+  const char *cursor_size_env = getenv("XCURSOR_SIZE");
+  if (cursor_size_env && cursor_size_env[0] != '\0') {
+    i32 parsed = atoi(cursor_size_env);
+    if (parsed > 0 && parsed < 512) {
+      cursor_size = parsed;
+    }
+  }
+
+  g_platform.cursor_theme =
+      wl_cursor_theme_load(NULL, cursor_size, g_platform.shm);
+  if (!g_platform.cursor_theme) {
+    return;
+  }
+
+  g_platform.cursor_surface = wl_compositor_create_surface(g_platform.compositor);
+}
+
 static void EnsureDir(const char *path) {
   char tmp[512];
   char *p = NULL;
@@ -146,8 +223,31 @@ static void Platform_SelfInstall(void) {
 /* ===== Cursor API ===== */
 
 void Platform_SetCursor(cursor_type cursor) {
-  (void)cursor;
-  /* TODO: Implement Wayland cursor setting */
+  g_platform.current_cursor = cursor;
+
+  if (!g_platform.pointer || !g_platform.cursor_surface ||
+      !g_platform.cursor_theme || g_platform.last_pointer_serial == 0) {
+    return;
+  }
+
+  struct wl_cursor *wl_cursor = GetCursorForType(cursor);
+  if (!wl_cursor || wl_cursor->image_count < 1) {
+    return;
+  }
+
+  struct wl_cursor_image *image = wl_cursor->images[0];
+  struct wl_buffer *buffer = wl_cursor_image_get_buffer(image);
+  if (!buffer) {
+    return;
+  }
+
+  wl_pointer_set_cursor(g_platform.pointer, g_platform.last_pointer_serial,
+                        g_platform.cursor_surface, (i32)image->hotspot_x,
+                        (i32)image->hotspot_y);
+  wl_surface_attach(g_platform.cursor_surface, buffer, 0, 0);
+  wl_surface_damage(g_platform.cursor_surface, 0, 0, (i32)image->width,
+                    (i32)image->height);
+  wl_surface_commit(g_platform.cursor_surface);
 }
 
 /* ===== Platform Init/Shutdown ===== */
@@ -189,6 +289,9 @@ b32 Platform_Init(void) {
     return false;
   }
 
+  InitCursorTheme();
+  g_platform.current_cursor = WB_CURSOR_DEFAULT;
+
   /* Ensure app is installed to desktop (icon + .desktop file) */
   Platform_SelfInstall();
 
@@ -217,6 +320,10 @@ void Platform_Shutdown(void) {
     wl_keyboard_destroy(g_platform.keyboard);
   if (g_platform.pointer)
     wl_pointer_destroy(g_platform.pointer);
+  if (g_platform.cursor_surface)
+    wl_surface_destroy(g_platform.cursor_surface);
+  if (g_platform.cursor_theme)
+    wl_cursor_theme_destroy(g_platform.cursor_theme);
   if (g_platform.seat)
     wl_seat_destroy(g_platform.seat);
   if (g_platform.xdg_wm_base)

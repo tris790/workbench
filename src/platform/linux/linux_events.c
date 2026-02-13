@@ -226,9 +226,15 @@ static void PointerEnter(void *data, struct wl_pointer *pointer, u32 serial,
                          wl_fixed_t sy) {
   (void)pointer; (void)surface;
   g_platform.last_serial = serial;
+  g_platform.last_pointer_serial = serial;
   platform_window *window = (platform_window *)data;
   window->mouse_x = wl_fixed_to_int(sx);
   window->mouse_y = wl_fixed_to_int(sy);
+
+  /* Reset to default cursor when re-entering this window so external cursor
+   * shapes (e.g. text selection from another app) do not leak into Workbench.
+   */
+  Platform_SetCursor(WB_CURSOR_DEFAULT);
 }
 
 static void PointerLeave(void *data, struct wl_pointer *pointer, u32 serial,

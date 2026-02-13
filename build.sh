@@ -32,7 +32,7 @@ CC="gcc"
 CFLAGS="-std=c99 -D_GNU_SOURCE -Wall -Wextra -Werror -Wpedantic"
 CFLAGS="$CFLAGS $INCLUDES"
 CFLAGS="$CFLAGS $(pkg-config --cflags freetype2 fontconfig)"
-LDFLAGS="-lwayland-client -lwayland-egl -lEGL -lGL -lrt -lm -lutil -lpthread $(pkg-config --libs freetype2 fontconfig)"
+LDFLAGS="-lwayland-cursor -lwayland-client -lwayland-egl -lEGL -lGL -lrt -lm -lutil -lpthread $(pkg-config --libs freetype2 fontconfig)"
 
 # Mode-specific flags
 if [ "$BUILD_MODE" = "release" ]; then

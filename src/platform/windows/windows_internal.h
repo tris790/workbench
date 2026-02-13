@@ -59,6 +59,7 @@ struct platform_window {
 
   /* Input state */
   i32 mouse_x, mouse_y;
+  b32 mouse_in_window;
   u32 modifiers;
   WPARAM last_vk;
 };
