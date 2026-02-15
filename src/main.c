@@ -135,6 +135,10 @@ int main(int argc, char **argv) {
   /* Initialize Layout (which inits explorers) */
   layout_state layout;
   Layout_Init(&layout, &arena);
+  
+  /* Global reference for notification callbacks */
+  extern layout_state *g_layout_state;
+  g_layout_state = &layout;
 
   /* Navigate panels to starting directory/directories */
   Args_Handle(&layout, &args);

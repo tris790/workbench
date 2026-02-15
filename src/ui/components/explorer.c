@@ -449,6 +449,7 @@ static void Explorer_SetupInputDialog(explorer_state *state, explorer_mode mode,
   memset(&state->input_state, 0, sizeof(state->input_state));
   state->input_state.cursor_pos = (i32)strlen(state->input_buffer);
   state->input_state.has_focus = true;
+  state->input_state.selection_start = -1;  /* No selection initially */
 }
 
 static void Explorer_GetInputPath(explorer_state *state, char *out_path,
@@ -471,6 +472,42 @@ void Explorer_StartCreateFile(explorer_state *state) {
 
 void Explorer_StartCreateDir(explorer_state *state) {
   Explorer_SetupInputDialog(state, WB_EXPLORER_MODE_CREATE_DIR, NULL);
+}
+
+/* Cleanup callback for delete task - shows notifications on failure */
+void Explorer_OnDeleteComplete(void *user_data, b32 success) {
+  fs_delete_task_data *data = (fs_delete_task_data *)user_data;
+  
+  /* Count failures */
+  i32 fail_count = 0;
+  const char *first_fail_name = NULL;
+  
+  for (i32 i = 0; i < data->count; i++) {
+    if (!data->results[i].success) {
+      if (fail_count == 0) {
+        /* Extract filename from path for concise message */
+        first_fail_name = FS_GetFilename(data->results[i].path);
+      }
+      fail_count++;
+    }
+  }
+  
+  /* Show notification if any failures */
+  if (fail_count > 0) {
+    extern layout_state *g_layout_state;  /* Declared in layout.h or main.c */
+    if (g_layout_state) {
+      if (fail_count == 1) {
+        Notification_Error(&g_layout_state->notifications, 
+                           "Failed to delete: %s", first_fail_name);
+      } else {
+        Notification_Error(&g_layout_state->notifications,
+                           "Failed to delete %d items", fail_count);
+      }
+    }
+  }
+  
+  /* Note: Success case is silent - no notification needed for successful deletion */
+  (void)success;  /* Parameter used for other potential future behaviors */
 }
 
 void Explorer_ConfirmDelete(explorer_state *state, ui_context *ui) {
@@ -592,9 +629,15 @@ paste_result Explorer_Paste(explorer_state *state) {
     }
   }
 
-  /* Show toast/status error if any failures */
-  if (result.failure_count > 0) {
-    /* TODO: StatusBar_ShowError(result.last_error); */
+  /* Show notification on failure */
+  if (result.failure_count > 0 && state->layout) {
+    if (result.failure_count == 1) {
+      Notification_Error(&state->layout->notifications, "%s", result.last_error);
+    } else {
+      Notification_Error(&state->layout->notifications, 
+                         "Failed to %s %d items", 
+                         is_cut ? "move" : "copy", result.failure_count);
+    }
   }
 
   if (result.success_count > 0) {
@@ -814,6 +857,9 @@ static void Explorer_OnConfirm(explorer_state *state) {
       Explorer_GetInputPath(state, new_path, sizeof(new_path));
       if (FS_Rename(entry->path, new_path)) {
         Explorer_Refresh(state);
+      } else if (state->layout) {
+        Notification_Error(&state->layout->notifications,
+                           "Failed to rename to: %s", state->input_buffer);
       }
     }
     state->mode = WB_EXPLORER_MODE_NORMAL;
@@ -825,6 +871,9 @@ static void Explorer_OnConfirm(explorer_state *state) {
       Explorer_GetInputPath(state, new_path, sizeof(new_path));
       if (FS_CreateFile(new_path)) {
         Explorer_Refresh(state);
+      } else if (state->layout) {
+        Notification_Error(&state->layout->notifications,
+                           "Failed to create file: %s", state->input_buffer);
       }
     }
     state->mode = WB_EXPLORER_MODE_NORMAL;
@@ -836,6 +885,9 @@ static void Explorer_OnConfirm(explorer_state *state) {
       Explorer_GetInputPath(state, new_path, sizeof(new_path));
       if (FS_CreateDirectory(new_path)) {
         Explorer_Refresh(state);
+      } else if (state->layout) {
+        Notification_Error(&state->layout->notifications,
+                           "Failed to create directory: %s", state->input_buffer);
       }
     }
     state->mode = WB_EXPLORER_MODE_NORMAL;
@@ -850,7 +902,7 @@ static void Explorer_OnConfirm(explorer_state *state) {
       if (count > 0) {
         TaskQueue_Submit(&state->layout->tasks, 
                          FS_DeleteTask_Work,
-                         NULL,  /* No special cleanup - will refresh on completion detection */
+                         Explorer_OnDeleteComplete,  /* Cleanup shows notifications */
                          task_data);
       }
     }

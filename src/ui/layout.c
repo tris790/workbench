@@ -17,6 +17,9 @@
 /* Cached splitter ID to avoid hashing every frame */
 static ui_id g_splitter_id = 0;
 
+/* Global layout state for notification callbacks from background tasks */
+layout_state *g_layout_state = NULL;
+
 void Layout_Init(layout_state *layout, memory_arena *arena) {
   layout->arena = arena;
   layout->mode = WB_LAYOUT_MODE_SINGLE;
@@ -57,6 +60,9 @@ void Layout_Init(layout_state *layout, memory_arena *arena) {
 
   /* Initialize progress bar */
   ProgressBar_Init(&layout->progress_bar);
+  
+  /* Initialize notification system */
+  Notification_Init(&layout->notifications);
 }
 
 void Layout_Shutdown(layout_state *layout) {
@@ -302,6 +308,9 @@ void Layout_Render(layout_state *layout, ui_context *ui, rect bounds) {
 
   /* Render drag and drop preview on top of everything */
   DragDrop_RenderPreview(&layout->drag_drop, ui);
+  
+  /* Render notifications on top of everything */
+  Notification_UpdateAndRender(&layout->notifications, ui, bounds);
 }
 
 void Layout_SetMode(layout_state *layout, layout_mode mode) {

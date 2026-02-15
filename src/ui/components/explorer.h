@@ -151,6 +151,9 @@ void Explorer_StartRename(explorer_state *state);
 void Explorer_StartCreateFile(explorer_state *state);
 void Explorer_StartCreateDir(explorer_state *state);
 void Explorer_ConfirmDelete(explorer_state *state, ui_context *ui);
+
+/* Delete task cleanup callback - shows error notifications */
+void Explorer_OnDeleteComplete(void *user_data, b32 success);
 void Explorer_Copy(explorer_state *state);
 void Explorer_Cut(explorer_state *state);
 paste_result Explorer_Paste(explorer_state *state);

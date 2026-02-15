@@ -160,8 +160,15 @@ b32 FS_Delete(const char *path, memory_arena *arena);
 #define FS_MAX_DELETE_PATHS 64
 
 typedef struct {
+  char path[FS_MAX_PATH];
+  b32 success;
+} fs_delete_result;
+
+typedef struct {
   char paths[FS_MAX_DELETE_PATHS][FS_MAX_PATH];
   i32 count;
+  /* Results populated during work function */
+  fs_delete_result results[FS_MAX_DELETE_PATHS];
 } fs_delete_task_data;
 
 /* Work function for background delete task.

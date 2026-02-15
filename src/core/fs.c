@@ -66,8 +66,12 @@ b32 FS_DeleteTask_Work(void *user_data, void (*progress)(const task_progress *))
       progress(&p);
     }
     
-    /* Delete the path */
-    if (!Platform_Delete(data->paths[i])) {
+    /* Delete the path and record result */
+    strncpy(data->results[i].path, data->paths[i], FS_MAX_PATH - 1);
+    data->results[i].path[FS_MAX_PATH - 1] = '\0';
+    data->results[i].success = Platform_Delete(data->paths[i]);
+    
+    if (!data->results[i].success) {
       all_success = false;
       /* Continue with other paths even if one fails */
     }

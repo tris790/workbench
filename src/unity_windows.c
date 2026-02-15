@@ -42,6 +42,7 @@
 #include "ui/components/config_diagnostics.c"
 #include "ui/components/context_menu.c"
 #include "ui/components/dialog.c"
+#include "ui/components/notification.c"
 #include "ui/components/drag_drop.c"
 #include "ui/components/explorer.c"
 #include "ui/components/file_item.c"

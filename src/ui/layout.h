@@ -13,6 +13,7 @@
 #include "../renderer/renderer.h"
 #include "components/drag_drop.h"
 #include "components/explorer.h"
+#include "components/notification.h"
 #include "components/progress_bar.h"
 #include "components/scroll_container.h"
 #include "components/terminal_panel.h"
@@ -65,9 +66,15 @@ typedef struct layout_state_s {
 
   /* Progress Bar */
   progress_bar_state progress_bar;
+  
+  /* Notification system */
+  notification_state notifications;
 } layout_state;
 
 #define MIN_PANEL_WIDTH 100.0f
+
+/* Global layout state for notification callbacks from background tasks */
+extern layout_state *g_layout_state;
 
 /* Initialize the layout system */
 void Layout_Init(layout_state *layout, memory_arena *arena);
