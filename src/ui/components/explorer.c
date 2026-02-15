@@ -306,6 +306,9 @@ void Explorer_Init(explorer_state *state, memory_arena *arena) {
   strncpy(state->history[0], state->fs.current_path, FS_MAX_PATH - 1);
   state->history_index = 0;
   state->history_count = 1;
+  
+  /* Initialize task tracking */
+  state->was_task_busy = false;
 }
 
 void Explorer_Shutdown(explorer_state *state) {
@@ -839,20 +842,24 @@ static void Explorer_OnConfirm(explorer_state *state) {
   } break;
 
   case WB_EXPLORER_MODE_CONFIRM_DELETE: {
-    /* Delete all selected items (skip "..") */
-    for (i32 idx = FS_GetFirstSelected(&state->fs); idx >= 0;
-         idx = FS_GetNextSelected(&state->fs, idx)) {
-      fs_entry *entry = FS_GetEntry(&state->fs, idx);
-      if (entry && strcmp(entry->name, "..") != 0) {
-        FS_Delete(entry->path, state->fs.arena);
+    /* Submit delete task to background queue */
+    if (state->layout) {
+      fs_delete_task_data *task_data = ArenaPush(state->fs.arena, sizeof(fs_delete_task_data));
+      i32 count = FS_DeleteTask_FromSelection(&state->fs, task_data);
+      
+      if (count > 0) {
+        TaskQueue_Submit(&state->layout->tasks, 
+                         FS_DeleteTask_Work,
+                         NULL,  /* No special cleanup - will refresh on completion detection */
+                         task_data);
       }
     }
-    Explorer_Refresh(state);
-
+    
+    /* Close dialog immediately - actual deletion happens in background */
     /* Arena-allocated dialog_text is automatically reclaimed */
     state->dialog_text.lines = NULL;
     state->dialog_text.count = 0;
-
+    
     state->mode = WB_EXPLORER_MODE_NORMAL;
   } break;
 
@@ -884,6 +891,16 @@ void Explorer_PollWatcher(explorer_state *state) {
   /* Poll file watcher for external changes */
   if (FSWatcher_Poll(&state->watcher)) {
     Explorer_Refresh(state);
+  }
+  
+  /* Also refresh when background tasks complete (were busy, now idle) */
+  if (state->layout) {
+    b32 is_busy = TaskQueue_IsBusy(&state->layout->tasks);
+    if (state->was_task_busy && !is_busy) {
+      /* Task just completed - refresh */
+      Explorer_Refresh(state);
+    }
+    state->was_task_busy = is_busy;
   }
 }
 

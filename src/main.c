@@ -465,6 +465,7 @@ int main(int argc, char **argv) {
     Platform_SleepMs(16); /* ~60fps target */
   }
 
+  Layout_Shutdown(&layout);
   UI_Shutdown(&ui);
   if (main_font)
     Font_Free(main_font);

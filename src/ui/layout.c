@@ -7,6 +7,7 @@
 #include "../core/input.h"
 #include "components/config_diagnostics.h"
 #include "components/dialog.h"
+#include "components/progress_bar.h"
 
 #include <string.h>
 
@@ -50,6 +51,16 @@ void Layout_Init(layout_state *layout, memory_arena *arena) {
 
   /* Initialize drag and drop */
   DragDrop_Init(&layout->drag_drop);
+
+  /* Initialize background task queue */
+  TaskQueue_Init(&layout->tasks, arena);
+
+  /* Initialize progress bar */
+  ProgressBar_Init(&layout->progress_bar);
+}
+
+void Layout_Shutdown(layout_state *layout) {
+  TaskQueue_Shutdown(&layout->tasks);
 }
 
 void Layout_RefreshConfig(layout_state *layout) {
@@ -65,6 +76,15 @@ void Layout_RefreshConfig(layout_state *layout) {
 }
 
 void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
+  /* Update background task queue */
+  TaskQueue_Update(&layout->tasks);
+
+  /* Update progress bar */
+  b32 is_busy = TaskQueue_IsBusy(&layout->tasks);
+  u64 elapsed = TaskQueue_GetElapsedMs(&layout->tasks);
+  const task_progress *progress = is_busy ? TaskQueue_GetProgress(&layout->tasks) : NULL;
+  ProgressBar_Update(&layout->progress_bar, is_busy, elapsed, progress, ui->dt);
+
   /* Update drag and drop system */
   DragDrop_Update(&layout->drag_drop, ui, layout, bounds, Platform_GetTimeMs(),
                   ui->dt);
@@ -246,17 +266,23 @@ static void RenderPanelWithTerminal(layout_state *layout, ui_context *ui,
 }
 
 void Layout_Render(layout_state *layout, ui_context *ui, rect bounds) {
-  if (layout->mode == WB_LAYOUT_MODE_SINGLE) {
-    RenderPanelWithTerminal(layout, ui, bounds, 0);
-  } else {
-    f32 available_width = bounds.w;
-    f32 split_x = bounds.x + (available_width * layout->split_ratio);
+  /* Reserve space for progress bar if visible or animating */
+  f32 progress_height = PROGRESS_BAR_HEIGHT;
+  rect content_bounds = bounds;
+  content_bounds.h -= progress_height;
 
-    rect left_bounds = {bounds.x, bounds.y, split_x - bounds.x, bounds.h};
-    rect splitter_bounds = {split_x, bounds.y, SPLITTER_WIDTH, bounds.h};
-    rect right_bounds = {split_x + SPLITTER_WIDTH, bounds.y,
-                         bounds.w - (split_x - bounds.x) - SPLITTER_WIDTH,
-                         bounds.h};
+  if (layout->mode == WB_LAYOUT_MODE_SINGLE) {
+    RenderPanelWithTerminal(layout, ui, content_bounds, 0);
+  } else {
+    f32 available_width = content_bounds.w;
+    f32 split_x = content_bounds.x + (available_width * layout->split_ratio);
+
+    rect left_bounds = {content_bounds.x, content_bounds.y, 
+                        split_x - content_bounds.x, content_bounds.h};
+    rect splitter_bounds = {split_x, content_bounds.y, SPLITTER_WIDTH, content_bounds.h};
+    rect right_bounds = {split_x + SPLITTER_WIDTH, content_bounds.y,
+                         content_bounds.w - (split_x - content_bounds.x) - SPLITTER_WIDTH,
+                         content_bounds.h};
 
     bool hover = UI_PointInRect(ui->input.mouse_pos, splitter_bounds);
 
@@ -267,6 +293,12 @@ void Layout_Render(layout_state *layout, ui_context *ui, rect bounds) {
 
   /* Render config diagnostic modal if active */
   ConfigDiagnostics_Render(ui, bounds, layout);
+
+  /* Render progress bar at the bottom */
+  const task_progress *progress = TaskQueue_IsBusy(&layout->tasks) 
+                                    ? TaskQueue_GetProgress(&layout->tasks) 
+                                    : NULL;
+  ProgressBar_Render(&layout->progress_bar, ui, bounds, progress);
 
   /* Render drag and drop preview on top of everything */
   DragDrop_RenderPreview(&layout->drag_drop, ui);

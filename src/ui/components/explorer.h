@@ -94,6 +94,9 @@ typedef struct explorer_state_s {
   /* Cached visible entries (indices into fs.entries) */
   i32 visible_entries[FS_MAX_ENTRIES];
   i32 visible_count;
+  
+  /* Track background task busy state for refresh on completion */
+  b32 was_task_busy;
 } explorer_state;
 
 /* ===== Explorer API ===== */

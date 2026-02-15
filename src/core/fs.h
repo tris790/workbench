@@ -8,6 +8,7 @@
 #ifndef FS_H
 #define FS_H
 
+#include "task_queue.h"
 #include "types.h"
 
 /* ===== Configuration ===== */
@@ -152,6 +153,30 @@ b32 FS_NavigateHome(fs_state *state);
 
 /* Delete file or recursively delete directory */
 b32 FS_Delete(const char *path, memory_arena *arena);
+
+/* ===== Background Delete Task ===== */
+
+/* Maximum number of paths that can be deleted in one task */
+#define FS_MAX_DELETE_PATHS 64
+
+typedef struct {
+  char paths[FS_MAX_DELETE_PATHS][FS_MAX_PATH];
+  i32 count;
+} fs_delete_task_data;
+
+/* Work function for background delete task.
+ * Deletes all paths in the task data.
+ * Reports progress via the progress callback. */
+b32 FS_DeleteTask_Work(void *user_data, void (*progress)(const task_progress *));
+
+/* Cleanup function called after delete task completes.
+ * success: true if all deletions succeeded, false if any failed. */
+typedef void (*fs_delete_cleanup_fn)(void *user_data, b32 success);
+
+/* Create a delete task from currently selected entries in fs_state.
+ * Copies selected paths (excluding "..") into task_data.
+ * Returns number of paths copied. */
+i32 FS_DeleteTask_FromSelection(fs_state *fs, fs_delete_task_data *task_data);
 
 /* Rename file or directory */
 b32 FS_Rename(const char *old_path, const char *new_path);

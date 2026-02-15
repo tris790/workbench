@@ -14,6 +14,7 @@
 #include "core/image.c"
 #include "core/input.c"
 #include "core/key_repeat.c"
+#include "core/task_queue.c"
 #include "core/text.c"
 #include "core/theme.c"
 
@@ -25,6 +26,7 @@
 #include "platform/linux/linux_platform.c"
 #include "platform/linux/linux_process.c"
 #include "platform/linux/linux_pty.c"
+#include "platform/linux/linux_threads.c"
 #include "platform/linux/linux_time.c"
 #include "platform/linux/linux_window.c"
 #include "platform/protocols/xdg-decoration-protocol.c"
@@ -45,6 +47,7 @@
 #include "ui/components/drag_drop.c"
 #include "ui/components/explorer.c"
 #include "ui/components/file_item.c"
+#include "ui/components/progress_bar.c"
 #include "ui/components/quick_filter.c"
 #include "ui/components/scroll_container.c"
 #include "ui/components/terminal_panel.c"

@@ -50,6 +50,48 @@ b32 FS_IsWindowsDriveRoot(const char *path) {
   return false;
 }
 
+/* ===== Background Delete Task ===== */
+
+b32 FS_DeleteTask_Work(void *user_data, void (*progress)(const task_progress *)) {
+  fs_delete_task_data *data = (fs_delete_task_data *)user_data;
+  b32 all_success = true;
+  
+  for (i32 i = 0; i < data->count; i++) {
+    /* Report progress before each deletion */
+    if (progress) {
+      task_progress p = {
+        .type = WB_PROGRESS_TYPE_UNBOUNDED,
+        .data.unbounded.status = data->paths[i]
+      };
+      progress(&p);
+    }
+    
+    /* Delete the path */
+    if (!Platform_Delete(data->paths[i])) {
+      all_success = false;
+      /* Continue with other paths even if one fails */
+    }
+  }
+  
+  return all_success;
+}
+
+i32 FS_DeleteTask_FromSelection(fs_state *fs, fs_delete_task_data *task_data) {
+  task_data->count = 0;
+  
+  for (i32 idx = FS_GetFirstSelected(fs); idx >= 0 && task_data->count < FS_MAX_DELETE_PATHS;
+       idx = FS_GetNextSelected(fs, idx)) {
+    fs_entry *entry = FS_GetEntry(fs, idx);
+    if (entry && strcmp(entry->name, "..") != 0) {
+      strncpy(task_data->paths[task_data->count], entry->path, FS_MAX_PATH - 1);
+      task_data->paths[task_data->count][FS_MAX_PATH - 1] = '\0';
+      task_data->count++;
+    }
+  }
+  
+  return task_data->count;
+}
+
 void FS_NormalizePath(char *path) {
   if (!path)
     return;

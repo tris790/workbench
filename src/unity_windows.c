@@ -13,6 +13,7 @@
 #include "core/fuzzy_match.c"
 #include "core/input.c"
 #include "core/key_repeat.c"
+#include "core/task_queue.c"
 #include "core/text.c"
 #include "core/theme.c"
 
@@ -26,6 +27,7 @@
 #include "platform/windows/windows_platform.c"
 #include "platform/windows/windows_process.c"
 #include "platform/windows/windows_pty.c"
+#include "platform/windows/windows_threads.c"
 #include "platform/windows/windows_time.c"
 #include "platform/windows/windows_window.c"
 
@@ -43,6 +45,7 @@
 #include "ui/components/drag_drop.c"
 #include "ui/components/explorer.c"
 #include "ui/components/file_item.c"
+#include "ui/components/progress_bar.c"
 #include "ui/components/quick_filter.c"
 #include "ui/components/scroll_container.c"
 #include "ui/components/terminal_panel.c"

@@ -8,10 +8,12 @@
 #ifndef LAYOUT_H
 #define LAYOUT_H
 
+#include "../core/task_queue.h"
 #include "../core/types.h"
 #include "../renderer/renderer.h"
 #include "components/drag_drop.h"
 #include "components/explorer.h"
+#include "components/progress_bar.h"
 #include "components/scroll_container.h"
 #include "components/terminal_panel.h"
 #include "ui.h"
@@ -57,12 +59,21 @@ typedef struct layout_state_s {
 
   /* Context menu reference (managed by main.c) */
   struct context_menu_state_s *context_menu;
+
+  /* Background Task Queue */
+  task_queue tasks;
+
+  /* Progress Bar */
+  progress_bar_state progress_bar;
 } layout_state;
 
 #define MIN_PANEL_WIDTH 100.0f
 
 /* Initialize the layout system */
 void Layout_Init(layout_state *layout, memory_arena *arena);
+
+/* Shutdown the layout system */
+void Layout_Shutdown(layout_state *layout);
 
 /* Update layout logic (input handling, animations) - call before render */
 void Layout_Update(layout_state *layout, ui_context *ui, rect bounds);
