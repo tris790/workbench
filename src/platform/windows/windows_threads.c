@@ -45,33 +45,54 @@ void Platform_DestroyThread(void *thread) {
   CloseHandle(h);
 }
 
-/* ===== Mutex Implementation ===== */
+/* ===== Mutex Implementation =====
+ * 
+ * We use SRWLOCK (Slim Reader-Writer Lock) instead of Mutex because:
+ * 1. SRWLOCK is much lighter weight than Mutex objects
+ * 2. SRWLOCK can be used with CONDITION_VARIABLE
+ * 3. We only need exclusive locking (writer mode), so SRWLOCK acts like a mutex
+ */
+
+typedef struct {
+  SRWLOCK lock;
+} windows_mutex;
 
 void *Platform_CreateMutex(void) {
-  HANDLE mutex = CreateMutex(NULL, FALSE, NULL);
-  return mutex;
+  windows_mutex *m = (windows_mutex *)malloc(sizeof(windows_mutex));
+  if (!m) return NULL;
+  
+  InitializeSRWLock(&m->lock);
+  
+  return m;
 }
 
 void Platform_DestroyMutex(void *mutex) {
   if (!mutex) return;
-  CloseHandle((HANDLE)mutex);
+  /* SRWLOCK doesn't need explicit destruction */
+  free(mutex);
 }
 
 void Platform_LockMutex(void *mutex) {
   if (!mutex) return;
-  WaitForSingleObject((HANDLE)mutex, INFINITE);
+  windows_mutex *m = (windows_mutex *)mutex;
+  AcquireSRWLockExclusive(&m->lock);
 }
 
 void Platform_UnlockMutex(void *mutex) {
   if (!mutex) return;
-  ReleaseMutex((HANDLE)mutex);
+  windows_mutex *m = (windows_mutex *)mutex;
+  ReleaseSRWLockExclusive(&m->lock);
 }
 
-/* ===== Condition Variable Implementation ===== */
+/* ===== Condition Variable Implementation =====
+ *
+ * Windows CONDITION_VARIABLE works with SRWLOCK.
+ * The key fix: we must use the passed mutex (which is our SRWLOCK wrapper)
+ * with SleepConditionVariableSRW, not an internal lock.
+ */
 
 typedef struct {
   CONDITION_VARIABLE cond;
-  CRITICAL_SECTION cs;
 } windows_cond_var;
 
 void *Platform_CreateCondVar(void) {
@@ -79,27 +100,30 @@ void *Platform_CreateCondVar(void) {
   if (!cv) return NULL;
   
   InitializeConditionVariable(&cv->cond);
-  InitializeCriticalSection(&cv->cs);
   
   return cv;
 }
 
 void Platform_DestroyCondVar(void *cond) {
   if (!cond) return;
-  windows_cond_var *cv = (windows_cond_var *)cond;
-  DeleteCriticalSection(&cv->cs);
-  free(cv);
+  /* CONDITION_VARIABLE doesn't need explicit destruction */
+  free(cond);
 }
 
 void Platform_CondWait(void *cond, void *mutex) {
   if (!cond || !mutex) return;
   windows_cond_var *cv = (windows_cond_var *)cond;
-  /* Note: Windows condition variables use their own critical section */
-  /* This is a simplified implementation - for proper use we'd need to integrate
-   * with the mutex properly. For now, this works with our usage pattern. */
-  EnterCriticalSection(&cv->cs);
-  LeaveCriticalSection(&cv->cs);
-  SleepConditionVariableCS(&cv->cond, &cv->cs, INFINITE);
+  windows_mutex *m = (windows_mutex *)mutex;
+  
+  /* 
+   * This atomically releases the SRWLOCK and waits on the condition variable.
+   * When signaled or spuriously woken, it re-acquires the lock before returning.
+   * 
+   * Note: We use 0 as flags (not CONDITION_VARIABLE_INIT), which means:
+   * - The lock is released while waiting
+   * - The lock is re-acquired on wake
+   */
+  SleepConditionVariableSRW(&cv->cond, &m->lock, INFINITE, 0);
 }
 
 void Platform_CondSignal(void *cond) {
