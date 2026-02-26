@@ -4,8 +4,6 @@
  * C99, handmade hero style.
  */
 
-#define _POSIX_C_SOURCE 200809L
-
 #include "fs.h"
 #include "../platform/platform.h"
 #include <strings.h>
@@ -13,9 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 #include <time.h>
-#include <unistd.h>
 
 /* ===== Utility Functions ===== */
 
@@ -657,15 +653,19 @@ i32 FS_GetNextSelected(fs_state *state, i32 after) {
 }
 
 const char *FS_GetHomePath(void) {
-  const char *home = getenv("HOME");
-  if (home)
-    return home;
+  static char home_path[FS_MAX_PATH];
+  if (Platform_GetHomePath(home_path, sizeof(home_path)))
+    return home_path;
 
 #ifdef _WIN32
   return "C:/";
 #else
   return "/";
 #endif
+}
+
+const char *FS_GetDownloadsPath(char *buffer, usize buffer_size) {
+  return Platform_GetDownloadsPath(buffer, buffer_size);
 }
 
 b32 FS_NavigateHome(fs_state *state) {

@@ -220,6 +220,8 @@ b32 Platform_Delete(const char *path);
 b32 Platform_Rename(const char *old_path, const char *new_path);
 b32 Platform_Copy(const char *src, const char *dst);
 b32 Platform_GetRealPath(const char *path, char *out_path, usize out_size);
+const char *Platform_GetHomePath(char *buffer, usize buffer_size);
+const char *Platform_GetDownloadsPath(char *buffer, usize buffer_size);
 
 /* ===== Clipboard API ===== */
 

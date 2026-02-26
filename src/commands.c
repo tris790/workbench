@@ -129,6 +129,19 @@ static void Cmd_NavHome(void *u) {
     Explorer_NavigateTo(e, FS_GetHomePath(), false);
 }
 
+static void Cmd_NavDownloads(void *u) {
+  (void)u;
+  explorer_state *e = GET_ACTIVE_EXPLORER();
+  if (!e)
+    return;
+
+  char downloadsPath[FS_MAX_PATH];
+  const char *path = FS_GetDownloadsPath(downloadsPath, sizeof(downloadsPath));
+  if (path) {
+    Explorer_NavigateTo(e, path, false);
+  }
+}
+
 static void Cmd_NavRoot(void *u) {
   (void)u;
   explorer_state *e = GET_ACTIVE_EXPLORER();
@@ -327,6 +340,8 @@ static const CommandDef g_commands[] = {
     {"Nav: Focus Path", "palette", "Navigation", "filter search focus path",
      Cmd_NavFocusPath},
     {"Nav: Go Back", "Alt + Left", "Navigation", "history back", Cmd_NavBack},
+    {"Nav: Go Downloads", "palette", "Navigation",
+     "downloads download down folder", Cmd_NavDownloads},
     {"Nav: Go Forward", "Alt + Right", "Navigation", "history forward",
      Cmd_NavForward},
     {"Nav: Go Home", "palette", "Navigation", "user desk home", Cmd_NavHome},

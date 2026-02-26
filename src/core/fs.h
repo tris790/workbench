@@ -146,6 +146,9 @@ const char *FS_GetCurrentPath(fs_state *state);
 /* Get home directory path */
 const char *FS_GetHomePath(void);
 
+/* Build downloads directory path into caller buffer (returns NULL on failure) */
+const char *FS_GetDownloadsPath(char *buffer, usize buffer_size);
+
 /* Navigate to home directory */
 b32 FS_NavigateHome(fs_state *state);
 

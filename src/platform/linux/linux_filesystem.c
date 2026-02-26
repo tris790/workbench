@@ -215,3 +215,33 @@ b32 Platform_GetRealPath(const char *path, char *out_path, usize out_size) {
   }
   return false;
 }
+
+const char *Platform_GetHomePath(char *buffer, usize buffer_size) {
+  if (!buffer || buffer_size == 0)
+    return NULL;
+
+  const char *home = getenv("HOME");
+  if (!home || home[0] == '\0')
+    home = "/";
+
+  strncpy(buffer, home, buffer_size - 1);
+  buffer[buffer_size - 1] = '\0';
+  return buffer;
+}
+
+const char *Platform_GetDownloadsPath(char *buffer, usize buffer_size) {
+  if (!buffer || buffer_size == 0)
+    return NULL;
+
+  char home[FS_MAX_PATH];
+  const char *homePath = Platform_GetHomePath(home, sizeof(home));
+  if (!homePath)
+    return NULL;
+
+  if (homePath[strlen(homePath) - 1] == '/') {
+    snprintf(buffer, buffer_size, "%sDownloads", homePath);
+  } else {
+    snprintf(buffer, buffer_size, "%s/Downloads", homePath);
+  }
+  return buffer;
+}

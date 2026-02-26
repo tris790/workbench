@@ -9,6 +9,7 @@
 
 #include "fs.h"
 #include "windows_internal.h"
+#include <shlobj.h>
 #include <shlwapi.h>
 
 /* ===== File System API ===== */
@@ -281,5 +282,56 @@ b32 Platform_GetRealPath(const char *path, char *out_path, usize out_size) {
     return false;
 
   return true;
+}
+
+static const char *Windows_GetKnownFolderPath(REFKNOWNFOLDERID folder_id,
+                                              char *buffer,
+                                              usize buffer_size) {
+  if (!buffer || buffer_size == 0)
+    return NULL;
+
+  PWSTR wide_path = NULL;
+  HRESULT hr = SHGetKnownFolderPath(folder_id, 0, NULL, &wide_path);
+  if (SUCCEEDED(hr) && wide_path) {
+    if (WideToUtf8(wide_path, buffer, (int)buffer_size) != 0) {
+      FS_NormalizePath(buffer);
+      CoTaskMemFree(wide_path);
+      return buffer;
+    }
+    CoTaskMemFree(wide_path);
+  }
+
+  return NULL;
+}
+
+const char *Platform_GetHomePath(char *buffer, usize buffer_size) {
+  if (Windows_GetKnownFolderPath(&FOLDERID_Profile, buffer, buffer_size))
+    return buffer;
+
+  const char *user_profile = getenv("USERPROFILE");
+  if (user_profile && user_profile[0] != '\0') {
+    strncpy(buffer, user_profile, buffer_size - 1);
+    buffer[buffer_size - 1] = '\0';
+    FS_NormalizePath(buffer);
+    return buffer;
+  }
+
+  strncpy(buffer, "C:/", buffer_size - 1);
+  buffer[buffer_size - 1] = '\0';
+  return buffer;
+}
+
+const char *Platform_GetDownloadsPath(char *buffer, usize buffer_size) {
+  if (Windows_GetKnownFolderPath(&FOLDERID_Downloads, buffer, buffer_size))
+    return buffer;
+
+  char home[FS_MAX_PATH];
+  const char *home_path = Platform_GetHomePath(home, sizeof(home));
+  if (!home_path)
+    return NULL;
+
+  FS_JoinPath(buffer, buffer_size, home_path, "Downloads");
+  FS_NormalizePath(buffer);
+  return buffer;
 }
 #endif /* _WIN32 */
