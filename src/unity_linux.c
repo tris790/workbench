@@ -5,6 +5,10 @@
  * Compile with: gcc unity_linux.c -o wb
  */
 
+/* Feature-test macros must be defined once, before any system headers. */
+#define _POSIX_C_SOURCE 200809L
+#define _XOPEN_SOURCE 700
+
 /* === Core === */
 #include "core/animation.c"
 #include "core/args.c"

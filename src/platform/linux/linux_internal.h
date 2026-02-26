@@ -5,9 +5,6 @@
 #ifndef LINUX_INTERNAL_H
 #define LINUX_INTERNAL_H
 
-#define _POSIX_C_SOURCE 200809L
-#define _XOPEN_SOURCE 700 // For strdup
-
 #include "../platform.h"
 #include "../protocols/xdg-decoration-client-protocol.h"
 #include "../protocols/xdg-shell-client-protocol.h"
