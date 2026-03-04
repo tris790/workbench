@@ -33,6 +33,80 @@ static context_menu_state *g_menu = NULL;
 
 /* ===== Internal Helpers ===== */
 
+#define CONTEXT_MENU_OUTER_PADDING 4
+#define CONTEXT_MENU_ITEM_INSET_X 4
+#define CONTEXT_MENU_SEPARATOR_GAP_TOP 4
+#define CONTEXT_MENU_SEPARATOR_THICKNESS 1
+#define CONTEXT_MENU_SEPARATOR_GAP_BOTTOM 4
+#define CONTEXT_MENU_ACTION_BUTTON_SIZE 28
+
+static i32 ContextMenu_GetSeparatorHeight(void) {
+  return CONTEXT_MENU_SEPARATOR_GAP_TOP + CONTEXT_MENU_SEPARATOR_THICKNESS +
+         CONTEXT_MENU_SEPARATOR_GAP_BOTTOM;
+}
+
+static i32 ContextMenu_AdvanceSeparator(i32 y) {
+  return y + ContextMenu_GetSeparatorHeight();
+}
+
+static b32 ContextMenu_ActionRowNeedsSeparator(context_menu_state *state) {
+  if (state->custom_action_count <= 0)
+    return false;
+
+  if (state->item_count <= 0)
+    return true;
+
+  return !state->items[state->item_count - 1].separator_after;
+}
+
+static i32 ContextMenu_GetActionRowY(context_menu_state *state, i32 menu_y) {
+  i32 y = menu_y + CONTEXT_MENU_OUTER_PADDING;
+
+  for (i32 i = 0; i < state->item_count; i++) {
+    y += state->item_height;
+    if (state->items[i].separator_after) {
+      y = ContextMenu_AdvanceSeparator(y);
+    }
+  }
+
+  if (ContextMenu_ActionRowNeedsSeparator(state)) {
+    y = ContextMenu_AdvanceSeparator(y);
+  }
+
+  return y;
+}
+
+static i32 ContextMenu_CalculateMenuHeight(context_menu_state *state) {
+  i32 menu_height = CONTEXT_MENU_OUTER_PADDING * 2;
+
+  for (i32 i = 0; i < state->item_count; i++) {
+    menu_height += state->item_height;
+    if (state->items[i].separator_after) {
+      menu_height += ContextMenu_GetSeparatorHeight();
+    }
+  }
+
+  if (state->custom_action_count > 0) {
+    if (ContextMenu_ActionRowNeedsSeparator(state)) {
+      menu_height += ContextMenu_GetSeparatorHeight();
+    }
+    menu_height += state->action_row_height;
+  }
+
+  return menu_height;
+}
+
+static i32 ContextMenu_DrawSeparator(render_context *renderer, const theme *th,
+                                     i32 menu_x, i32 menu_width, i32 y,
+                                     f32 fade) {
+  rect sep_rect = {menu_x + 8, y + CONTEXT_MENU_SEPARATOR_GAP_TOP,
+                   menu_width - 16, CONTEXT_MENU_SEPARATOR_THICKNESS};
+  color sep_color = th->border;
+  sep_color.a = (u8)(sep_color.a * fade);
+  Render_DrawRect(renderer, sep_rect, sep_color);
+  return ContextMenu_AdvanceSeparator(y);
+}
+
 static void AddMenuItem(context_menu_state *state, const char *label,
                         const char *shortcut, menu_action_fn action,
                         void *user_data, b32 separator_after) {
@@ -315,7 +389,8 @@ void ContextMenu_Show(context_menu_state *state, v2i position,
   }
 
   /* Calculate action row height based on loaded actions */
-  state->action_row_height = (state->custom_action_count > 0) ? 36 : 0;
+  state->action_row_height =
+      (state->custom_action_count > 0) ? CONTEXT_MENU_ACTION_BUTTON_SIZE : 0;
 
   /* Calculate optimal width */
   state->menu_width = 180; /* Minimum width */
@@ -345,14 +420,7 @@ void ContextMenu_Show(context_menu_state *state, v2i position,
 
   /* Calculate initial menu height and set adjusted position
    * (will be refined in render when we know window dimensions) */
-  i32 separator_count = 0;
-  for (i32 i = 0; i < state->item_count; i++) {
-    if (state->items[i].separator_after)
-      separator_count++;
-  }
-  state->menu_height =
-      state->item_count * state->item_height + separator_count * 8 + 8;
-  state->menu_height += state->action_row_height;
+  state->menu_height = ContextMenu_CalculateMenuHeight(state);
   state->adjusted_position = position; /* Will be corrected in render */
 
   /* Start fade-in animation */
@@ -445,9 +513,10 @@ b32 ContextMenu_Update(context_menu_state *state, ui_context *ui) {
     if (UI_PointInRect(input->mouse_pos, menu_rect)) {
       /* Click inside menu - check which item */
       if (input->mouse_pressed[WB_MOUSE_LEFT]) {
-        i32 item_y = menu_y + 4;
+        i32 item_y = menu_y + CONTEXT_MENU_OUTER_PADDING;
         for (i32 i = 0; i < state->item_count; i++) {
-          rect item_rect = {menu_x + 4, item_y, state->menu_width - 8,
+          rect item_rect = {menu_x + CONTEXT_MENU_ITEM_INSET_X, item_y,
+                            state->menu_width - CONTEXT_MENU_ITEM_INSET_X * 2,
                             state->item_height};
           if (UI_PointInRect(input->mouse_pos, item_rect)) {
             state->selected_index = i;
@@ -458,16 +527,18 @@ b32 ContextMenu_Update(context_menu_state *state, ui_context *ui) {
           }
           item_y += state->item_height;
           if (state->items[i].separator_after) {
-            item_y += 8;
+            item_y = ContextMenu_AdvanceSeparator(item_y);
           }
         }
 
         /* Check custom action row */
         if (state->custom_action_count > 0) {
-          item_y += 5;
+          item_y = ContextMenu_GetActionRowY(state, menu_y);
           i32 action_start_x = menu_x + 8;
           for (i32 i = 0; i < state->custom_action_count; i++) {
-            rect action_rect = {action_start_x + i * 32, item_y, 28, 28};
+            rect action_rect = {action_start_x + i * 32, item_y,
+                                CONTEXT_MENU_ACTION_BUTTON_SIZE,
+                                CONTEXT_MENU_ACTION_BUTTON_SIZE};
             if (UI_PointInRect(input->mouse_pos, action_rect)) {
               Action_CustomCommand(state->custom_actions[i].command);
               ContextMenu_Close(state);
@@ -503,19 +574,8 @@ void ContextMenu_Render(context_menu_state *state, ui_context *ui,
 
   f32 fade = state->fade_anim.current;
 
-  /* ... inside ContextMenu_Render ... */
   /* Calculate menu dimensions */
-  i32 separator_count = 0;
-  for (i32 i = 0; i < state->item_count; i++) {
-    if (state->items[i].separator_after)
-      separator_count++;
-  }
-
-  i32 menu_height =
-      state->item_count * state->item_height + separator_count * 8 + 8;
-
-  /* Add action row height */
-  menu_height += state->action_row_height;
+  i32 menu_height = ContextMenu_CalculateMenuHeight(state);
 
   /* Adjust position if menu would go off-screen */
   i32 menu_x = state->position.x;
@@ -558,12 +618,18 @@ void ContextMenu_Render(context_menu_state *state, ui_context *ui,
   Render_DrawRectRounded(renderer, menu_rect, th->radius_md, bg);
 
   /* ===== Items ===== */
-  i32 item_y = menu_y + 4;
+  i32 item_y = menu_y + CONTEXT_MENU_OUTER_PADDING;
+  i32 action_row_y = -1;
+
+  if (state->custom_action_count > 0) {
+    action_row_y = ContextMenu_GetActionRowY(state, menu_y);
+  }
 
   for (i32 i = 0; i < state->item_count; i++) {
     menu_item *item = &state->items[i];
 
-    rect item_rect = {menu_x + 4, item_y, state->menu_width - 8,
+    rect item_rect = {menu_x + CONTEXT_MENU_ITEM_INSET_X, item_y,
+                      state->menu_width - CONTEXT_MENU_ITEM_INSET_X * 2,
                       state->item_height};
 
     /* Check for hover - only update selection on hover if menu is still open */
@@ -571,10 +637,9 @@ void ContextMenu_Render(context_menu_state *state, ui_context *ui,
     b32 selected = (i == state->selected_index);
 
     /* Ensure we don't select regular items if we are hovering action row */
-    if (state->action_row_height > 0) {
-      rect action_row_check = {menu_x,
-                               menu_y + menu_height - state->action_row_height,
-                               state->menu_width, state->action_row_height};
+    if (action_row_y >= 0) {
+      rect action_row_check = {menu_x, action_row_y, state->menu_width,
+                               state->action_row_height};
       if (UI_PointInRect(input->mouse_pos, action_row_check)) {
         hovered = false;
       }
@@ -617,29 +682,24 @@ void ContextMenu_Render(context_menu_state *state, ui_context *ui,
 
     /* Separator */
     if (item->separator_after) {
-      item_y += 4;
-      rect sep_rect = {menu_x + 8, item_y, state->menu_width - 16, 1};
-      color sep_color = th->border;
-      sep_color.a = (u8)(sep_color.a * fade);
-      Render_DrawRect(renderer, sep_rect, sep_color);
-      item_y += 4;
+      item_y = ContextMenu_DrawSeparator(renderer, th, menu_x, state->menu_width,
+                                        item_y, fade);
     }
   }
 
   /* ===== Custom Actions Row ===== */
   if (state->custom_action_count > 0) {
-    /* Separator before actions */
-    rect sep_rect = {menu_x + 8, item_y, state->menu_width - 16, 1};
-    color sep_color = th->border;
-    sep_color.a = (u8)(sep_color.a * fade);
-    Render_DrawRect(renderer, sep_rect, sep_color);
-
-    item_y += 5; // Spacing
+    if (ContextMenu_ActionRowNeedsSeparator(state)) {
+      item_y = ContextMenu_DrawSeparator(renderer, th, menu_x, state->menu_width,
+                                        item_y, fade);
+    }
 
     i32 action_start_x = menu_x + 8;
 
     for (i32 i = 0; i < state->custom_action_count; i++) {
-      rect action_rect = {action_start_x + i * 32, item_y, 28, 28};
+      rect action_rect = {action_start_x + i * 32, item_y,
+                          CONTEXT_MENU_ACTION_BUTTON_SIZE,
+                          CONTEXT_MENU_ACTION_BUTTON_SIZE};
 
       b32 hovered = UI_PointInRect(input->mouse_pos, action_rect);
       b32 selected = (i == state->selected_action_index);
@@ -656,8 +716,6 @@ void ContextMenu_Render(context_menu_state *state, ui_context *ui,
         sel_bg.a = (u8)(sel_bg.a * fade);
         Render_DrawRectRounded(renderer, action_rect, th->radius_sm, sel_bg);
       }
-
-#include "../../core/image.h"
 
       /* Icon */
       custom_action *action = &state->custom_actions[i];
