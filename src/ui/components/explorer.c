@@ -236,6 +236,18 @@ static i32 Explorer_VisibleToActualIndex(explorer_state *state,
   return -1;
 }
 
+/* Get visible index from actual entry index */
+static i32 Explorer_ActualToVisibleIndex(explorer_state *state,
+                                         i32 actual_index) {
+  for (i32 i = 0; i < state->visible_count; i++) {
+    if (state->visible_entries[i] == actual_index) {
+      return i;
+    }
+  }
+
+  return -1;
+}
+
 void Explorer_SetSelection(explorer_state *state, i32 index) {
   FS_SetSelection(&state->fs, index);
   SmoothValue_SetTarget(&state->selection_anim, (f32)state->fs.selected_index);
@@ -1053,12 +1065,28 @@ void Explorer_Update(explorer_state *state, ui_context *ui,
             if (input->modifiers & MOD_CTRL) {
               FS_SelectToggle(&state->fs, actual_index);
             } else if (input->modifiers & MOD_SHIFT) {
-              i32 anchor = state->fs.selection_anchor;
-              if (anchor < 0)
-                anchor = state->fs.selected_index;
-              if (anchor < 0)
-                anchor = 0;
-              FS_SelectRange(&state->fs, anchor, actual_index);
+              i32 anchor_actual = state->fs.selection_anchor;
+              if (anchor_actual < 0 ||
+                  anchor_actual >= (i32)state->fs.entry_count) {
+                anchor_actual = state->fs.selected_index;
+              }
+              if (anchor_actual < 0 ||
+                  anchor_actual >= (i32)state->fs.entry_count) {
+                anchor_actual = actual_index;
+              }
+
+              i32 anchor_visible_index =
+                  Explorer_ActualToVisibleIndex(state, anchor_actual);
+              if (anchor_visible_index < 0) {
+                anchor_visible_index = clicked_visible_index;
+                anchor_actual = actual_index;
+              }
+
+              FS_SelectOrderedRange(
+                  &state->fs, state->visible_entries, state->visible_count,
+                  anchor_visible_index, clicked_visible_index, anchor_actual,
+                  actual_index);
+              state->scroll_to_selection = true;
             } else if (!was_already_selected) {
               /* Only reset selection if clicking on unselected item.
                * If clicking on already-selected item, preserve multi-selection

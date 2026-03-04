@@ -618,6 +618,58 @@ void FS_SelectRange(fs_state *state, i32 from, i32 to) {
   state->selected_index = to;
 }
 
+void FS_SelectOrderedRange(fs_state *state, const i32 *ordered_indices,
+                           i32 ordered_count, i32 from_ordered_index,
+                           i32 to_ordered_index, i32 anchor_index,
+                           i32 active_index) {
+  b32 active_valid = active_index >= 0 && active_index < (i32)state->entry_count;
+  b32 anchor_valid = anchor_index >= 0 && anchor_index < (i32)state->entry_count;
+
+  if (!ordered_indices || ordered_count <= 0 || from_ordered_index < 0 ||
+      from_ordered_index >= ordered_count || to_ordered_index < 0 ||
+      to_ordered_index >= ordered_count) {
+    if (active_valid) {
+      FS_SelectSingle(state, active_index);
+    } else {
+      FS_ClearSelection(state);
+      state->selected_index = -1;
+      state->selection_anchor = -1;
+    }
+    return;
+  }
+
+  if (!active_valid) {
+    FS_ClearSelection(state);
+    state->selected_index = -1;
+    state->selection_anchor = -1;
+    return;
+  }
+
+  if (from_ordered_index > to_ordered_index) {
+    i32 temp = from_ordered_index;
+    from_ordered_index = to_ordered_index;
+    to_ordered_index = temp;
+  }
+
+  for (i32 i = from_ordered_index; i <= to_ordered_index; i++) {
+    i32 index = ordered_indices[i];
+    if (index < 0 || index >= (i32)state->entry_count) {
+      FS_SelectSingle(state, active_index);
+      return;
+    }
+  }
+
+  FS_ClearSelection(state);
+
+  for (i32 i = from_ordered_index; i <= to_ordered_index; i++) {
+    SetSelectionBit(state, ordered_indices[i], 1);
+  }
+
+  state->selection_count = to_ordered_index - from_ordered_index + 1;
+  state->selected_index = active_index;
+  state->selection_anchor = anchor_valid ? anchor_index : active_index;
+}
+
 void FS_SelectAll(fs_state *state) {
   for (u32 i = 0; i < state->entry_count; i++) {
     SetSelectionBit(state, i, 1);

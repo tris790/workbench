@@ -33,6 +33,21 @@ void QuickFilter_Init(quick_filter_state *state) {
 
 /* ===== Update ===== */
 
+static b32 QuickFilter_ShouldPassThroughShortcut(ui_input *input) {
+  if (input->key_pressed[WB_KEY_DELETE]) {
+    return true;
+  }
+
+  if (!(input->modifiers & MOD_CTRL)) {
+    return false;
+  }
+
+  return input->key_pressed[WB_KEY_A] || input->key_pressed[WB_KEY_C] ||
+         input->key_pressed[WB_KEY_X] || input->key_pressed[WB_KEY_V] ||
+         input->key_pressed[WB_KEY_H] || input->key_pressed[WB_KEY_N] ||
+         input->key_pressed[WB_KEY_R] || input->key_pressed[WB_KEY_PERIOD];
+}
+
 b32 QuickFilter_Update(quick_filter_state *state, ui_context *ui) {
   /* Update fade animation */
   SmoothValue_Update(&state->fade_anim, ui->dt);
@@ -58,8 +73,11 @@ b32 QuickFilter_Update(quick_filter_state *state, ui_context *ui) {
     return true;
   }
 
+  b32 pass_through_shortcut = QuickFilter_ShouldPassThroughShortcut(&ui->input);
+
   /* Process text input using shared engine (Requirement 12) */
-  if (UI_ProcessTextInput(&state->input_state, state->buffer,
+  if (!pass_through_shortcut &&
+      UI_ProcessTextInput(&state->input_state, state->buffer,
                           QUICK_FILTER_MAX_INPUT, &ui->input)) {
     /* Deactivate when buffer becomes empty (Requirement 22, Success Criteria
      * 32) */
@@ -83,10 +101,20 @@ b32 QuickFilter_Update(quick_filter_state *state, ui_context *ui) {
   }
 
   /* Consume keys if we are active to prevent explorer navigation etc. */
-  if (Input_GetTextInput() >= 32 || Input_KeyRepeat(WB_KEY_BACKSPACE) ||
-      Input_KeyRepeat(WB_KEY_DELETE) || Input_KeyRepeat(WB_KEY_LEFT) ||
-      Input_KeyRepeat(WB_KEY_RIGHT) || Input_KeyRepeat(WB_KEY_HOME) ||
-      Input_KeyRepeat(WB_KEY_END) || (Input_GetModifiers() & MOD_CTRL)) {
+  if (!pass_through_shortcut &&
+      (Input_GetTextInput() >= 32 || ui->input.key_pressed[WB_KEY_BACKSPACE] ||
+       Input_KeyRepeat(WB_KEY_BACKSPACE) || ui->input.key_pressed[WB_KEY_DELETE] ||
+       Input_KeyRepeat(WB_KEY_DELETE) || ui->input.key_pressed[WB_KEY_LEFT] ||
+       Input_KeyRepeat(WB_KEY_LEFT) || ui->input.key_pressed[WB_KEY_RIGHT] ||
+       Input_KeyRepeat(WB_KEY_RIGHT) || ui->input.key_pressed[WB_KEY_HOME] ||
+       Input_KeyRepeat(WB_KEY_HOME) || ui->input.key_pressed[WB_KEY_END] ||
+       Input_KeyRepeat(WB_KEY_END) ||
+       ((Input_GetModifiers() & MOD_CTRL) &&
+        (ui->input.key_pressed[WB_KEY_LEFT] ||
+         ui->input.key_pressed[WB_KEY_RIGHT] ||
+         ui->input.key_pressed[WB_KEY_BACKSPACE] ||
+         ui->input.key_pressed[WB_KEY_DELETE] ||
+         ui->input.key_pressed[WB_KEY_Z])))) {
     Input_ConsumeKeys();
     Input_ConsumeText();
     return true;

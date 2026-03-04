@@ -119,6 +119,12 @@ void FS_SelectToggle(fs_state *state, i32 index);
 /* Select range from 'from' to 'to' inclusive (Shift+Click) */
 void FS_SelectRange(fs_state *state, i32 from, i32 to);
 
+/* Select an inclusive range using an explicit ordered index list */
+void FS_SelectOrderedRange(fs_state *state, const i32 *ordered_indices,
+                           i32 ordered_count, i32 from_ordered_index,
+                           i32 to_ordered_index, i32 anchor_index,
+                           i32 active_index);
+
 /* Select all entries */
 void FS_SelectAll(fs_state *state);
 
