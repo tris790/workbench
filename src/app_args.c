@@ -1,4 +1,5 @@
 #include "app_args.h"
+#include "config/config.h"
 #include "platform/platform.h"
 #include <string.h>
 
@@ -39,6 +40,14 @@ static void ApplyPathToExplorer(explorer_state *e, const char *path) {
 
 void Args_Handle(layout_state *layout, const app_args *args) {
   if (args->path_count == 0) {
+    const char *start_directory =
+        Config_GetString("explorer.start_directory", "~");
+
+    if (start_directory && start_directory[0] != '\0') {
+      ApplyPathToExplorer(&layout->panels[0].explorer, start_directory);
+      ApplyPathToExplorer(&layout->panels[1].explorer, start_directory);
+    }
+
     return;
   }
 

@@ -101,6 +101,8 @@ static const char *DEFAULT_CONFIG_CONTENT =
     "# Explorer\n"
     "explorer.show_hidden = false\n"
     "explorer.confirm_delete = true\n"
+    "# Used at startup when no path arguments are passed\n"
+    "explorer.start_directory = ~\n"
     "\n"
     "# Terminal\n"
     "terminal.font_size = 14\n"
