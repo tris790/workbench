@@ -7,34 +7,94 @@
 #include "dialog.h"
 #include "theme.h"
 
+static i32 Dialog_GetConfirmBodyHeight(ui_context *ui,
+                                       const dialog_config *config) {
+  i32 icon_size = 20;
+  i32 text_h = Font_GetLineHeight(ui->font);
+
+  if (config->message.lines) {
+    text_h = Text_GetWrappedHeight(config->message.count, ui->font);
+  }
+
+  if (config->hint) {
+    text_h += ui->theme->spacing_md + Font_GetLineHeight(ui->font);
+  }
+
+  return (text_h > icon_size) ? text_h : icon_size;
+}
+
+static void Dialog_RenderConfirmBody(ui_context *ui, rect body_rect,
+                                     const dialog_config *config) {
+  render_context *ctx = ui->renderer;
+  const theme *th = ui->theme;
+  i32 icon_size = 20;
+  rect icon_rect = {body_rect.x, body_rect.y, icon_size, icon_size};
+  i32 text_x = body_rect.x + icon_size + th->spacing_lg;
+  i32 text_y = body_rect.y;
+
+  Render_DrawRectRounded(ctx, icon_rect, 4.0f, th->error);
+
+  if (config->message.lines) {
+    v2i msg_pos = {text_x, text_y};
+    for (i32 i = 0; i < config->message.count; i++) {
+      Render_DrawText(ctx, msg_pos, config->message.lines[i], ui->font,
+                      th->text);
+      msg_pos.y += Font_GetLineHeight(ui->font);
+    }
+    text_y = msg_pos.y;
+  } else {
+    v2i msg_pos = {text_x, text_y};
+    Render_DrawText(ctx, msg_pos, "Are you sure?", ui->font, th->text);
+    text_y += Font_GetLineHeight(ui->font);
+  }
+
+  if (config->hint) {
+    v2i hint_pos = {text_x, text_y + th->spacing_md};
+    Render_DrawText(ctx, hint_pos, config->hint, ui->font, th->text_muted);
+  }
+}
+
+static void Dialog_RenderInputBody(rect body_rect, const dialog_config *config) {
+  rect input_rect = {body_rect.x, body_rect.y, body_rect.w, 36};
+
+  UI_PushStyleInt(WB_UI_STYLE_PADDING, 8);
+  UI_BeginLayout(WB_UI_LAYOUT_VERTICAL, input_rect);
+  if (config->input_buffer && config->input_state) {
+    UI_TextInput(config->input_buffer, config->input_buffer_size,
+                 config->placeholder ? config->placeholder : "Enter text...",
+                 config->input_state);
+  }
+  UI_EndLayout();
+  UI_PopStyle();
+}
+
 dialog_result Dialog_Render(ui_context *ui, rect bounds,
                             const dialog_config *config) {
   render_context *ctx = ui->renderer;
   const theme *th = ui->theme;
   dialog_result result = WB_DIALOG_RESULT_NONE;
+  i32 outer_pad_x = th->spacing_xl;
+  i32 body_pad_top = th->spacing_lg;
+  i32 body_pad_bottom = th->spacing_xl;
+  i32 footer_pad_y = th->spacing_lg;
+  i32 actions_gap_x = th->spacing_md;
+  i32 header_h = 52;
+  i32 btn_w = 96;
+  i32 btn_h = 36;
+  i32 footer_h = btn_h + (footer_pad_y * 2);
+  i32 body_content_h = 36;
 
   /* Dim background */
   color dim = Color_WithAlpha(th->background, 200);
   Render_DrawRect(ctx, bounds, dim);
 
-  /* Calculate dialog height based on content */
-  i32 content_base_h = 140; /* Header + Footer + padding */
-  i32 text_h = 0;
-
   if (config->type == WB_DIALOG_TYPE_CONFIRM) {
-    if (config->message.lines) {
-      text_h = Text_GetWrappedHeight(config->message.count, ui->font) + 20;
-    } else {
-      text_h = 40;
-    }
-    if (text_h < 60)
-      text_h = 60;
-  } else {
-    text_h = 60; /* Fixed height for input dialogs */
+    body_content_h = Dialog_GetConfirmBodyHeight(ui, config);
   }
 
   i32 dialog_w = DIALOG_WIDTH;
-  i32 dialog_h = content_base_h + text_h;
+  i32 dialog_h =
+      header_h + body_pad_top + body_content_h + body_pad_bottom + footer_h;
 
   rect dialog = {bounds.x + (bounds.w - dialog_w) / 2,
                  bounds.y + (bounds.h - dialog_h) / 2, dialog_w, dialog_h};
@@ -46,9 +106,8 @@ dialog_result Dialog_Render(ui_context *ui, rect bounds,
 
   /* Header */
   color title_color = config->is_danger ? th->error : th->text;
-  i32 header_h = 44;
   rect header_rect = {dialog.x, dialog.y, dialog.w, header_h};
-  v2i title_pos = {header_rect.x + th->spacing_lg,
+  v2i title_pos = {header_rect.x + outer_pad_x,
                    header_rect.y +
                        (header_h - Font_GetLineHeight(ui->font)) / 2};
   Render_DrawText(ctx, title_pos, config->title ? config->title : "Dialog",
@@ -58,75 +117,42 @@ dialog_result Dialog_Render(ui_context *ui, rect bounds,
   Render_DrawRect(ctx, sep, Color_WithAlpha(th->border, 100));
 
   /* Content Area */
-  i32 content_y = dialog.y + header_h + th->spacing_lg;
-  i32 content_w = dialog.w - (th->spacing_lg * 2);
+  rect body_rect = {dialog.x + outer_pad_x, dialog.y + header_h + body_pad_top,
+                    dialog.w - (outer_pad_x * 2), body_content_h};
 
   if (config->type == WB_DIALOG_TYPE_CONFIRM) {
-    /* Warning Icon */
-    i32 icon_size = 20;
-    rect icon_rect = {dialog.x + th->spacing_lg, content_y, icon_size,
-                      icon_size};
-    Render_DrawRectRounded(ctx, icon_rect, 4.0f, th->error);
-
-    i32 text_x = icon_rect.x + icon_size + th->spacing_md;
-    v2i msg_pos = {text_x,
-                   content_y + (icon_size - Font_GetLineHeight(ui->font)) / 2};
-
-    /* Render wrapped text */
-    if (config->message.lines) {
-      for (i32 i = 0; i < config->message.count; i++) {
-        Render_DrawText(ctx, msg_pos, config->message.lines[i], ui->font,
-                        th->text);
-        msg_pos.y += Font_GetLineHeight(ui->font);
-      }
-    } else {
-      Render_DrawText(ctx, msg_pos, "Are you sure?", ui->font, th->text);
-      msg_pos.y += Font_GetLineHeight(ui->font);
-    }
-
-    if (config->hint) {
-      v2i hint_pos = {text_x, msg_pos.y + 12};
-      Render_DrawText(ctx, hint_pos, config->hint, ui->font, th->text_muted);
-    }
+    Dialog_RenderConfirmBody(ui, body_rect, config);
   } else {
-    /* Text input area */
-    rect input_rect = {dialog.x + th->spacing_lg, content_y, content_w, 36};
-    UI_PushStyleInt(WB_UI_STYLE_PADDING, 8);
-    UI_BeginLayout(WB_UI_LAYOUT_VERTICAL, input_rect);
-    if (config->input_buffer && config->input_state) {
-      UI_TextInput(config->input_buffer, config->input_buffer_size,
-                   config->placeholder ? config->placeholder : "Enter text...",
-                   config->input_state);
-    }
-    UI_EndLayout();
-    UI_PopStyle();
+    Dialog_RenderInputBody(body_rect, config);
   }
 
   /* Footer Buttons */
-  i32 footer_h = 50;
   rect footer_rect = {dialog.x, dialog.y + dialog.h - footer_h, dialog.w,
                       footer_h};
-
-  i32 btn_w = 90;
-  i32 btn_h = 30;
-  i32 btn_y = footer_rect.y + (footer_h - btn_h) / 2;
+  i32 btn_y = footer_rect.y + footer_pad_y;
 
   /* Cancel Button */
-  rect cancel_rect = {footer_rect.x + footer_rect.w - (btn_w * 2) -
-                          (th->spacing_lg * 2),
-                      btn_y, btn_w, btn_h};
+  rect confirm_rect = {dialog.x + dialog.w - outer_pad_x - btn_w, btn_y, btn_w,
+                       btn_h};
+  rect cancel_rect = {confirm_rect.x - actions_gap_x - btn_w, btn_y, btn_w,
+                      btn_h};
+
   UI_BeginLayout(WB_UI_LAYOUT_HORIZONTAL, cancel_rect);
+  UI_PushStyleInt(WB_UI_STYLE_MIN_WIDTH, btn_w);
+  UI_PushStyleInt(WB_UI_STYLE_MIN_HEIGHT, btn_h);
   UI_PushStyleColor(WB_UI_STYLE_BG_COLOR, Color_WithAlpha(th->panel_alt, 150));
   if (UI_Button(config->cancel_label ? config->cancel_label : "Cancel")) {
     result = WB_DIALOG_RESULT_CANCEL;
   }
   UI_PopStyle();
+  UI_PopStyle();
+  UI_PopStyle();
   UI_EndLayout();
 
   /* Confirm Button */
-  rect confirm_rect = {footer_rect.x + footer_rect.w - btn_w - th->spacing_lg,
-                       btn_y, btn_w, btn_h};
   UI_BeginLayout(WB_UI_LAYOUT_HORIZONTAL, confirm_rect);
+  UI_PushStyleInt(WB_UI_STYLE_MIN_WIDTH, btn_w);
+  UI_PushStyleInt(WB_UI_STYLE_MIN_HEIGHT, btn_h);
   if (config->is_danger) {
     UI_PushStyleColor(WB_UI_STYLE_BG_COLOR, th->error);
     UI_PushStyleColor(WB_UI_STYLE_HOVER_COLOR, Color_Lighten(th->error, 0.1f));
@@ -145,6 +171,8 @@ dialog_result Dialog_Render(ui_context *ui, rect bounds,
   UI_PopStyle();
   if (config->is_danger)
     UI_PopStyle();
+  UI_PopStyle();
+  UI_PopStyle();
   UI_EndLayout();
 
   return result;

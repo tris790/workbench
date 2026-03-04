@@ -543,8 +543,9 @@ void Explorer_ConfirmDelete(explorer_state *state, ui_context *ui) {
   const theme *th = ui->theme;
 
   i32 icon_size = 20;
-  i32 text_x = th->spacing_lg + icon_size + th->spacing_md;
-  i32 max_text_w = EXPLORER_DIALOG_WIDTH - text_x - th->spacing_lg;
+  i32 dialog_pad_x = th->spacing_xl;
+  i32 text_x = dialog_pad_x + icon_size + th->spacing_lg;
+  i32 max_text_w = EXPLORER_DIALOG_WIDTH - text_x - dialog_pad_x;
 
   char msg[512];
   if (delete_count == 1) {
