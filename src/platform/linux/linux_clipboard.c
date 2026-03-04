@@ -50,6 +50,8 @@ static void DataSourceCancelled(void *data, struct wl_data_source *source) {
   (void)data;
   if (g_platform.clipboard_source == source) {
     g_platform.clipboard_source = NULL;
+    g_platform.file_clipboard.count = 0;
+    g_platform.file_clipboard.is_cut = false;
     wl_data_source_destroy(source);
     return;
   }
@@ -210,6 +212,10 @@ b32 Platform_SetClipboard(const char *text) {
     return false;
   }
 
+  /* Replacing the clipboard with text invalidates any file cut/copy state. */
+  g_platform.file_clipboard.count = 0;
+  g_platform.file_clipboard.is_cut = false;
+
   /* Update stored content */
   if (g_platform.clipboard_content) {
     free(g_platform.clipboard_content);
@@ -235,8 +241,6 @@ b32 Platform_SetClipboard(const char *text) {
 /* ===== File Clipboard API ===== */
 
 b32 Platform_ClipboardSetFiles(const char **paths, i32 count, b32 is_cut) {
-  (void)is_cut; /* Cut vs copy is handled by the app on paste, not by Wayland protocol */
-  
   if (!g_platform.data_device_manager || !g_platform.seat) {
     return false;
   }
@@ -278,7 +282,24 @@ b32 Platform_ClipboardSetFiles(const char **paths, i32 count, b32 is_cut) {
 }
 
 i32 Platform_ClipboardGetFiles(char **paths_out, i32 max_paths, b32 *is_cut_out) {
-  *is_cut_out = false; /* Wayland doesn't distinguish cut vs copy in protocol */
+  if (g_platform.clipboard_source && g_platform.file_clipboard.count > 0) {
+    clipboard_files *files = &g_platform.file_clipboard;
+    i32 count = files->count < max_paths ? files->count : max_paths;
+
+    *is_cut_out = files->is_cut;
+    for (i32 i = 0; i < count; i++) {
+      usize path_len = strlen(files->paths[i]);
+      if (path_len >= FS_MAX_PATH) {
+        path_len = FS_MAX_PATH - 1;
+      }
+      memcpy(paths_out[i], files->paths[i], path_len);
+      paths_out[i][path_len] = '\0';
+    }
+
+    return count;
+  }
+
+  *is_cut_out = false; /* External Wayland offers do not expose cut vs copy. */
   
   if (!g_platform.selection_offer) {
     return 0;
