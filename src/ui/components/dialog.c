@@ -68,6 +68,123 @@ static void Dialog_RenderInputBody(rect body_rect, const dialog_config *config) 
   UI_PopStyle();
 }
 
+dialog_shell_layout Dialog_BeginShell(ui_context *ui, rect bounds,
+                                      const dialog_shell_config *config) {
+  render_context *ctx = ui->renderer;
+  const theme *th = ui->theme;
+  dialog_shell_layout layout = {0};
+  i32 header_h = 52;
+  i32 footer_pad_y = th->spacing_lg;
+  i32 footer_h = 36 + (footer_pad_y * 2);
+  i32 outer_pad_x = th->spacing_xl;
+  i32 body_pad_y = th->spacing_lg;
+  i32 margin_x = 32;
+  i32 margin_y = 36;
+  i32 preferred_w = DIALOG_WIDTH;
+  i32 preferred_h = header_h + footer_h + 160;
+  i32 min_w = DIALOG_WIDTH;
+  i32 min_h = header_h + footer_h + 96;
+  const char *title = "Dialog";
+  const char *modal_name = "DialogShell";
+  color backdrop = {0, 0, 0, 180};
+  i32 avail_w;
+  i32 avail_h;
+  i32 dialog_w;
+  i32 dialog_h;
+  rect border;
+  rect header_sep;
+  rect footer_sep;
+
+  if (config) {
+    if (config->title) {
+      title = config->title;
+    }
+    if (config->modal_name) {
+      modal_name = config->modal_name;
+    }
+    if (config->margin_x > 0) {
+      margin_x = config->margin_x;
+    }
+    if (config->margin_y > 0) {
+      margin_y = config->margin_y;
+    }
+    if (config->preferred_width > 0) {
+      preferred_w = config->preferred_width;
+    }
+    if (config->preferred_height > 0) {
+      preferred_h = config->preferred_height;
+    }
+    if (config->min_width > 0) {
+      min_w = config->min_width;
+    }
+    if (config->min_height > 0) {
+      min_h = config->min_height;
+    }
+  }
+
+  UI_BeginModal(modal_name);
+
+  Render_DrawRect(ctx, bounds, backdrop);
+
+  avail_w = Max(1, bounds.w - margin_x * 2);
+  avail_h = Max(1, bounds.h - margin_y * 2);
+  dialog_w = Min(avail_w, Max(min_w, preferred_w));
+  dialog_h = Min(avail_h, Max(min_h, preferred_h));
+
+  layout.frame = (rect){bounds.x + (bounds.w - dialog_w) / 2,
+                        bounds.y + (bounds.h - dialog_h) / 2, dialog_w,
+                        dialog_h};
+  layout.header_h = header_h;
+  layout.footer_h = footer_h;
+  layout.outer_pad_x = outer_pad_x;
+  layout.footer_pad_y = footer_pad_y;
+  layout.actions_gap_x = th->spacing_md;
+
+  border = (rect){layout.frame.x - 1, layout.frame.y - 1, layout.frame.w + 2,
+                  layout.frame.h + 2};
+  Render_DrawRectRounded(ctx, border, th->radius_md + 1, th->border);
+  UI_DrawPanel(layout.frame);
+
+  layout.header = (rect){layout.frame.x, layout.frame.y, layout.frame.w,
+                         header_h};
+  Render_DrawText(
+      ctx,
+      (v2i){layout.header.x + outer_pad_x,
+            layout.header.y + (header_h - Font_GetLineHeight(ui->font)) / 2},
+      title, ui->font, th->text);
+
+  header_sep =
+      (rect){layout.frame.x, layout.frame.y + header_h, layout.frame.w, 1};
+  Render_DrawRect(ctx, header_sep, Color_WithAlpha(th->border, 100));
+
+  layout.footer = (rect){layout.frame.x,
+                         layout.frame.y + layout.frame.h - footer_h,
+                         layout.frame.w, footer_h};
+  footer_sep = (rect){layout.footer.x, layout.footer.y, layout.footer.w, 1};
+  Render_DrawRect(ctx, footer_sep, Color_WithAlpha(th->border, 80));
+
+  layout.content = (rect){layout.frame.x + outer_pad_x,
+                          layout.frame.y + header_h + body_pad_y,
+                          layout.frame.w - (outer_pad_x * 2),
+                          layout.frame.h - header_h - footer_h -
+                              (body_pad_y * 2)};
+
+  if (layout.content.w < 0) {
+    layout.content.w = 0;
+  }
+  if (layout.content.h < 0) {
+    layout.content.h = 0;
+  }
+
+  return layout;
+}
+
+void Dialog_EndShell(ui_context *ui, const dialog_shell_layout *layout) {
+  (void)ui;
+  (void)layout;
+  UI_EndModal();
+}
+
 dialog_result Dialog_Render(ui_context *ui, rect bounds,
                             const dialog_config *config) {
   render_context *ctx = ui->renderer;

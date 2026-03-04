@@ -3,215 +3,426 @@
 #include "../../config/config_internal.h"
 #include "../../core/input.h"
 #include "../../core/theme.h"
+#include "dialog.h"
 #include "scroll_container.h"
 #include <stdio.h>
+#include <string.h>
+
+#define CONFIG_DIAGNOSTICS_MIN_WIDTH 560
+#define CONFIG_DIAGNOSTICS_MIN_HEIGHT 360
+#define CONFIG_DIAGNOSTICS_MAX_WIDTH 980
+#define CONFIG_DIAGNOSTICS_MAX_HEIGHT 760
+#define CONFIG_DIAGNOSTICS_MARGIN_X 32
+#define CONFIG_DIAGNOSTICS_MARGIN_Y 36
+
+static void RenderTextWithEllipsis(ui_context *ui, font *f, v2i pos,
+                                   const char *text, i32 max_width,
+                                   color text_color, char *scratch,
+                                   usize scratch_size) {
+  usize len;
+  i32 ellipsis_w;
+
+  if (!text || !f || !scratch || scratch_size == 0 || max_width <= 0) {
+    return;
+  }
+
+  if (Font_MeasureWidth(f, text) <= max_width) {
+    Render_DrawText(ui->renderer, pos, text, f, text_color);
+    return;
+  }
+
+  strncpy(scratch, text, scratch_size - 1);
+  scratch[scratch_size - 1] = '\0';
+
+  ellipsis_w = Font_MeasureWidth(f, "...");
+  len = strlen(scratch);
+  while (len > 0 && Font_MeasureWidth(f, scratch) > max_width - ellipsis_w) {
+    scratch[--len] = '\0';
+  }
+
+  if (len == 0) {
+    if (ellipsis_w <= max_width) {
+      Render_DrawText(ui->renderer, pos, "...", f, text_color);
+    }
+    return;
+  }
+
+  strncat(scratch, "...", scratch_size - strlen(scratch) - 1);
+  Render_DrawText(ui->renderer, pos, scratch, f, text_color);
+}
+
+static i32 RenderWrappedText(ui_context *ui, memory_arena *arena,
+                             const char *text, font *f, rect bounds,
+                             color text_color) {
+  i32 line_height;
+  wrapped_text wrapped;
+  i32 y;
+
+  if (!text || !f || bounds.w <= 0) {
+    return 0;
+  }
+
+  line_height = Font_GetLineHeight(f);
+  wrapped = Text_Wrap(arena, text, f, bounds.w);
+  if (!wrapped.lines || wrapped.count <= 0) {
+    Render_DrawText(ui->renderer, (v2i){bounds.x, bounds.y}, text, f,
+                    text_color);
+    return line_height;
+  }
+
+  y = bounds.y;
+  for (i32 i = 0; i < wrapped.count; ++i) {
+    Render_DrawText(ui->renderer, (v2i){bounds.x, y}, wrapped.lines[i], f,
+                    text_color);
+    y += line_height;
+  }
+
+  return wrapped.count * line_height;
+}
+
+static void FormatConfigValue(const ConfigEntry *entry, char *value_buf,
+                              usize value_buf_size, const char **type_str) {
+  *type_str = "unknown";
+  value_buf[0] = '\0';
+
+  switch (entry->type) {
+  case WB_CONFIG_TYPE_BOOL:
+    *type_str = "bool";
+    snprintf(value_buf, value_buf_size, "%s",
+             entry->value.bool_val ? "true" : "false");
+    break;
+  case WB_CONFIG_TYPE_I64:
+    *type_str = "i64";
+    snprintf(value_buf, value_buf_size, "%lld",
+             (long long)entry->value.i64_val);
+    break;
+  case WB_CONFIG_TYPE_F64:
+    *type_str = "f64";
+    snprintf(value_buf, value_buf_size, "%.2f", entry->value.f64_val);
+    break;
+  case WB_CONFIG_TYPE_STRING:
+    *type_str = "string";
+    snprintf(value_buf, value_buf_size, "\"%s\"", entry->value.string_val);
+    break;
+  }
+}
 
 void ConfigDiagnostics_Render(ui_context *ui, rect bounds,
                               layout_state *layout) {
-  if (!layout->show_config_diagnostics)
+  render_context *ctx;
+  const theme *th;
+  temporary_memory temp;
+  dialog_shell_config shell_config;
+  dialog_shell_layout shell;
+  rect meta_rect;
+  rect body_rect;
+  i32 line_height;
+  i32 meta_height;
+  i32 body_gap;
+  i32 diag_count;
+  i32 entry_count;
+  char path_buf[FS_MAX_PATH + 16];
+  char path_draw_buf[FS_MAX_PATH + 16];
+  char error_status[32];
+  char values_status[32];
+  i32 error_status_w;
+  i32 values_status_w;
+  i32 right_group_w;
+  i32 right_gap;
+  i32 path_max_w;
+  scroll_container_state *scroll;
+  i32 scroll_offset_y;
+  i32 content_x;
+  i32 content_y;
+  i32 content_w;
+  i32 content_start_y;
+  i32 content_height;
+  b32 close_modal = false;
+  font *code_font;
+  i32 btn_h = 36;
+  i32 btn_pad;
+
+  if (!layout->show_config_diagnostics) {
     return;
+  }
 
-  render_context *ctx = ui->renderer;
-  const theme *th = ui->theme;
+  ctx = ui->renderer;
+  th = ui->theme;
+  temp = BeginTemporaryMemory(layout->arena);
+  line_height = Font_GetLineHeight(ui->font);
+  body_gap = th->spacing_md;
+  diag_count = Config_GetDiagnosticCount();
+  entry_count = Config_GetEntryCount();
+  code_font = ui->mono_font ? ui->mono_font : ui->font;
+  btn_pad = th->spacing_lg * 2;
 
-  /* Dim background */
-  color dim = Color_WithAlpha(th->background, 200);
-  Render_DrawRect(ctx, bounds, dim);
+  shell_config = (dialog_shell_config){
+      .modal_name = "ConfigDiagnostics",
+      .title = "Configuration Diagnostics",
+      .preferred_width = Min(CONFIG_DIAGNOSTICS_MAX_WIDTH,
+                             Max(CONFIG_DIAGNOSTICS_MIN_WIDTH,
+                                 bounds.w - CONFIG_DIAGNOSTICS_MARGIN_X * 2)),
+      .preferred_height = Min(
+          CONFIG_DIAGNOSTICS_MAX_HEIGHT,
+          Max(CONFIG_DIAGNOSTICS_MIN_HEIGHT,
+              bounds.h - CONFIG_DIAGNOSTICS_MARGIN_Y * 2)),
+      .min_width = CONFIG_DIAGNOSTICS_MIN_WIDTH,
+      .min_height = CONFIG_DIAGNOSTICS_MIN_HEIGHT,
+      .margin_x = CONFIG_DIAGNOSTICS_MARGIN_X,
+      .margin_y = CONFIG_DIAGNOSTICS_MARGIN_Y,
+  };
+  shell = Dialog_BeginShell(ui, bounds, &shell_config);
 
-  UI_BeginModal("ConfigDiagnostics");
+  meta_height = line_height + th->spacing_md;
+  if (meta_height < 32) {
+    meta_height = 32;
+  }
 
-  /* Dialog size */
-  i32 dialog_w = 600;
-  i32 dialog_h = 500;
-  rect dialog = {bounds.x + (bounds.w - dialog_w) / 2,
-                 bounds.y + (bounds.h - dialog_h) / 2, dialog_w, dialog_h};
+  meta_rect = (rect){shell.content.x, shell.content.y, shell.content.w,
+                     meta_height};
+  body_rect = (rect){shell.content.x, shell.content.y + meta_height + body_gap,
+                     shell.content.w,
+                     shell.content.h - meta_height - body_gap};
+  if (body_rect.h < 0) {
+    body_rect.h = 0;
+  }
 
-  UI_DrawPanel(dialog);
-
-  /* Header */
-  i32 header_h = 44;
-  rect header_rect = {dialog.x, dialog.y, dialog.w, header_h};
-  v2i title_pos = {header_rect.x + th->spacing_lg,
-                   header_rect.y +
-                       (header_h - Font_GetLineHeight(ui->font)) / 2};
-  Render_DrawText(ctx, title_pos, "Configuration Diagnostics", ui->font,
-                  th->text);
-
-  rect sep = {dialog.x, dialog.y + header_h, dialog.w, 1};
-  Render_DrawRect(ctx, sep, Color_WithAlpha(th->border, 100));
-
-  /* Actions (Footer) */
-  i32 footer_h = 56;
-  rect footer_rect = {dialog.x, dialog.y + dialog.h - footer_h, dialog.w,
-                      footer_h};
-
-  /* Render footer background separator */
-  rect footer_sep = {footer_rect.x, footer_rect.y, footer_rect.w, 1};
-  Render_DrawRect(ctx, footer_sep, Color_WithAlpha(th->border, 50));
-
-  /* Content Area - fixed portion for path */
-  rect path_rect = {
-      dialog.x + th->spacing_lg, dialog.y + header_h + th->spacing_md,
-      dialog.w - th->spacing_lg * 2, Font_GetLineHeight(ui->font)};
-
-  /* Config Path */
-  char path_buf[1024];
   snprintf(path_buf, sizeof(path_buf), "File: %s",
            Config_GetPath() ? Config_GetPath() : "Unknown");
-  Render_DrawText(ctx, (v2i){path_rect.x, path_rect.y}, path_buf, ui->font,
-                  th->text);
+  snprintf(error_status, sizeof(error_status), "%d error%s", diag_count,
+           diag_count == 1 ? "" : "s");
+  snprintf(values_status, sizeof(values_status), "%d loaded value%s",
+           entry_count, entry_count == 1 ? "" : "s");
 
-  /* Scrollable content area - below path */
-  i32 path_area_h = Font_GetLineHeight(ui->font) + 12;
-  rect scroll_rect = {dialog.x + th->spacing_lg,
-                      dialog.y + header_h + th->spacing_md + path_area_h,
-                      dialog.w - th->spacing_lg * 2,
-                      dialog.h - header_h - footer_h - th->spacing_md * 2 -
-                          path_area_h};
+  error_status_w = Font_MeasureWidth(ui->font,
+                                     diag_count > 0 ? error_status : "No errors");
+  values_status_w = Font_MeasureWidth(ui->font, values_status);
+  right_gap = th->spacing_lg;
+  right_group_w = error_status_w + right_gap + values_status_w;
+  path_max_w = meta_rect.w - right_group_w - th->spacing_lg;
+  if (path_max_w < 0) {
+    path_max_w = 0;
+  }
 
-  /* Update scroll container - handles input */
-  scroll_container_state *scroll = &layout->diagnostic_scroll;
-  ScrollContainer_Update(scroll, ui, scroll_rect);
+  RenderTextWithEllipsis(
+      ui, ui->font,
+      (v2i){meta_rect.x, meta_rect.y + (meta_rect.h - line_height) / 2},
+      path_buf, path_max_w, th->text, path_draw_buf, sizeof(path_draw_buf));
 
-  /* Set clip rect for scrollable content */
-  Render_SetClipRect(ctx, scroll_rect);
-
-  /* Calculate content layout with scroll offset */
-  i32 scroll_offset_y = (i32)ScrollContainer_GetOffsetY(scroll);
-  rect content_bounds = {scroll_rect.x, scroll_rect.y - scroll_offset_y,
-                         scroll_rect.w - SCROLL_SCROLLBAR_GUTTER,
-                         scroll_rect.h * 10}; /* Large height for content */
-
-  UI_BeginLayout(WB_UI_LAYOUT_VERTICAL, content_bounds);
-
-  /* Errors Section */
-  i32 diag_count = Config_GetDiagnosticCount();
   if (diag_count > 0) {
-    UI_PushStyleColor(WB_UI_STYLE_TEXT_COLOR, th->error);
-    UI_Label("Errors:");
-
-    for (i32 i = 0; i < diag_count; i++) {
-      char diag_buf[1024];
-      snprintf(diag_buf, sizeof(diag_buf), "  - %s",
-               Config_GetDiagnosticMessage(i));
-      UI_Label(diag_buf);
-    }
-    UI_PopStyle();
-    UI_Spacer(16);
+    Render_DrawText(
+        ctx,
+        (v2i){meta_rect.x + meta_rect.w - right_group_w,
+              meta_rect.y + (meta_rect.h - line_height) / 2},
+        error_status, ui->font, th->error);
+  } else {
+    Render_DrawText(
+        ctx,
+        (v2i){meta_rect.x + meta_rect.w - right_group_w,
+              meta_rect.y + (meta_rect.h - line_height) / 2},
+        "No errors", ui->font, th->success);
   }
 
-  /* Loaded Values Section */
-  UI_PushStyleColor(WB_UI_STYLE_TEXT_COLOR, th->accent);
-  UI_Label("Loaded Values:");
-  UI_PopStyle();
-  UI_Spacer(4);
+  Render_DrawText(
+      ctx,
+      (v2i){meta_rect.x + meta_rect.w - values_status_w,
+            meta_rect.y + (meta_rect.h - line_height) / 2},
+      values_status, ui->font, th->text_muted);
 
-  i32 entry_count = Config_GetEntryCount();
-  for (i32 i = 0; i < entry_count; i++) {
-    ConfigEntry *entry = Config_GetEntry(i);
-    if (!entry)
-      continue;
+  Render_DrawRect(
+      ctx,
+      (rect){meta_rect.x, meta_rect.y + meta_rect.h + th->spacing_xs / 2,
+             meta_rect.w, 1},
+      Color_WithAlpha(th->border, 70));
 
-    char entry_buf[3072];
-    const char *type_str = "unknown";
-    char val_buf[2048];
+  scroll = &layout->diagnostic_scroll;
+  ScrollContainer_Update(scroll, ui, body_rect);
 
-    switch (entry->type) {
-    case WB_CONFIG_TYPE_BOOL:
-      type_str = "bool";
-      snprintf(val_buf, sizeof(val_buf), "%s",
-               entry->value.bool_val ? "true" : "false");
-      break;
-    case WB_CONFIG_TYPE_I64:
-      type_str = "i64";
-      snprintf(val_buf, sizeof(val_buf), "%lld",
-               (long long)entry->value.i64_val);
-      break;
-    case WB_CONFIG_TYPE_F64:
-      type_str = "f64";
-      snprintf(val_buf, sizeof(val_buf), "%.2f", entry->value.f64_val);
-      break;
-    case WB_CONFIG_TYPE_STRING:
-      type_str = "string";
-      snprintf(val_buf, sizeof(val_buf), "\"%s\"", entry->value.string_val);
-      break;
+  Render_SetClipRect(ctx, body_rect);
+
+  scroll_offset_y = (i32)ScrollContainer_GetOffsetY(scroll);
+  content_x = body_rect.x;
+  content_y = body_rect.y - scroll_offset_y;
+  content_w = body_rect.w - SCROLL_SCROLLBAR_GUTTER;
+  if (content_w < 0) {
+    content_w = 0;
+  }
+  content_start_y = content_y;
+
+  if (diag_count > 0) {
+    Render_DrawText(ctx, (v2i){content_x, content_y}, "Errors", ui->font,
+                    th->error);
+    content_y += line_height + th->spacing_sm;
+
+    for (i32 i = 0; i < diag_count; ++i) {
+      char diag_buf[544];
+      const char *message = Config_GetDiagnosticMessage(i);
+      i32 diag_height;
+
+      snprintf(diag_buf, sizeof(diag_buf), "- %s", message ? message : "");
+      diag_height =
+          RenderWrappedText(ui, layout->arena, diag_buf, ui->font,
+                            (rect){content_x, content_y, content_w, 0},
+                            th->error);
+      content_y += diag_height + th->spacing_sm;
     }
 
-    snprintf(entry_buf, sizeof(entry_buf), "  %-24s (%-6s) = %s", entry->key,
-             type_str, val_buf);
-    UI_Label(entry_buf);
+    content_y += th->spacing_lg;
   }
 
-  /* Get content height from layout before ending it */
-  ui_context *ui_ctx = UI_GetContext();
-  ui_layout *current_layout = &ui_ctx->layout_stack[ui_ctx->layout_depth - 1];
-  f32 content_height =
-      (f32)(current_layout->cursor.y - current_layout->bounds.y);
+  Render_DrawText(ctx, (v2i){content_x, content_y}, "Loaded Values", ui->font,
+                  th->accent);
+  content_y += line_height + th->spacing_md;
 
-  UI_EndLayout();
+  if (entry_count == 0) {
+    Render_DrawText(ctx, (v2i){content_x, content_y}, "No values loaded.",
+                    ui->font, th->text_muted);
+    content_y += line_height;
+  } else {
+    i32 col_gap = th->spacing_md;
+    i32 type_w = 72;
+    i32 key_w = Clamp((content_w * 34) / 100, 120, 280);
+    i32 min_value_w = 120;
 
-  /* Update scroll container with measured content size */
-  ScrollContainer_SetContentSize(scroll, content_height);
+    if (content_w - (col_gap * 2) - type_w - key_w < min_value_w) {
+      type_w = 56;
+      key_w = content_w - (col_gap * 2) - type_w - min_value_w;
+      if (key_w < 96) {
+        key_w = 96;
+      }
+    }
 
-  /* Reset clip and render scrollbar */
+    for (i32 i = 0; i < entry_count; ++i) {
+      ConfigEntry *entry = Config_GetEntry(i);
+      char value_buf[2048];
+      const char *type_str;
+      char key_buf[256];
+      i32 key_x;
+      i32 type_x;
+      i32 value_x;
+      i32 value_w;
+      i32 value_height;
+      i32 row_height;
+
+      if (!entry) {
+        continue;
+      }
+
+      key_x = content_x;
+      type_x = key_x + key_w + col_gap;
+      value_x = type_x + type_w + col_gap;
+      value_w = content_w - (value_x - content_x);
+      if (value_w < 64) {
+        value_w = 64;
+      }
+
+      FormatConfigValue(entry, value_buf, sizeof(value_buf), &type_str);
+      value_height =
+          RenderWrappedText(ui, layout->arena, value_buf, code_font,
+                            (rect){value_x, content_y, value_w, 0}, th->text);
+      row_height = Max(line_height, value_height);
+
+      RenderTextWithEllipsis(ui, code_font, (v2i){key_x, content_y}, entry->key,
+                             key_w, th->text, key_buf, sizeof(key_buf));
+      Render_DrawText(ctx, (v2i){type_x, content_y}, type_str, ui->font,
+                      th->text_muted);
+
+      content_y += row_height + th->spacing_sm;
+      Render_DrawRect(ctx,
+                      (rect){content_x, content_y, content_w, 1},
+                      Color_WithAlpha(th->border, 40));
+      content_y += th->spacing_sm;
+    }
+  }
+
+  content_height = content_y - content_start_y;
+  if (content_height < body_rect.h) {
+    content_height = body_rect.h;
+  }
+  ScrollContainer_SetContentSize(scroll, (f32)content_height);
+
   Render_ResetClipRect(ctx);
   ScrollContainer_RenderScrollbar(scroll, ui);
 
-  /* Footer Buttons - Right aligned */
-  i32 btn_pad = th->spacing_sm * 2;
+  {
+    const char *close_label = "Close";
+    const char *open_label = "Open Config File";
+    const char *reload_label = "Reload";
+    i32 close_w = Max(96, UI_MeasureText(close_label, ui->font).x + btn_pad);
+    i32 open_w = Max(96, UI_MeasureText(open_label, ui->font).x + btn_pad);
+    i32 reload_w = Max(96, UI_MeasureText(reload_label, ui->font).x + btn_pad);
+    i32 btn_y = shell.footer.y + (shell.footer.h - btn_h) / 2;
+    i32 current_x = shell.footer.x + shell.footer.w - shell.outer_pad_x;
 
-  /* Measure buttons */
-  i32 close_w = UI_MeasureText("Close", ui->font).x + btn_pad;
-  if (close_w < 80)
-    close_w = 80; /* Min width for aesthetics */
-
-  i32 open_w = UI_MeasureText("Open Config File", ui->font).x + btn_pad;
-  i32 reload_w = UI_MeasureText("Reload", ui->font).x + btn_pad;
-
-  i32 btn_h = 32;
-  i32 btn_y = footer_rect.y + (footer_rect.h - btn_h) / 2;
-
-  /* Layout from right to left */
-  i32 current_x = footer_rect.x + footer_rect.w - th->spacing_lg;
-
-  /* Close Button */
-  current_x -= close_w;
-  rect close_rect = {current_x, btn_y, close_w, btn_h};
-  UI_BeginLayout(WB_UI_LAYOUT_HORIZONTAL, close_rect);
-  if (UI_Button("Close")) {
-    layout->show_config_diagnostics = false;
-    UI_EndModal();
-    Input_PopFocus();
-  }
-  UI_EndLayout();
-
-  /* Open File Button */
-  current_x -= (open_w + th->spacing_md);
-  rect open_rect = {current_x, btn_y, open_w, btn_h};
-  UI_BeginLayout(WB_UI_LAYOUT_HORIZONTAL, open_rect);
-  if (UI_Button("Open Config File")) {
-    const char *path = Config_GetPath();
-    if (path) {
-      Platform_OpenFile(path);
+    current_x -= close_w;
+    UI_BeginLayout(WB_UI_LAYOUT_HORIZONTAL,
+                   (rect){current_x, btn_y, close_w, btn_h});
+    UI_PushStyleInt(WB_UI_STYLE_MIN_WIDTH, close_w);
+    UI_PushStyleInt(WB_UI_STYLE_MIN_HEIGHT, btn_h);
+    UI_PushStyleColor(WB_UI_STYLE_BG_COLOR, Color_WithAlpha(th->panel_alt, 220));
+    UI_PushStyleColor(WB_UI_STYLE_HOVER_COLOR, Color_Lighten(th->panel_alt, 0.1f));
+    UI_PushStyleColor(WB_UI_STYLE_ACTIVE_COLOR,
+                      Color_Lighten(th->panel_alt, 0.18f));
+    if (UI_Button(close_label)) {
+      close_modal = true;
     }
-  }
-  UI_EndLayout();
+    UI_PopStyle();
+    UI_PopStyle();
+    UI_PopStyle();
+    UI_PopStyle();
+    UI_PopStyle();
+    UI_EndLayout();
 
-  /* Reload Button */
-  current_x -= (reload_w + th->spacing_md);
-  rect reload_rect = {current_x, btn_y, reload_w, btn_h};
-  UI_BeginLayout(WB_UI_LAYOUT_HORIZONTAL, reload_rect);
-  if (UI_Button("Reload")) {
-    Config_Reload();
-  }
-  UI_EndLayout();
+    current_x -= open_w + shell.actions_gap_x;
+    UI_BeginLayout(WB_UI_LAYOUT_HORIZONTAL,
+                   (rect){current_x, btn_y, open_w, btn_h});
+    UI_PushStyleInt(WB_UI_STYLE_MIN_WIDTH, open_w);
+    UI_PushStyleInt(WB_UI_STYLE_MIN_HEIGHT, btn_h);
+    UI_PushStyleColor(WB_UI_STYLE_BG_COLOR, Color_WithAlpha(th->panel_alt, 220));
+    UI_PushStyleColor(WB_UI_STYLE_HOVER_COLOR, Color_Lighten(th->panel_alt, 0.1f));
+    UI_PushStyleColor(WB_UI_STYLE_ACTIVE_COLOR,
+                      Color_Lighten(th->panel_alt, 0.18f));
+    if (UI_Button(open_label)) {
+      const char *path = Config_GetPath();
+      if (path) {
+        Platform_OpenFile(path);
+      }
+    }
+    UI_PopStyle();
+    UI_PopStyle();
+    UI_PopStyle();
+    UI_PopStyle();
+    UI_PopStyle();
+    UI_EndLayout();
 
-  /* Handle Escape / Return to close */
-  if (ui->input.key_pressed[WB_KEY_ESCAPE] || ui->input.key_pressed[WB_KEY_RETURN]) {
+    current_x -= reload_w + shell.actions_gap_x;
+    UI_BeginLayout(WB_UI_LAYOUT_HORIZONTAL,
+                   (rect){current_x, btn_y, reload_w, btn_h});
+    UI_PushStyleInt(WB_UI_STYLE_MIN_WIDTH, reload_w);
+    UI_PushStyleInt(WB_UI_STYLE_MIN_HEIGHT, btn_h);
+    UI_PushStyleColor(WB_UI_STYLE_BG_COLOR, th->accent);
+    UI_PushStyleColor(WB_UI_STYLE_HOVER_COLOR, th->accent_hover);
+    UI_PushStyleColor(WB_UI_STYLE_ACTIVE_COLOR, th->accent_active);
+    if (UI_Button(reload_label)) {
+      Config_Reload();
+    }
+    UI_PopStyle();
+    UI_PopStyle();
+    UI_PopStyle();
+    UI_PopStyle();
+    UI_PopStyle();
+    UI_EndLayout();
+  }
+
+  if (ui->input.key_pressed[WB_KEY_ESCAPE]) {
+    close_modal = true;
+  }
+
+  if (close_modal) {
     layout->show_config_diagnostics = false;
-    UI_EndModal();
     Input_PopFocus();
   }
 
-  UI_EndModal();
+  Dialog_EndShell(ui, &shell);
+  EndTemporaryMemory(temp);
 }

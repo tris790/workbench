@@ -231,15 +231,6 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
   PreviewPanel_Update(&layout->preview, ui, &layout->panels[0].explorer,
                       layout->mode == WB_LAYOUT_MODE_SINGLE);
 
-  /* Handle global config diagnostic modal */
-  if (layout->show_config_diagnostics) {
-    if (ui->input.key_pressed[WB_KEY_ESCAPE] ||
-        ui->input.key_pressed[WB_KEY_RETURN]) {
-      layout->show_config_diagnostics = false;
-      UI_EndModal();
-      Input_PopFocus();
-    }
-  }
 }
 
 static void DrawSplitter(ui_context *ui, rect bounds, bool hot, bool active) {

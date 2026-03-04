@@ -45,6 +45,29 @@ typedef struct {
   const char *cancel_label;
 } dialog_config;
 
+typedef struct {
+  const char *modal_name;
+  const char *title;
+  i32 preferred_width;
+  i32 preferred_height;
+  i32 min_width;
+  i32 min_height;
+  i32 margin_x;
+  i32 margin_y;
+} dialog_shell_config;
+
+typedef struct {
+  rect frame;
+  rect header;
+  rect content;
+  rect footer;
+  i32 outer_pad_x;
+  i32 footer_pad_y;
+  i32 actions_gap_x;
+  i32 header_h;
+  i32 footer_h;
+} dialog_shell_layout;
+
 /* ===== Dialog API ===== */
 
 /* Render a dialog centered in bounds.
@@ -52,6 +75,13 @@ typedef struct {
  */
 dialog_result Dialog_Render(ui_context *ui, rect bounds,
                             const dialog_config *config);
+
+/* Draw a reusable modal shell for larger custom-content dialogs. */
+dialog_shell_layout Dialog_BeginShell(ui_context *ui, rect bounds,
+                                      const dialog_shell_config *config);
+
+/* End a modal shell started with Dialog_BeginShell. */
+void Dialog_EndShell(ui_context *ui, const dialog_shell_layout *layout);
 
 /* Default dialog width */
 #define DIALOG_WIDTH 420
