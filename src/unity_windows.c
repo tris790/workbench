@@ -46,6 +46,7 @@
 #include "ui/components/drag_drop.c"
 #include "ui/components/explorer.c"
 #include "ui/components/file_item.c"
+#include "ui/components/preview_panel.c"
 #include "ui/components/progress_bar.c"
 #include "ui/components/quick_filter.c"
 #include "ui/components/scroll_container.c"

@@ -14,6 +14,7 @@
 #include "components/drag_drop.h"
 #include "components/explorer.h"
 #include "components/notification.h"
+#include "components/preview_panel.h"
 #include "components/progress_bar.h"
 #include "components/scroll_container.h"
 #include "components/terminal_panel.h"
@@ -66,6 +67,9 @@ typedef struct layout_state_s {
 
   /* Progress Bar */
   progress_bar_state progress_bar;
+
+  /* Preview pane */
+  preview_state preview;
   
   /* Notification system */
   notification_state notifications;
@@ -99,5 +103,8 @@ panel *Layout_GetActivePanel(layout_state *layout);
 
 /* Toggle terminal for active panel */
 void Layout_ToggleTerminal(layout_state *layout);
+
+/* Toggle preview for single-pane mode */
+void Layout_TogglePreview(layout_state *layout);
 
 #endif /* LAYOUT_H */

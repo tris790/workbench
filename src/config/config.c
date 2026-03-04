@@ -75,6 +75,12 @@ static void SetDefaults(void) {
   Config_SetString("explorer.start_directory", "~");
   Config_SetString("explorer.sort_type", "name");
   Config_SetString("explorer.sort_order", "ascending");
+  Config_SetBool("preview.enabled", (b32) false);
+  Config_SetF64("preview.width_ratio", 0.40);
+  Config_SetI64("preview.text.max_bytes", 262144);
+  Config_SetI64("preview.image.max_decode_bytes", 33554432);
+  Config_SetI64("preview.image.max_dimension", 4096);
+  Config_SetI64("preview.selection_debounce_ms", 60);
   Config_SetI64("terminal.font_size", 14);
   Config_SetI64("terminal.scrollback_lines", 10000);
 

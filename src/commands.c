@@ -231,6 +231,13 @@ static void Cmd_ToggleAnimations(void *u) {
   g_animations_enabled = !g_animations_enabled;
 }
 
+static void Cmd_ViewTogglePreview(void *u) {
+  (void)u;
+  if (g_layout) {
+    Layout_TogglePreview(g_layout);
+  }
+}
+
 /* ===== Sorting ===== */
 
 static void Cmd_SortByName(void *u) {
@@ -372,6 +379,8 @@ static const CommandDef g_commands[] = {
      Cmd_ViewFocusNextPane},
     {"View: Toggle Fullscreen", "F11", "View", "maximize fullscreen",
      Cmd_ViewToggleFullscreen},
+    {"View: Toggle Preview", "palette", "View",
+     "preview peek inspector side pane", Cmd_ViewTogglePreview},
     {"View: Toggle Split", "Ctrl + \\", "Layout", "divide panel dual split",
      Cmd_ViewToggleSplit},
 

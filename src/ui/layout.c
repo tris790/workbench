@@ -60,12 +60,16 @@ void Layout_Init(layout_state *layout, memory_arena *arena) {
 
   /* Initialize progress bar */
   ProgressBar_Init(&layout->progress_bar);
+
+  /* Initialize preview pane */
+  PreviewPanel_Init(&layout->preview);
   
   /* Initialize notification system */
   Notification_Init(&layout->notifications);
 }
 
 void Layout_Shutdown(layout_state *layout) {
+  PreviewPanel_Shutdown(&layout->preview);
   TaskQueue_Shutdown(&layout->tasks);
 }
 
@@ -79,6 +83,8 @@ void Layout_RefreshConfig(layout_state *layout) {
        to handle new file visibility */
     Explorer_Refresh(&layout->panels[i].explorer);
   }
+
+  PreviewPanel_RefreshConfig(&layout->preview);
 }
 
 void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
@@ -222,6 +228,9 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
                     &layout->drag_drop, layout->active_panel_idx);
   }
 
+  PreviewPanel_Update(&layout->preview, ui, &layout->panels[0].explorer,
+                      layout->mode == WB_LAYOUT_MODE_SINGLE);
+
   /* Handle global config diagnostic modal */
   if (layout->show_config_diagnostics) {
     if (ui->input.key_pressed[WB_KEY_ESCAPE] ||
@@ -250,6 +259,10 @@ static void RenderPanelWithTerminal(layout_state *layout, ui_context *ui,
                                     rect bounds, u32 panel_idx) {
   panel *p = &layout->panels[panel_idx];
   b32 has_focus = (layout->active_panel_idx == panel_idx);
+  b32 show_preview =
+      (panel_idx == 0) &&
+      PreviewPanel_IsVisible(&layout->preview,
+                             layout->mode == WB_LAYOUT_MODE_SINGLE);
 
   /* Calculate terminal height if visible */
   i32 terminal_height = TerminalPanel_GetHeight(&p->terminal, bounds.h);
@@ -260,10 +273,28 @@ static void RenderPanelWithTerminal(layout_state *layout, ui_context *ui,
     explorer_bounds.h = bounds.h - terminal_height;
   }
 
-  /* Render explorer */
-  Explorer_Render(&p->explorer, ui, explorer_bounds,
-                  has_focus && !TerminalPanel_HasFocus(&p->terminal),
-                  &layout->drag_drop, panel_idx);
+  if (show_preview) {
+    rect list_bounds;
+    rect splitter_bounds;
+    rect preview_bounds;
+
+    PreviewPanel_ComputeBounds(&layout->preview, explorer_bounds, &list_bounds,
+                               &splitter_bounds, &preview_bounds);
+    layout->preview.host_bounds = explorer_bounds;
+    layout->preview.last_splitter_bounds = splitter_bounds;
+    Explorer_Render(&p->explorer, ui, list_bounds,
+                    has_focus && !TerminalPanel_HasFocus(&p->terminal),
+                    &layout->drag_drop, panel_idx);
+    PreviewPanel_Render(&layout->preview, ui, preview_bounds);
+  } else {
+    layout->preview.host_bounds = (rect){0};
+    layout->preview.content_bounds = (rect){0};
+    layout->preview.last_splitter_bounds = (rect){0};
+    /* Render explorer */
+    Explorer_Render(&p->explorer, ui, explorer_bounds,
+                    has_focus && !TerminalPanel_HasFocus(&p->terminal),
+                    &layout->drag_drop, panel_idx);
+  }
 
   /* Render terminal if visible */
   if (terminal_height > 0) {
@@ -379,4 +410,14 @@ void Layout_ToggleTerminal(layout_state *layout) {
 
   /* Toggle terminal for this panel */
   TerminalPanel_Toggle(&p->terminal, cwd);
+}
+
+void Layout_TogglePreview(layout_state *layout) {
+  if (!layout) {
+    return;
+  }
+
+  layout->preview.enabled = !layout->preview.enabled;
+  Config_SetBool("preview.enabled", layout->preview.enabled);
+  Config_Save();
 }
