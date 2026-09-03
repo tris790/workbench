@@ -4,6 +4,7 @@
 #include "../../core/fs.h"
 #include "../../core/image.h"
 #include "scroll_container.h"
+#include "preview_zoom.h"
 
 struct explorer_state_s;
 
@@ -65,8 +66,19 @@ typedef struct {
   f32 drag_start_ratio;
   rect host_bounds;
   rect content_bounds;
+  rect content_view_bounds;
   rect last_splitter_bounds;
   scroll_container_state scroll;
+  preview_zoom_state zoom;
+  v2f image_pan;
+  ui_id content_pan_id;
+  b32 dragging_content;
+  mouse_button pan_button;
+  v2i pan_start_mouse;
+  v2f pan_start_offset;
+  font *zoom_font;
+  i32 zoom_font_size;
+  i32 text_font_base_size;
 
   i32 observed_selection_count;
   char observed_path[FS_MAX_PATH];

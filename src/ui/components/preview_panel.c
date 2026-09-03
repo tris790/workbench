@@ -5,6 +5,7 @@
  */
 
 #include "preview_panel.h"
+#include "../../core/assets_embedded.h"
 #include "../../config/config.h"
 #include "../../platform/platform.h"
 #include "../../renderer/font.h"
@@ -22,6 +23,8 @@
 #define PREVIEW_LINE_BUFFER 1024
 #define PREVIEW_MIN_RATIO 0.05f
 #define PREVIEW_MAX_RATIO 0.95f
+#define PREVIEW_TEXT_MIN_FONT_SIZE 4
+#define PREVIEW_TEXT_MAX_FONT_SIZE 256
 
 extern void *Platform_CreateThread(void *(*func)(void *), void *arg);
 extern void *Platform_CreateMutex(void);
@@ -52,6 +55,16 @@ static void PreviewCopyString(char *dst, usize dst_size, const char *src) {
     memcpy(dst, src, len);
   }
   dst[len] = '\0';
+}
+
+static void PreviewPanel_ResetView(preview_state *state) {
+  ScrollContainer_Init(&state->scroll);
+  PreviewZoom_Reset(&state->zoom);
+  state->image_pan = (v2f){0.0f, 0.0f};
+  state->dragging_content = false;
+  state->pan_button = WB_MOUSE_LEFT;
+  state->pan_start_mouse = (v2i){0, 0};
+  state->pan_start_offset = (v2f){0.0f, 0.0f};
 }
 
 static void PreviewContent_Clear(preview_content *content) {
@@ -344,8 +357,9 @@ static void *PreviewPanel_WorkerThread(void *arg) {
 void PreviewPanel_Init(preview_state *state) {
   memset(state, 0, sizeof(*state));
   state->splitter_id = UI_GenID("PreviewPanelSplitter");
+  state->content_pan_id = UI_GenID("PreviewPanelContentPan");
   state->observed_selection_count = -1;
-  ScrollContainer_Init(&state->scroll);
+  PreviewPanel_ResetView(state);
   PreviewPanel_RefreshConfig(state);
 
   state->mutex = Platform_CreateMutex();
@@ -366,11 +380,17 @@ void PreviewPanel_Shutdown(preview_state *state) {
     Platform_CondSignal(state->cond_var);
     Platform_UnlockMutex(state->mutex);
   }
+  if (state->zoom_font) {
+    Font_Free(state->zoom_font);
+    state->zoom_font = NULL;
+  }
   PreviewContent_Clear(&state->current);
   PreviewContent_Clear(&state->previous);
 }
 
 void PreviewPanel_RefreshConfig(preview_state *state) {
+  i32 old_text_font_base_size = state->text_font_base_size;
+
   state->enabled = Config_GetBool("preview.enabled", false);
   state->width_ratio =
       (f32)Config_GetF64("preview.width_ratio", 0.40);
@@ -388,6 +408,17 @@ void PreviewPanel_RefreshConfig(preview_state *state) {
       Config_GetI64("preview.image.max_dimension", 4096);
   state->selection_debounce_ms =
       Config_GetI64("preview.selection_debounce_ms", 60);
+  state->text_font_base_size =
+      (i32)Max(Config_GetI64("terminal.font_size", 14), 1);
+
+  if (old_text_font_base_size != 0 &&
+      old_text_font_base_size != state->text_font_base_size) {
+    if (state->zoom_font) {
+      Font_Free(state->zoom_font);
+      state->zoom_font = NULL;
+    }
+    state->zoom_font_size = 0;
+  }
 }
 
 b32 PreviewPanel_IsVisible(preview_state *state, b32 preview_allowed) {
@@ -486,7 +517,7 @@ static void PreviewPanel_ConsumeWorkerResult(preview_state *state) {
     PreviewContent_Move(&state->previous, &state->current);
   }
   PreviewContent_Move(&state->current, &result);
-  ScrollContainer_Init(&state->scroll);
+  PreviewPanel_ResetView(state);
 }
 
 static b32 PreviewContentMatches(const preview_content *content,
@@ -537,7 +568,7 @@ static void PreviewPanel_BeginLoading(preview_state *state, const fs_entry *entr
   state->pending_request.modified_time = entry->modified_time;
   state->pending_due_time_ms =
       Platform_GetTimeMs() + (u64)Max(state->selection_debounce_ms, 0);
-  ScrollContainer_Init(&state->scroll);
+  PreviewPanel_ResetView(state);
 }
 
 static void PreviewPanel_ApplySelection(preview_state *state,
@@ -556,13 +587,13 @@ static void PreviewPanel_ApplySelection(preview_state *state,
 
   PreviewRememberSelection(state, selection_count, entry);
   state->has_pending_request = false;
+  PreviewPanel_ResetView(state);
 
   if (selection_count <= 0 || !entry) {
     state->current_generation++;
     PreviewPanel_PreserveCurrent(state);
     PreviewContent_SetSimple(&state->current, WB_PREVIEW_CONTENT_EMPTY, NULL,
                              state->current_generation, "No selection");
-    ScrollContainer_Init(&state->scroll);
     return;
   }
 
@@ -572,7 +603,6 @@ static void PreviewPanel_ApplySelection(preview_state *state,
     PreviewContent_SetSimple(&state->current, WB_PREVIEW_CONTENT_MULTI_SELECTION,
                              entry, state->current_generation,
                              "Multiple items selected");
-    ScrollContainer_Init(&state->scroll);
     return;
   }
 
@@ -588,7 +618,6 @@ static void PreviewPanel_ApplySelection(preview_state *state,
     preview_content temp = state->current;
     state->current = state->previous;
     state->previous = temp;
-    ScrollContainer_Init(&state->scroll);
     return;
   }
 
@@ -597,7 +626,6 @@ static void PreviewPanel_ApplySelection(preview_state *state,
     PreviewPanel_PreserveCurrent(state);
     PreviewContent_SetSimple(&state->current, WB_PREVIEW_CONTENT_DIRECTORY, entry,
                              state->current_generation, "Directory");
-    ScrollContainer_Init(&state->scroll);
     return;
   }
 
@@ -616,7 +644,6 @@ static void PreviewPanel_ApplySelection(preview_state *state,
     PreviewPanel_PreserveCurrent(state);
     PreviewContent_SetSimple(&state->current, WB_PREVIEW_CONTENT_METADATA, entry,
                              state->current_generation, "Preview not available");
-    ScrollContainer_Init(&state->scroll);
     break;
   }
 }
@@ -664,6 +691,168 @@ static void PreviewPanel_UpdateSplitter(preview_state *state, ui_context *ui) {
   }
 }
 
+static font *PreviewPanel_GetTextFont(preview_state *state, ui_context *ui) {
+  i32 desired_size;
+
+  if (!ui) {
+    return NULL;
+  }
+
+  /* Text previews use a fixed font size.  Zoom is an image-only interaction;
+   * text content uses the scroll container below for navigation. */
+  desired_size = Max(state->text_font_base_size, 1);
+  desired_size = Clamp(desired_size, PREVIEW_TEXT_MIN_FONT_SIZE,
+                        PREVIEW_TEXT_MAX_FONT_SIZE);
+
+  if (!state->zoom_font || state->zoom_font_size != desired_size) {
+    if (state->zoom_font) {
+      Font_Free(state->zoom_font);
+      state->zoom_font = NULL;
+    }
+
+    state->zoom_font = Font_LoadFromFile(
+        "assets/fonts/JetBrainsMono-Regular.ttf", desired_size);
+    if (!state->zoom_font) {
+      state->zoom_font = Font_LoadFromMemory(asset_font_regular_data,
+                                             asset_font_regular_size,
+                                             desired_size);
+    }
+    state->zoom_font_size = state->zoom_font ? desired_size : 0;
+  }
+
+  return state->zoom_font ? state->zoom_font
+                          : (ui->mono_font ? ui->mono_font : ui->font);
+}
+
+static f32 PreviewPanel_GetImageFitScale(rect bounds, const image *img) {
+  f32 scale_x;
+  f32 scale_y;
+  f32 scale;
+
+  if (!img || bounds.w <= 0 || bounds.h <= 0) {
+    return 1.0f;
+  }
+
+  scale_x = (f32)bounds.w / (f32)Max(img->width, 1);
+  scale_y = (f32)bounds.h / (f32)Max(img->height, 1);
+  scale = Min(scale_x, scale_y);
+  if (scale > 1.0f) {
+    scale = 1.0f;
+  }
+  return scale > 0.0f ? scale : 1.0f;
+}
+
+static void PreviewPanel_ApplyZoom(preview_state *state, ui_context *ui,
+                                   rect viewport) {
+  f32 old_scale;
+  f32 new_scale;
+  v2i mouse = ui->input.mouse_pos;
+
+  if (!PreviewZoom_ApplyWheel(&state->zoom, ui->input.scroll_delta,
+                              Platform_GetTimeMs(), &old_scale, &new_scale)) {
+    return;
+  }
+
+  if (state->current.type == WB_PREVIEW_CONTENT_IMAGE &&
+      state->current.img) {
+    f32 fit_scale = PreviewPanel_GetImageFitScale(viewport, state->current.img);
+    f32 old_total_scale = fit_scale * old_scale;
+    f32 new_total_scale = fit_scale * new_scale;
+    f32 old_w = (f32)state->current.img->width * old_total_scale;
+    f32 old_h = (f32)state->current.img->height * old_total_scale;
+    f32 new_w = (f32)state->current.img->width * new_total_scale;
+    f32 new_h = (f32)state->current.img->height * new_total_scale;
+    f32 old_left = (f32)viewport.x + ((f32)viewport.w - old_w) * 0.5f +
+                   state->image_pan.x;
+    f32 old_top = (f32)viewport.y + ((f32)viewport.h - old_h) * 0.5f +
+                  state->image_pan.y;
+    f32 image_x = ((f32)mouse.x - old_left) / Max(old_total_scale, 0.0001f);
+    f32 image_y = ((f32)mouse.y - old_top) / Max(old_total_scale, 0.0001f);
+    f32 new_left = (f32)mouse.x - image_x * new_total_scale;
+    f32 new_top = (f32)mouse.y - image_y * new_total_scale;
+
+    state->image_pan.x =
+        new_left - ((f32)viewport.x + ((f32)viewport.w - new_w) * 0.5f);
+    state->image_pan.y =
+        new_top - ((f32)viewport.y + ((f32)viewport.h - new_h) * 0.5f);
+  }
+}
+
+static b32 PreviewPanel_ContentCanPan(preview_state *state, rect viewport) {
+  if (!state || viewport.w <= 0 || viewport.h <= 0) {
+    return false;
+  }
+
+  if (state->current.type == WB_PREVIEW_CONTENT_IMAGE &&
+      state->current.img) {
+    /* Keep the image draggable even when it is smaller than the viewport or
+     * zoomed out below its fit scale. */
+    return true;
+  }
+
+  return false;
+}
+
+static void PreviewPanel_UpdateContentPan(preview_state *state,
+                                          ui_context *ui) {
+  rect viewport;
+  rect hit_bounds;
+  b32 pressed;
+  mouse_button button;
+
+  if (!state || !ui) {
+    return;
+  }
+
+  viewport = state->content_view_bounds;
+  if (viewport.w <= 0 || viewport.h <= 0) {
+    return;
+  }
+
+  /* The whole preview surface is draggable.  In particular, do not require
+   * the pointer to be over the currently visible part of an image: panning
+   * past an edge can move that part outside the viewport. */
+  hit_bounds = state->content_bounds;
+  if (hit_bounds.w <= 0 || hit_bounds.h <= 0) {
+    hit_bounds = viewport;
+  }
+
+  if (!state->dragging_content && ui->active == UI_ID_NONE &&
+      UI_PointInRect(ui->input.mouse_pos, hit_bounds) &&
+      PreviewPanel_ContentCanPan(state, viewport)) {
+    pressed = ui->input.mouse_pressed[WB_MOUSE_LEFT] ||
+              ui->input.mouse_pressed[WB_MOUSE_MIDDLE];
+    if (pressed) {
+      button = ui->input.mouse_pressed[WB_MOUSE_LEFT]
+                   ? WB_MOUSE_LEFT
+                   : WB_MOUSE_MIDDLE;
+      state->dragging_content = true;
+      state->pan_button = button;
+      state->pan_start_mouse = ui->input.mouse_pos;
+      state->pan_start_offset = state->image_pan;
+      ui->active = state->content_pan_id;
+    }
+  }
+
+  if (ui->active != state->content_pan_id) {
+    return;
+  }
+
+  if (ui->input.mouse_down[state->pan_button]) {
+    f32 dx = (f32)(ui->input.mouse_pos.x - state->pan_start_mouse.x);
+    f32 dy = (f32)(ui->input.mouse_pos.y - state->pan_start_mouse.y);
+
+    if (state->current.type == WB_PREVIEW_CONTENT_IMAGE &&
+        state->current.img) {
+      state->image_pan.x = state->pan_start_offset.x + dx;
+      state->image_pan.y = state->pan_start_offset.y + dy;
+    }
+  } else {
+    state->dragging_content = false;
+    ui->active = UI_ID_NONE;
+  }
+}
+
 void PreviewPanel_Update(preview_state *state, ui_context *ui,
                          struct explorer_state_s *explorer,
                          b32 preview_allowed) {
@@ -671,16 +860,34 @@ void PreviewPanel_Update(preview_state *state, ui_context *ui,
 
   if (!PreviewPanel_IsVisible(state, preview_allowed)) {
     state->has_pending_request = false;
+    state->content_view_bounds = (rect){0};
     return;
   }
 
   PreviewPanel_UpdateSplitter(state, ui);
 
-  if (state->content_bounds.w > 0 && state->content_bounds.h > 0) {
-    ScrollContainer_Update(&state->scroll, ui, state->content_bounds);
+  PreviewPanel_ApplySelection(state, explorer);
+
+  PreviewPanel_UpdateContentPan(state, ui);
+
+  if (state->content_view_bounds.w > 0 &&
+      state->content_view_bounds.h > 0 &&
+      UI_PointInRect(ui->input.mouse_pos, state->content_view_bounds) &&
+      ui->input.scroll_delta != 0.0f) {
+    /* Zoom and consume wheel input only for images. Text wheel input is left
+     * for ScrollContainer_Update so long previews remain scrollable. */
+    if (!state->dragging_content &&
+        state->current.type == WB_PREVIEW_CONTENT_IMAGE &&
+        state->current.img) {
+      PreviewPanel_ApplyZoom(state, ui, state->content_view_bounds);
+      ui->input.scroll_delta = 0.0f;
+    }
   }
 
-  PreviewPanel_ApplySelection(state, explorer);
+  if (state->content_view_bounds.w > 0 &&
+      state->content_view_bounds.h > 0) {
+    ScrollContainer_Update(&state->scroll, ui, state->content_view_bounds);
+  }
 
   if (state->has_pending_request &&
       Platform_GetTimeMs() >= state->pending_due_time_ms) {
@@ -690,8 +897,8 @@ void PreviewPanel_Update(preview_state *state, ui_context *ui,
 }
 
 static i32 PreviewDrawWrappedText(ui_context *ui, rect bounds, const char *text,
-                                  f32 scroll_y, b32 draw_text) {
-  font *font_to_use = ui->mono_font ? ui->mono_font : ui->font;
+                                  f32 scroll_y, b32 draw_text,
+                                  font *font_to_use) {
   i32 line_height = Font_GetLineHeight(font_to_use);
   i32 cell_width = Max(Font_MeasureWidth(font_to_use, "M"), 1);
   i32 columns = Max(bounds.w / cell_width, 1);
@@ -710,7 +917,7 @@ static i32 PreviewDrawWrappedText(ui_context *ui, rect bounds, const char *text,
     buffer[out_len] = '\0';
 
     if (draw_text && y + line_height >= bounds.y && y <= bounds.y + bounds.h) {
-      Render_DrawText(ui->renderer, (v2i){bounds.x, y}, buffer, font_to_use,
+    Render_DrawText(ui->renderer, (v2i){bounds.x, y}, buffer, font_to_use,
                       ui->theme->text);
     }
 
@@ -824,15 +1031,18 @@ void PreviewPanel_Render(preview_state *state, ui_context *ui, rect bounds) {
   if (state->current.type == WB_PREVIEW_CONTENT_TEXT && state->current.text) {
     rect text_bounds = {inner.x, inner.y + meta_height, inner.w,
                         Max(inner.h - meta_height, 0)};
+    font *text_font = PreviewPanel_GetTextFont(state, ui);
+
+    state->content_view_bounds = text_bounds;
 
     ScrollContainer_SetContentSize(
         &state->scroll,
         (f32)PreviewDrawWrappedText(ui, text_bounds, state->current.text,
-                                    state->scroll.offset.y, false));
+                                    state->scroll.offset.y, false, text_font));
 
     Render_SetClipRect(ctx, text_bounds);
     PreviewDrawWrappedText(ui, text_bounds, state->current.text,
-                           state->scroll.offset.y, true);
+                           state->scroll.offset.y, true, text_font);
     Render_ResetClipRect(ctx);
     ScrollContainer_RenderScrollbar(&state->scroll, ui);
     return;
@@ -841,23 +1051,31 @@ void PreviewPanel_Render(preview_state *state, ui_context *ui, rect bounds) {
   if (state->current.type == WB_PREVIEW_CONTENT_IMAGE && state->current.img) {
     rect image_bounds = {inner.x, inner.y + meta_height, inner.w,
                          Max(inner.h - meta_height, 0)};
-    f32 scale_x = (f32)image_bounds.w / (f32)Max(state->current.img->width, 1);
-    f32 scale_y = (f32)image_bounds.h / (f32)Max(state->current.img->height, 1);
-    f32 scale = Min(scale_x, scale_y);
-    if (scale > 1.0f) {
-      scale = 1.0f;
-    }
-    if (scale <= 0.0f) {
-      scale = 1.0f;
-    }
+    f32 scale = PreviewPanel_GetImageFitScale(image_bounds, state->current.img) *
+                state->zoom.scale;
+    f32 draw_w_f = (f32)state->current.img->width * scale;
+    f32 draw_h_f = (f32)state->current.img->height * scale;
+    i32 draw_w = Max((i32)draw_w_f, 1);
+    i32 draw_h = Max((i32)draw_h_f, 1);
+    i32 draw_x;
+    i32 draw_y;
+    rect draw_rect;
 
-    i32 draw_w = (i32)((f32)state->current.img->width * scale);
-    i32 draw_h = (i32)((f32)state->current.img->height * scale);
-    rect draw_rect = {image_bounds.x + (image_bounds.w - draw_w) / 2,
-                      image_bounds.y + (image_bounds.h - draw_h) / 2, draw_w,
-                      draw_h};
+    state->content_view_bounds = image_bounds;
+    draw_x = image_bounds.x + (image_bounds.w - draw_w) / 2 +
+             (i32)state->image_pan.x;
+    draw_y = image_bounds.y + (image_bounds.h - draw_h) / 2 +
+             (i32)state->image_pan.y;
+    draw_rect = (rect){draw_x, draw_y, draw_w, draw_h};
+
+    Render_SetClipRect(ctx, image_bounds);
     Render_DrawImage(ctx, draw_rect, state->current.img,
                      COLOR_RGBA(255, 255, 255, 255));
+    Render_ResetClipRect(ctx);
+    PreviewZoom_RenderIndicator(&state->zoom, ui, image_bounds,
+                                Platform_GetTimeMs());
     return;
   }
+
+  state->content_view_bounds = (rect){0};
 }
