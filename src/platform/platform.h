@@ -15,6 +15,13 @@
 
 typedef struct platform_window platform_window;
 typedef struct platform_event platform_event;
+typedef struct platform_instance platform_instance;
+
+typedef enum {
+  WB_INSTANCE_PRIMARY = 0,
+  WB_INSTANCE_FORWARDED,
+  WB_INSTANCE_UNAVAILABLE,
+} platform_instance_result;
 
 /* ===== Event Types ===== */
 
@@ -195,6 +202,7 @@ void Platform_SetWindowTitle(platform_window *window, const char *title);
 void Platform_GetWindowSize(platform_window *window, i32 *width, i32 *height);
 b32 Platform_WindowShouldClose(platform_window *window);
 void Platform_RequestQuit(platform_window *window);
+void Platform_ActivateWindow(platform_window *window);
 void Platform_SetFullscreen(platform_window *window, b32 fullscreen);
 b32 Platform_IsFullscreen(platform_window *window);
 
@@ -202,6 +210,20 @@ b32 Platform_IsFullscreen(platform_window *window);
 
 b32 Platform_PollEvent(platform_window *window, platform_event *event);
 void Platform_WaitEvents(platform_window *window);
+
+/* ===== Single-instance handoff =====
+ * The first Workbench process owns the per-user instance endpoint. Later
+ * launches forward their command line to it and exit, allowing the existing
+ * window to open the requested picker. */
+platform_instance_result Platform_InstanceAcquire(platform_instance **out,
+                                                   const char *app_id,
+                                                   int argc, char **argv);
+void Platform_InstanceAttachWindow(platform_instance *instance,
+                                    platform_window *window);
+b32 Platform_InstancePoll(platform_instance *instance, i32 *argc,
+                          char **argv, i32 max_args, char *storage,
+                          usize storage_size);
+void Platform_InstanceRelease(platform_instance *instance);
 
 /* ===== File System API ===== */
 

@@ -205,10 +205,14 @@ static void CommandPalette_ExecuteSelectedItem(command_palette_state *state) {
     }
     state->recent_commands[0] = cmd_idx;
 
-    /* Execute command callback */
+    /* Close the palette before invoking callbacks.  Some commands open a
+     * second modal (for example the save picker); closing first preserves the
+     * focus stack so the new modal owns keyboard input. */
+    CommandPalette_Close(state);
     if (item->callback) {
       item->callback(item->user_data);
     }
+    return;
   }
 
   CommandPalette_Close(state);

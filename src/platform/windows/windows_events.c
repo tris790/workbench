@@ -251,6 +251,18 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
       (platform_window *)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
 
   switch (msg) {
+  case WM_COPYDATA: {
+    COPYDATASTRUCT *data = (COPYDATASTRUCT *)lParam;
+    if (data && data->dwData == 0x57424D53 && data->lpData &&
+        data->cbData > 0) {
+      Platform_InstanceReceive(data->lpData, data->cbData);
+      if (window)
+        Platform_ActivateWindow(window);
+      return TRUE;
+    }
+    break;
+  }
+
   case WM_CLOSE: {
     if (window) {
       window->should_close = true;

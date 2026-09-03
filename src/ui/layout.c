@@ -66,6 +66,9 @@ void Layout_Init(layout_state *layout, memory_arena *arena) {
   
   /* Initialize notification system */
   Notification_Init(&layout->notifications);
+
+  /* Initialize the modal save picker */
+  SaveDialog_Init(&layout->save_dialog, arena);
 }
 
 void Layout_Shutdown(layout_state *layout) {
@@ -88,6 +91,18 @@ void Layout_RefreshConfig(layout_state *layout) {
 }
 
 void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
+  /* A picker is a true application modal.  Do not advance background task,
+   * progress, splitter, watcher, terminal, preview, or explorer state while
+   * it owns the window. */
+  if (SaveDialog_IsOpen(&layout->save_dialog)) {
+    UI_BeginModal("SaveDialog");
+    /* The picker may have opened during this frame, before UI_BeginFrame had
+     * a chance to carry next_modal into active_modal. */
+    ui->active_modal = ui->current_modal;
+    SaveDialog_Update(&layout->save_dialog, ui);
+    return;
+  }
+
   /* Update background task queue */
   TaskQueue_Update(&layout->tasks);
 
@@ -341,8 +356,12 @@ void Layout_Render(layout_state *layout, ui_context *ui, rect bounds) {
   /* Render drag and drop preview on top of everything */
   DragDrop_RenderPreview(&layout->drag_drop, ui);
   
-  /* Render notifications on top of everything */
-  Notification_UpdateAndRender(&layout->notifications, ui, bounds);
+  /* A picker owns the frame, including notification animation state. */
+  if (!SaveDialog_IsOpen(&layout->save_dialog))
+    Notification_UpdateAndRender(&layout->notifications, ui, bounds);
+
+  /* The save picker is the topmost application modal. */
+  SaveDialog_Render(&layout->save_dialog, ui, bounds);
 }
 
 void Layout_SetMode(layout_state *layout, layout_mode mode) {

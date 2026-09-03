@@ -17,6 +17,7 @@
 #include "components/preview_panel.h"
 #include "components/progress_bar.h"
 #include "components/scroll_container.h"
+#include "components/save_dialog.h"
 #include "components/terminal_panel.h"
 #include "ui.h"
 
@@ -73,6 +74,9 @@ typedef struct layout_state_s {
   
   /* Notification system */
   notification_state notifications;
+
+  /* External and in-app save picker */
+  save_dialog_state save_dialog;
 } layout_state;
 
 #define MIN_PANEL_WIDTH 100.0f

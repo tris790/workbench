@@ -38,7 +38,12 @@ b32 FS_IsWindowsDriveRoot(const char *path) {
 #ifdef _WIN32
   if ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z')) {
     if (path[1] == ':') {
-      return true;
+      /* Accept both C: and C:/ (or C:\\) as the drive root.  A path such as
+       * C:/Users is not a root and must still be navigable. */
+      if (path[2] == '\0')
+        return true;
+      if (FS_IsPathSeparator(path[2]) && path[3] == '\0')
+        return true;
     }
   }
 #endif
@@ -101,7 +106,12 @@ void FS_NormalizePath(char *path) {
   }
   /* Remove trailing slash unless it's the root */
   usize len = strlen(path);
-  if (len > 1 && path[len - 1] == '/') {
+  b32 preserve_drive_root = false;
+#ifdef _WIN32
+  preserve_drive_root =
+      len == 3 && path[1] == ':' && FS_IsPathSeparator(path[2]);
+#endif
+  if (len > 1 && path[len - 1] == '/' && !preserve_drive_root) {
     path[len - 1] = '\0';
   }
 }
@@ -472,9 +482,14 @@ b32 FS_NavigateUp(fs_state *state) {
   if (last_sep == parent) {
     /* Parent is root */
     parent[1] = '\0';
+#ifdef _WIN32
+  } else if (parent[1] == ':' && last_sep == parent + 2) {
+    /* C:/child -> C:/; loading C: would mean the process' current directory
+     * on that drive rather than the drive root. */
+    parent[3] = '\0';
+#endif
   } else if (last_sep) {
-    /* Truncate at separator, but handle Windows drives like C:/ later if
-     * needed. For now, just truncate. */
+    /* Truncate at the final separator. */
     char *sep_ptr = (char *)last_sep;
     *sep_ptr = '\0';
   }

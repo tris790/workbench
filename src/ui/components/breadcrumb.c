@@ -38,8 +38,11 @@ static i32 CountSegments(const char *path, const char *segments[],
     }
     p++;
   }
-  /* Handle Windows drive root like C:/ */
-  else if (FS_IsWindowsDriveRoot(p)) {
+  /* Handle Windows drive paths.  FS_IsWindowsDriveRoot intentionally only
+   * identifies the root itself, while a breadcrumb also needs to recognize
+   * C:/Users/... as an absolute path. */
+  else if (FS_IsWindowsDriveRoot(p) ||
+           (p[0] && p[1] == ':' && FS_IsPathSeparator(p[2]))) {
     if (count < max_segments) {
       segments[count++] = p; /* Drive root like "C:" */
     }

@@ -29,10 +29,14 @@ INCLUDES="-Isrc -Isrc/core -Isrc/platform -Isrc/platform/protocols -Isrc/rendere
 
 # Compiler and flags
 CC="gcc"
-CFLAGS="-std=c99 -D_GNU_SOURCE -Wall -Wextra -Werror -Wpedantic"
+# GCC's optimization-only strncpy diagnostics are false positives for the
+# project's intentionally bounded fixed-size buffers (the terminators are
+# written explicitly throughout the code).
+CFLAGS="-std=c99 -D_GNU_SOURCE -Wall -Wextra -Werror -Wpedantic -Wno-stringop-truncation"
 CFLAGS="$CFLAGS $INCLUDES"
 CFLAGS="$CFLAGS $(pkg-config --cflags freetype2 fontconfig)"
-LDFLAGS="-lwayland-cursor -lwayland-client -lwayland-egl -lEGL -lGL -lrt -lm -lutil -lpthread $(pkg-config --libs freetype2 fontconfig)"
+CFLAGS="$CFLAGS $(pkg-config --cflags dbus-1)"
+LDFLAGS="-lwayland-cursor -lwayland-client -lwayland-egl -lEGL -lGL -lrt -lm -lutil -lpthread $(pkg-config --libs freetype2 fontconfig dbus-1)"
 
 # Mode-specific flags
 if [ "$BUILD_MODE" = "release" ]; then

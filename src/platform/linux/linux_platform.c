@@ -22,6 +22,9 @@ static void RegistryGlobal(void *data, struct wl_registry *registry, u32 name,
     g_platform.xdg_wm_base = wl_registry_bind(
         registry, name, &xdg_wm_base_interface, Min(version, 2));
     /* Listener will be added in Init or here if we expose the listener */
+  } else if (strcmp(interface, xdg_activation_v1_interface.name) == 0) {
+    g_platform.activation = wl_registry_bind(
+        registry, name, &xdg_activation_v1_interface, Min(version, 1));
   } else if (strcmp(interface, wl_seat_interface.name) == 0) {
     g_platform.seat =
         wl_registry_bind(registry, name, &wl_seat_interface, Min(version, 5));
@@ -328,6 +331,8 @@ void Platform_Shutdown(void) {
     wl_seat_destroy(g_platform.seat);
   if (g_platform.xdg_wm_base)
     xdg_wm_base_destroy(g_platform.xdg_wm_base);
+  if (g_platform.activation)
+    xdg_activation_v1_destroy(g_platform.activation);
   if (g_platform.decoration_manager)
     zxdg_decoration_manager_v1_destroy(g_platform.decoration_manager);
   if (g_platform.shm)

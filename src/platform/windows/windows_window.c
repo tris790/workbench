@@ -160,6 +160,8 @@ platform_window *Platform_CreateWindow(window_config *config) {
 
   ShowWindow(window->hwnd, config->maximized ? SW_SHOWMAXIMIZED : SW_SHOW);
   UpdateWindow(window->hwnd);
+  if (g_platform.single_instance)
+    Platform_InstanceAttachWindow(g_platform.single_instance, window);
 
   return window;
 }

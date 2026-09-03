@@ -28,6 +28,7 @@ typedef struct {
   HINSTANCE instance;
   b32 ole_initialized;
   b32 initialized;
+  platform_instance *single_instance;
 } windows_platform;
 
 extern windows_platform g_platform;
@@ -73,6 +74,7 @@ u32 GetModifierState(void);
 /* Framebuffer management */
 b32 CreateFramebuffer(platform_window *window);
 void DestroyFramebuffer(platform_window *window);
+void Platform_InstanceReceive(const void *data, usize size);
 
 /* ===== String Conversions ===== */
 

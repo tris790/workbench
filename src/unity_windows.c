@@ -30,6 +30,7 @@
 #include "platform/windows/windows_threads.c"
 #include "platform/windows/windows_time.c"
 #include "platform/windows/windows_window.c"
+#include "platform/instance.c"
 
 /* === Renderer === */
 #include "renderer/icons.c"
@@ -51,6 +52,7 @@
 #include "ui/components/progress_bar.c"
 #include "ui/components/quick_filter.c"
 #include "ui/components/scroll_container.c"
+#include "ui/components/save_dialog.c"
 #include "ui/components/terminal_panel.c"
 #include "ui/components/text_input.c"
 #include "ui/components/widgets.c"

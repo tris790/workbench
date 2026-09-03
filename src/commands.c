@@ -99,6 +99,12 @@ static void Cmd_FileRefresh(void *u) {
     Explorer_Refresh(e);
 }
 
+static void Cmd_FileSaveAs(void *u) {
+  (void)u;
+  if (g_layout)
+    SaveDialog_Open(&g_layout->save_dialog, NULL, "untitled");
+}
+
 /* ===== Navigation ===== */
 
 static void Cmd_NavParent(void *u) {
@@ -340,6 +346,8 @@ static const CommandDef g_commands[] = {
      Cmd_FileNewFolder},
     {"File: Refresh", "palette", "File", "reload update refresh",
      Cmd_FileRefresh},
+    {"File: Save As...", "Ctrl + Shift + S", "File",
+     "save picker export download filename", Cmd_FileSaveAs},
     {"File: Rename", "F2", "File", "move rename", Cmd_FileRename},
     {"File: Toggle Hidden Files", "Ctrl + .", "File", "dot hide visible hidden",
      Cmd_ToggleHiddenFiles},

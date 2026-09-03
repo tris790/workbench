@@ -14,6 +14,9 @@
 #include "core/key_repeat.h"
 #include "core/theme.h"
 #include "platform/platform.h"
+#ifdef __linux__
+#include "platform/linux/linux_portal.h"
+#endif
 #include "renderer/font.h"
 #include "renderer/renderer.h"
 #include "ui/components/command_palette.h"
@@ -26,11 +29,58 @@
 #include <stdlib.h>
 #include <string.h>
 
+static save_dialog_mode Main_GetPickerMode(const app_args *args) {
+  if (!args || args->picker_mode <= WB_APP_PICKER_NONE)
+    return WB_PICKER_SAVE_FILE;
+  return (save_dialog_mode)(args->picker_mode - 1);
+}
+
+static void Main_OpenPicker(layout_state *layout, const app_args *args) {
+  if (!layout || !args || args->picker_mode <= WB_APP_PICKER_NONE)
+    return;
+
+  if (args->picker_mode == WB_APP_PICKER_SAVE_FILE) {
+    SaveDialog_OpenAt(
+        &layout->save_dialog, args->save_source[0] ? args->save_source : NULL,
+        args->save_name[0] ? args->save_name : NULL,
+        args->save_folder[0] ? args->save_folder : NULL, args->save_pick_only);
+  } else {
+    SaveDialog_OpenPicker(
+        &layout->save_dialog, Main_GetPickerMode(args),
+        args->picker_title[0] ? args->picker_title : NULL,
+        args->save_folder[0] ? args->save_folder : NULL,
+        args->save_name[0] ? args->save_name : NULL,
+        args->picker_accept[0] ? args->picker_accept : NULL,
+        args->picker_mode == WB_APP_PICKER_OPEN_MULTI_FILE);
+  }
+}
+
 int main(int argc, char **argv) {
 
   app_args args = Args_Parse(argc, argv);
 
+#ifdef __linux__
+  if (args.install_portal)
+    return Portal_Install() ? 0 : 1;
+#else
+  if (args.install_portal) {
+    fprintf(stderr, "Workbench portal installation is only available on Linux\n");
+    return 1;
+  }
+#endif
+
+  platform_instance *instance = NULL;
+  platform_instance_result instance_result =
+      Platform_InstanceAcquire(&instance, "workbench", argc, argv);
+  if (instance_result == WB_INSTANCE_FORWARDED)
+    return 0;
+  if (instance_result == WB_INSTANCE_UNAVAILABLE) {
+    fprintf(stderr, "Workbench is already running but could not receive the request\n");
+    return 1;
+  }
+
   if (!Platform_Init()) {
+    Platform_InstanceRelease(instance);
     fprintf(stderr, "Failed to initialize platform\n");
     return 1;
   }
@@ -47,16 +97,19 @@ int main(int argc, char **argv) {
 
   platform_window *window = Platform_CreateWindow(&config);
   if (!window) {
+    Platform_InstanceRelease(instance);
     fprintf(stderr, "Failed to create window\n");
     Config_Shutdown();
     Platform_Shutdown();
     return 1;
   }
+  Platform_InstanceAttachWindow(instance, window);
 
   /* Initialize font system AFTER window creation (GDI needs display context) */
   if (!Font_SystemInit()) {
     fprintf(stderr, "Failed to initialize font system\n");
     Platform_DestroyWindow(window);
+    Platform_InstanceRelease(instance);
     Config_Shutdown();
     Platform_Shutdown();
     return 1;
@@ -78,7 +131,10 @@ int main(int argc, char **argv) {
     renderer_name = "Software";
   }
 
-  printf("Workbench starting (%s) ...\n", renderer_name);
+  if (args.save_mode || args.portal_mode)
+    fprintf(stderr, "Workbench starting (%s) ...\n", renderer_name);
+  else
+    printf("Workbench starting (%s) ...\n", renderer_name);
 
   render_context renderer = {0};
   Render_Init(&renderer, backend);
@@ -135,13 +191,37 @@ int main(int argc, char **argv) {
   /* Initialize Layout (which inits explorers) */
   layout_state layout;
   Layout_Init(&layout, &arena);
+
+#ifdef __linux__
+  portal_server *portal = NULL;
+  b32 portal_ready = false;
+  /* The normal Workbench process owns the portal name as well.  That lets
+   * desktop/browser chooser requests reach its existing window instead of
+   * activating a second --portal process.  --portal remains the fallback
+   * service entry point when no Workbench window is running. */
+  if (Portal_Create(&portal, &arena) &&
+      Portal_Init(portal, &layout.save_dialog, &ui, window)) {
+    portal_ready = true;
+  } else if (args.portal_mode) {
+    fprintf(stderr, "Failed to initialize Workbench FileChooser portal\n");
+    if (portal)
+      Portal_Destroy(portal);
+    portal = NULL;
+    Platform_RequestQuit(window);
+  }
+#endif
   
   /* Global reference for notification callbacks */
   extern layout_state *g_layout_state;
   g_layout_state = &layout;
 
   /* Navigate panels to starting directory/directories */
-  Args_Handle(&layout, &args);
+  if (!args.portal_mode)
+    Args_Handle(&layout, &args);
+
+  /* External save requests open Workbench directly in its save picker. */
+  if (args.picker_mode > WB_APP_PICKER_NONE)
+    Main_OpenPicker(&layout, &args);
 
   /* Initialize Command Palette */
   command_palette_state palette;
@@ -173,6 +253,8 @@ int main(int argc, char **argv) {
   KeyRepeat_Init();
 
   u64 last_time = Platform_GetTimeMs();
+  b32 save_exit_requested = false;
+  i32 app_exit_code = 0;
 
   /* Main loop */
   i32 win_width = config.width;
@@ -197,22 +279,35 @@ int main(int argc, char **argv) {
     while (Platform_PollEvent(window, &event)) {
       switch (event.type) {
       case WB_EVENT_QUIT:
-        printf("Quit event received\n");
+        if (args.save_mode || args.portal_mode)
+          fprintf(stderr, "Quit event received\n");
+        else
+          printf("Quit event received\n");
         break;
 
       case WB_EVENT_KEY_DOWN: {
         bool consumed = false;
 
-        /* Command palette keybindings */
-        if (event.data.keyboard.key == WB_KEY_P &&
-            (event.data.keyboard.modifiers & MOD_CTRL)) {
-          if (event.data.keyboard.modifiers & MOD_SHIFT) {
-            CommandPalette_Open(&palette, WB_PALETTE_MODE_COMMAND);
-          } else {
-            CommandPalette_Open(&palette, WB_PALETTE_MODE_FILE);
+        /* Global shortcuts are suspended while the save picker is open. */
+        if (!layout.save_dialog.open) {
+          /* Command palette keybindings */
+          if (event.data.keyboard.key == WB_KEY_P &&
+              (event.data.keyboard.modifiers & MOD_CTRL)) {
+            if (event.data.keyboard.modifiers & MOD_SHIFT) {
+              CommandPalette_Open(&palette, WB_PALETTE_MODE_COMMAND);
+            } else {
+              CommandPalette_Open(&palette, WB_PALETTE_MODE_FILE);
+            }
+            consumed = true;
           }
-          consumed = true;
-        }
+
+          if (event.data.keyboard.key == WB_KEY_S &&
+              (event.data.keyboard.modifiers & MOD_CTRL) &&
+              (event.data.keyboard.modifiers & MOD_SHIFT) &&
+              !CommandPalette_IsOpen(&palette)) {
+            SaveDialog_Open(&layout.save_dialog, NULL, "untitled");
+            consumed = true;
+          }
 
         if (event.data.keyboard.key == WB_KEY_ESCAPE) {
           /* Let CommandPalette_Update handle ESC if palette is open */
@@ -230,39 +325,40 @@ int main(int argc, char **argv) {
           }
           consumed = true;
         }
-        /* Toggle Dual Panel Mode with Ctrl + / */
-        if (event.data.keyboard.key == WB_KEY_SLASH &&
-            (event.data.keyboard.modifiers & MOD_CTRL)) {
-          Layout_ToggleMode(&layout);
-          consumed = true;
-        }
+          /* Toggle Dual Panel Mode with Ctrl + / */
+          if (event.data.keyboard.key == WB_KEY_SLASH &&
+              (event.data.keyboard.modifiers & MOD_CTRL)) {
+            Layout_ToggleMode(&layout);
+            consumed = true;
+          }
 
-        /* Toggle Terminal with ` (backtick) */
-        if (event.data.keyboard.key == WB_KEY_GRAVE &&
-            !(event.data.keyboard.modifiers &
-              (MOD_CTRL | MOD_ALT | MOD_SHIFT))) {
-          Layout_ToggleTerminal(&layout);
-          consumed = true;
-        }
+          /* Toggle Terminal with ` (backtick) */
+          if (event.data.keyboard.key == WB_KEY_GRAVE &&
+              !(event.data.keyboard.modifiers &
+                (MOD_CTRL | MOD_ALT | MOD_SHIFT))) {
+            Layout_ToggleTerminal(&layout);
+            consumed = true;
+          }
 
-        /* Toggle Fullscreen with F11 */
-        if (event.data.keyboard.key == WB_KEY_F11) {
-          Platform_SetFullscreen(window, !Platform_IsFullscreen(window));
-          consumed = true;
-        }
+          /* Toggle Fullscreen with F11 */
+          if (event.data.keyboard.key == WB_KEY_F11) {
+            Platform_SetFullscreen(window, !Platform_IsFullscreen(window));
+            consumed = true;
+          }
 
-        /* Focus Split 1 (Alt + 1) */
-        if (event.data.keyboard.key == WB_KEY_1 &&
-            (event.data.keyboard.modifiers & MOD_ALT)) {
-          Layout_SetActivePanel(&layout, 0);
-          consumed = true;
-        }
+          /* Focus Split 1 (Alt + 1) */
+          if (event.data.keyboard.key == WB_KEY_1 &&
+              (event.data.keyboard.modifiers & MOD_ALT)) {
+            Layout_SetActivePanel(&layout, 0);
+            consumed = true;
+          }
 
-        /* Focus Split 2 (Alt + 2) */
-        if (event.data.keyboard.key == WB_KEY_2 &&
-            (event.data.keyboard.modifiers & MOD_ALT)) {
-          Layout_SetActivePanel(&layout, 1);
-          consumed = true;
+          /* Focus Split 2 (Alt + 2) */
+          if (event.data.keyboard.key == WB_KEY_2 &&
+              (event.data.keyboard.modifiers & MOD_ALT)) {
+            Layout_SetActivePanel(&layout, 1);
+            consumed = true;
+          }
         }
 
         if (event.data.keyboard.key < WB_KEY_COUNT) {
@@ -342,9 +438,36 @@ int main(int argc, char **argv) {
       }
     }
 
+    /* A second launch hands its picker request to this process. */
+    {
+      i32 forwarded_argc;
+      char *forwarded_argv[64];
+      char forwarded_storage[8192];
+      while (Platform_InstancePoll(instance, &forwarded_argc, forwarded_argv,
+                                   (i32)ArrayCount(forwarded_argv),
+                                   forwarded_storage,
+                                   sizeof(forwarded_storage))) {
+        app_args forwarded = Args_Parse(forwarded_argc, forwarded_argv);
+        if (forwarded.picker_mode > WB_APP_PICKER_NONE) {
+          CommandPalette_Close(&palette);
+          ContextMenu_Close(&context_menu);
+          Main_OpenPicker(&layout, &forwarded);
+          Platform_ActivateWindow(window);
+        }
+      }
+    }
+
+#ifdef __linux__
+    if (portal_ready)
+      Portal_Poll(portal);
+#endif
+
     /* Poll for configuration changes */
-    if (Config_Poll()) {
-      printf("Configuration reloaded due to file change\n");
+    if (!layout.save_dialog.open && Config_Poll()) {
+      if (args.save_mode || args.portal_mode)
+        fprintf(stderr, "Configuration reloaded due to file change\n");
+      else
+        printf("Configuration reloaded due to file change\n");
       Theme_InitFromConfig();
       /* Update explorer settings */
       Layout_RefreshConfig(&layout);
@@ -431,22 +554,54 @@ int main(int argc, char **argv) {
       /* Calculate layout bounds early for update */
       rect layout_bounds = {0, 0, win_width, win_height};
 
-      /* Update layout logic (handles splitter interaction, animation) */
-      /* Skip input processing for layout when command palette is open */
+      /* Update layout logic (handles splitter interaction, animation).  Both
+       * overlays suspend background interaction; the picker also suspends all
+       * background processing inside Layout_Update. */
       if (!CommandPalette_IsOpen(&palette)) {
         Layout_Update(&layout, &ui, layout_bounds);
       }
 
+#ifdef __linux__
+      if (portal_ready)
+        Portal_Complete(portal);
+#endif
+
       /* ===== Layout System (Full Window) ===== */
       Layout_Render(&layout, &ui, layout_bounds);
 
-      /* ===== Context Menu (overlay) ===== */
-      ContextMenu_Update(&context_menu, &ui);
-      ContextMenu_Render(&context_menu, &ui, win_width, win_height);
+      if (!layout.save_dialog.open) {
+        /* ===== Context Menu (overlay) ===== */
+        ContextMenu_Update(&context_menu, &ui);
+        ContextMenu_Render(&context_menu, &ui, win_width, win_height);
 
-      /* ===== Command Palette (overlay, rendered last) ===== */
-      CommandPalette_Update(&palette, &ui);
-      CommandPalette_Render(&palette, &ui, win_width, win_height);
+        /* ===== Command Palette (overlay, rendered last) ===== */
+        CommandPalette_Update(&palette, &ui);
+        if (!layout.save_dialog.open)
+          CommandPalette_Render(&palette, &ui, win_width, win_height);
+      }
+
+      if (args.picker_mode > WB_APP_PICKER_NONE &&
+          SaveDialog_IsFinished(&layout.save_dialog) &&
+          !save_exit_requested) {
+        save_exit_requested = true;
+        app_exit_code = SaveDialog_WasAccepted(&layout.save_dialog) ? 0 : 1;
+        if (SaveDialog_WasAccepted(&layout.save_dialog)) {
+          if (args.save_mode) {
+            printf("WORKBENCH_SAVE_PATH=%s\n",
+                   SaveDialog_GetResultPath(&layout.save_dialog));
+          } else {
+            for (i32 result = 0;
+                 result < SaveDialog_GetResultCount(&layout.save_dialog);
+                 result++)
+              printf("WORKBENCH_PICK_PATH=%s\n",
+                     SaveDialog_GetResultPathAt(&layout.save_dialog, result));
+          }
+        } else {
+          printf("WORKBENCH_SAVE_CANCELLED\n");
+        }
+        fflush(stdout);
+        Platform_RequestQuit(window);
+      }
 
       /* End input frame */
       Input_EndFrame();
@@ -469,6 +624,21 @@ int main(int argc, char **argv) {
     Platform_SleepMs(16); /* ~60fps target */
   }
 
+  (void)frame_count;
+
+#ifdef __linux__
+  if (portal_ready)
+    Portal_Destroy(portal);
+#endif
+
+  /* Closing the window is a cancellation in external save mode. */
+  if (args.picker_mode > WB_APP_PICKER_NONE &&
+      !SaveDialog_IsFinished(&layout.save_dialog)) {
+    app_exit_code = 1;
+    printf("WORKBENCH_SAVE_CANCELLED\n");
+    fflush(stdout);
+  }
+
   Layout_Shutdown(&layout);
   UI_Shutdown(&ui);
   if (main_font)
@@ -477,11 +647,15 @@ int main(int argc, char **argv) {
     Font_Free(mono_font);
   Render_Shutdown(&renderer);
   Platform_DestroyWindow(window);
+  Platform_InstanceRelease(instance);
   Font_SystemShutdown();
   Platform_Shutdown();
   free(arena_memory);
 
   Config_Shutdown();
-  printf("Workbench shutdown complete\n");
-  return 0;
+  if (args.save_mode || args.portal_mode)
+    fprintf(stderr, "Workbench shutdown complete\n");
+  else
+    printf("Workbench shutdown complete\n");
+  return app_exit_code;
 }

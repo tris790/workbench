@@ -8,6 +8,7 @@
 #include "../platform.h"
 #include "../protocols/xdg-decoration-client-protocol.h"
 #include "../protocols/xdg-shell-client-protocol.h"
+#include "../protocols/xdg-activation-client-protocol.h"
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,6 +36,7 @@ typedef struct {
   struct wl_compositor *compositor;
   struct wl_shm *shm;
   struct xdg_wm_base *xdg_wm_base;
+  struct xdg_activation_v1 *activation;
   struct zxdg_decoration_manager_v1 *decoration_manager;
   struct wl_seat *seat;
   struct wl_keyboard *keyboard;

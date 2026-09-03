@@ -28,12 +28,15 @@
 #include "platform/linux/linux_filesystem.c"
 #include "platform/linux/linux_fs_watcher.c"
 #include "platform/linux/linux_platform.c"
+#include "platform/linux/linux_portal.c"
 #include "platform/linux/linux_process.c"
 #include "platform/linux/linux_pty.c"
 #include "platform/linux/linux_threads.c"
 #include "platform/linux/linux_time.c"
 #include "platform/linux/linux_window.c"
+#include "platform/instance.c"
 #include "platform/protocols/xdg-decoration-protocol.c"
+#include "platform/protocols/xdg-activation-protocol.c"
 #include "platform/protocols/xdg-shell-protocol.c"
 
 /* === Renderer === */
@@ -57,6 +60,7 @@
 #include "ui/components/progress_bar.c"
 #include "ui/components/quick_filter.c"
 #include "ui/components/scroll_container.c"
+#include "ui/components/save_dialog.c"
 #include "ui/components/terminal_panel.c"
 #include "ui/components/text_input.c"
 #include "ui/components/widgets.c"
