@@ -27,16 +27,14 @@ b32 ScrollContainer_Update(scroll_container_state *state, ui_context *ui,
   state->bounds = bounds;
   state->view_size = (v2f){(f32)bounds.w, (f32)bounds.h};
 
-  /* Update smooth scroll animation */
-  SmoothValue_Update(&state->scroll_v, ui->dt);
-  SmoothValue_Update(&state->scroll_h, ui->dt);
-
   f32 old_offset = state->offset.y;
-  state->offset.y = state->scroll_v.current;
-  state->offset.x = state->scroll_h.current;
 
   /* Calculate max scroll */
   f32 max_scroll = ScrollContainer_GetMaxScroll(state);
+
+  state->target_offset.y = Clamp(state->target_offset.y, 0.0f, max_scroll);
+  state->scroll_v.current = Clamp(state->scroll_v.current, 0.0f, max_scroll);
+  state->scroll_v.target = state->target_offset.y;
 
   /* Handle scrollbar dragging */
   if (state->is_dragging) {
@@ -82,7 +80,8 @@ b32 ScrollContainer_Update(scroll_container_state *state, ui_context *ui,
     if (UI_PointInRect(ui->input.mouse_pos, bounds)) {
       if (ui->input.scroll_delta != 0) {
         state->target_offset.y -=
-            ui->input.scroll_delta * SCROLL_WHEEL_MULTIPLIER;
+            ui->input.scroll_delta * SCROLL_WHEEL_MULTIPLIER *
+            ui->scroll_multiplier;
 
         /* Clamp */
         if (state->target_offset.y < 0)
@@ -122,11 +121,21 @@ b32 ScrollContainer_Update(scroll_container_state *state, ui_context *ui,
     }
   }
 
+  /* Apply input before advancing the position so the first wheel event is
+   * reflected immediately. */
+  SmoothValue_UpdateResponsive(&state->scroll_v, ui->dt,
+                               UI_SCROLL_RESPONSE_RATE);
+  SmoothValue_UpdateResponsive(&state->scroll_h, ui->dt,
+                               UI_SCROLL_RESPONSE_RATE);
+  state->offset.y = state->scroll_v.current;
+  state->offset.x = state->scroll_h.current;
+
   /* Clamp current offset (for content size changes) */
   if (state->offset.y > max_scroll)
     state->offset.y = max_scroll;
   if (state->offset.y < 0)
     state->offset.y = 0;
+  state->scroll_v.current = state->offset.y;
 
   changed = (state->offset.y != old_offset);
   return changed;
@@ -143,6 +152,10 @@ void ScrollContainer_SetContentSize(scroll_container_state *state,
   if (state->target_offset.y > max_scroll) {
     state->target_offset.y = max_scroll;
     SmoothValue_SetTarget(&state->scroll_v, state->target_offset.y);
+  }
+  if (state->offset.y > max_scroll) {
+    state->offset.y = max_scroll;
+    SmoothValue_SetImmediate(&state->scroll_v, state->offset.y);
   }
 }
 
@@ -194,14 +207,15 @@ void ScrollContainer_ScrollToY(scroll_container_state *state, f32 y,
 
   /* Only scroll if content exceeds viewport */
   if (max_scroll > 0) {
+    f32 target_y = state->target_offset.y;
     if (y < view_top) {
       /* Item is above viewport - scroll up */
-      state->target_offset.y = y;
-      SmoothValue_SetTarget(&state->scroll_v, state->target_offset.y);
+      target_y = y;
     } else if (y > view_bottom) {
       /* Item is below viewport - scroll down */
-      state->target_offset.y = y - state->view_size.y + item_height;
-      SmoothValue_SetTarget(&state->scroll_v, state->target_offset.y);
+      target_y = y - state->view_size.y + item_height;
     }
+    state->target_offset.y = Clamp(target_y, 0.0f, max_scroll);
+    SmoothValue_SetTarget(&state->scroll_v, state->target_offset.y);
   }
 }

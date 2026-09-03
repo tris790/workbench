@@ -106,6 +106,12 @@ typedef struct {
 /* Update smooth value (dt in seconds) */
 void SmoothValue_Update(smooth_value *sv, f32 dt);
 
+/* Update smooth value with a frame-rate-independent exponential ease.  The
+ * response rate is measured in inverse seconds and controls how quickly the
+ * value approaches its target. */
+void SmoothValue_UpdateResponsive(smooth_value *sv, f32 dt,
+                                  f32 response_rate);
+
 /* Set target value */
 void SmoothValue_SetTarget(smooth_value *sv, f32 target);
 

@@ -24,6 +24,7 @@
 #define UI_MAX_TEXT_INPUT_SIZE 4096
 #define UI_MAX_UNDO_STATES 32
 #define UI_MAX_FOCUS_ORDER 256
+#define UI_SCROLL_RESPONSE_RATE 18.0f
 
 /* ===== Element ID ===== */
 
@@ -234,6 +235,7 @@ typedef struct ui_context_s {
 
   /* Frame state */
   f32 dt; /* Delta time in seconds */
+  f32 scroll_multiplier; /* Normalized ui.scroll_speed (3.0 is 1x) */
   u64 frame_count;
 
   /* Modal state */

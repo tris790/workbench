@@ -969,6 +969,18 @@ void Explorer_PollWatcher(explorer_state *state) {
   }
 }
 
+void Explorer_UpdateScroll(explorer_state *state, ui_context *ui) {
+  if (!state || !ui || state->list_bounds.w <= 0 ||
+      state->list_bounds.h <= 0) {
+    return;
+  }
+
+  if (UI_PointInRect(ui->input.mouse_pos, state->list_bounds) ||
+      state->scroll.is_dragging) {
+    ScrollContainer_Update(&state->scroll, ui, state->list_bounds);
+  }
+}
+
 void Explorer_Update(explorer_state *state, ui_context *ui,
                      drag_drop_state *drag, u32 panel_idx) {
   ui_input *input = &ui->input;
@@ -1010,11 +1022,6 @@ void Explorer_Update(explorer_state *state, ui_context *ui,
 
   /* Update selection animation */
   SmoothValue_Update(&state->selection_anim, ui->dt);
-
-  /* Update scroll container - handles mouse wheel and scrollbar drag */
-  if (state->list_bounds.w > 0 && state->list_bounds.h > 0) {
-    ScrollContainer_Update(&state->scroll, ui, state->list_bounds);
-  }
 
   /* Handle mouse input when hovering over list */
   if (state->list_bounds.w > 0 && state->list_bounds.h > 0 &&

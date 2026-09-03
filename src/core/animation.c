@@ -6,6 +6,8 @@
 
 #include "animation.h"
 
+#include <math.h>
+
 b32 g_animations_enabled = true;
 
 /* ===== Animation API ===== */
@@ -92,6 +94,30 @@ void SmoothValue_Update(smooth_value *sv, f32 dt) {
       sv->current = sv->target;
     }
   }
+}
+
+void SmoothValue_UpdateResponsive(smooth_value *sv, f32 dt,
+                                  f32 response_rate) {
+  if (sv->current == sv->target)
+    return;
+
+  if (!g_animations_enabled) {
+    sv->current = sv->target;
+    return;
+  }
+
+  if (dt <= 0.0f || response_rate <= 0.0f)
+    return;
+
+  /* Exponential convergence keeps the initial movement quick while making
+   * the settling time independent of the size of the scroll distance. */
+  f32 alpha = 1.0f - expf(-response_rate * dt);
+  sv->current += (sv->target - sv->current) * alpha;
+
+  /* Avoid spending frames converging on an insignificant fraction. */
+  f32 remaining = sv->target - sv->current;
+  if (remaining > -0.01f && remaining < 0.01f)
+    sv->current = sv->target;
 }
 
 void SmoothValue_SetTarget(smooth_value *sv, f32 target) {

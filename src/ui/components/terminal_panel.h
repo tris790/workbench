@@ -42,6 +42,7 @@ typedef struct {
   /* Selection scrolling */
   f32 selection_scroll_accumulator; /* Accumulates scroll distance during
                                        selection drags */
+  f32 wheel_scroll_accumulator; /* Preserves fractional wheel lines */
 
   /* Resizing state */
   b32 dragging;          /* Is the top border being dragged? */

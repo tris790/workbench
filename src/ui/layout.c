@@ -215,12 +215,22 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
                          (u32)i == layout->active_panel_idx, bounds.h);
   }
 
-  /* Update explorer only if it has focus (keys not consumed by terminal or
-   * modal) */
+  /* Pointer-driven scrolling follows the hovered explorer, independently of
+   * keyboard focus.  The active explorer also needs this when the terminal is
+   * focused. */
   /* Note: WB_INPUT_TARGET_DIALOG means explorer dialogs (rename, delete), not
    * global modals */
   input_target focus = Input_GetFocus();
   b32 config_modal_open = layout->show_config_diagnostics;
+  if (!config_modal_open) {
+    for (u32 i = 0; i < 2; ++i) {
+      if (layout->mode == WB_LAYOUT_MODE_DUAL || i == layout->active_panel_idx)
+        Explorer_UpdateScroll(&layout->panels[i].explorer, ui);
+    }
+  }
+
+  /* Update explorer selection and keyboard input only if it has focus (keys
+   * not consumed by terminal or modal). */
   if (!config_modal_open &&
       (focus == WB_INPUT_TARGET_EXPLORER || focus == WB_INPUT_TARGET_DIALOG ||
        focus == WB_INPUT_TARGET_CONTEXT_MENU)) {

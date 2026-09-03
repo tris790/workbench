@@ -141,7 +141,6 @@ void TerminalPanel_Toggle(terminal_panel_state *state, const char *cwd) {
 
 void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
                           b32 is_active, f32 available_height) {
-  (void)ui; /* Used to be for ui->input, now using centralized Input_* API */
   if (!state)
     return;
 
@@ -545,7 +544,13 @@ void TerminalPanel_Update(terminal_panel_state *state, ui_context *ui, f32 dt,
     /* Mouse scroll for terminal history */
     f32 scroll = Input_GetScrollDelta();
     if (scroll != 0) {
-      Terminal_Scroll(state->terminal, (i32)(scroll * 3));
+      state->wheel_scroll_accumulator +=
+          scroll * 3.0f * ui->scroll_multiplier;
+      i32 lines = (i32)state->wheel_scroll_accumulator;
+      if (lines != 0) {
+        Terminal_Scroll(state->terminal, lines);
+        state->wheel_scroll_accumulator -= (f32)lines;
+      }
       Input_ConsumeScroll();
     }
 

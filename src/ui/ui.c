@@ -5,6 +5,7 @@
  */
 
 #include "ui.h"
+#include "../config/config.h"
 #include <string.h>
 
 /* ===== Global Context ===== */
@@ -259,29 +260,37 @@ void UI_BeginScroll(v2i size, ui_scroll_state *state) {
   ctx->scroll_stack[ctx->scroll_depth].state = state;
   ctx->scroll_depth++;
 
-  /* Update smooth scroll */
-  SmoothValue_Update(&state->scroll_v, ctx->dt);
-  SmoothValue_Update(&state->scroll_h, ctx->dt);
-  state->offset.y = state->scroll_v.current;
-  state->offset.x = state->scroll_h.current;
+  state->view_size = (v2f){(f32)view.w, (f32)view.h};
+
+  /* Clamp stale targets before applying new input. */
+  f32 max_scroll = state->content_size.y - state->view_size.y;
+  if (max_scroll < 0.0f)
+    max_scroll = 0.0f;
+  state->target_offset.y = Clamp(state->target_offset.y, 0.0f, max_scroll);
+  state->scroll_v.target = state->target_offset.y;
 
   /* Handle mouse wheel scrolling */
   if (UI_PointInRect(ctx->input.mouse_pos, view)) {
     if (ctx->input.scroll_delta != 0) {
-      state->target_offset.y -= ctx->input.scroll_delta * 40.0f;
+      state->target_offset.y -=
+          ctx->input.scroll_delta * 40.0f * ctx->scroll_multiplier;
       /* Clamp to content bounds */
       if (state->target_offset.y < 0)
         state->target_offset.y = 0;
-      f32 max_scroll = state->content_size.y - state->view_size.y;
-      if (max_scroll < 0)
-        max_scroll = 0;
       if (state->target_offset.y > max_scroll)
         state->target_offset.y = max_scroll;
       SmoothValue_SetTarget(&state->scroll_v, state->target_offset.y);
     }
   }
 
-  state->view_size = (v2f){(f32)view.w, (f32)view.h};
+  /* Apply input before advancing the position so wheel input is visible in
+   * this frame. */
+  SmoothValue_UpdateResponsive(&state->scroll_v, ctx->dt,
+                               UI_SCROLL_RESPONSE_RATE);
+  SmoothValue_UpdateResponsive(&state->scroll_h, ctx->dt,
+                               UI_SCROLL_RESPONSE_RATE);
+  state->offset.y = state->scroll_v.current;
+  state->offset.x = state->scroll_h.current;
 
   /* Set clip rect */
   Render_SetClipRect(ctx->renderer, view);
@@ -310,6 +319,15 @@ void UI_EndScroll(void) {
     state->content_size.x =
         (f32)(layout->max_cross > 0 ? layout->max_cross : layout->bounds.w);
   }
+
+  /* Content may have changed since the previous frame. */
+  f32 max_scroll = state->content_size.y - state->view_size.y;
+  if (max_scroll < 0.0f)
+    max_scroll = 0.0f;
+  state->target_offset.y = Clamp(state->target_offset.y, 0.0f, max_scroll);
+  state->offset.y = Clamp(state->offset.y, 0.0f, max_scroll);
+  state->scroll_v.current = state->offset.y;
+  state->scroll_v.target = state->target_offset.y;
 
   UI_EndLayout();
 
@@ -376,6 +394,7 @@ void UI_Init(ui_context *ctx, render_context *renderer, const theme *th,
 
   /* Initialize hover animation */
   ctx->hover_anim.speed = 400.0f;
+  ctx->scroll_multiplier = 1.0f;
 
   g_ui_ctx = ctx;
 }
@@ -390,6 +409,12 @@ void UI_BeginFrame(ui_context *ctx, ui_input *input, f32 dt) {
   g_ui_ctx = ctx;
   ctx->input = *input;
   ctx->dt = dt;
+  f32 configured_scroll_speed =
+      (f32)Config_GetF64("ui.scroll_speed", 3.0);
+  if (!(configured_scroll_speed > 0.0f))
+    configured_scroll_speed = 3.0f;
+  configured_scroll_speed = Clamp(configured_scroll_speed, 0.25f, 8.0f);
+  ctx->scroll_multiplier = configured_scroll_speed / 3.0f;
   ctx->frame_count++;
 
   /* Reset layout stack */

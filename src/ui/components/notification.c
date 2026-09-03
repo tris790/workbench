@@ -279,5 +279,6 @@ void Notification_UpdateAndRender(notification_state *state, ui_context *ui,
     current_y = notif_y - NOTIFICATION_SPACING;
   }
   
+  (void)active_count;
   state->stack_offset = (f32)(start_y - current_y);
 }

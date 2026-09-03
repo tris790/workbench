@@ -233,8 +233,6 @@ void CommandPalette_Init(command_palette_state *state, fs_state *fs) {
   state->fade_anim.target = 0.0f;
   state->fade_anim.speed = 10.0f;
 
-  /* Initialize scroll animation speed */
-  state->scroll.scroll_v.speed = 1500.0f;
 }
 
 void CommandPalette_RegisterCommand(command_palette_state *state,
@@ -521,7 +519,8 @@ void CommandPalette_Render(command_palette_state *state, ui_context *ui,
 
   /* Handle mouse wheel scrolling */
   if (UI_PointInRect(input->mouse_pos, list_rect) && input->scroll_delta != 0) {
-    state->scroll.target_offset.y -= input->scroll_delta * 40.0f;
+    state->scroll.target_offset.y -=
+        input->scroll_delta * 40.0f * ui->scroll_multiplier;
     /* Clamp to bounds */
     if (state->scroll.target_offset.y < 0) {
       state->scroll.target_offset.y = 0;
@@ -558,8 +557,10 @@ void CommandPalette_Render(command_palette_state *state, ui_context *ui,
   /* Always sync smooth scroll target */
   state->scroll.scroll_v.target = state->scroll.target_offset.y;
 
-  /* Smooth scroll animation */
-  SmoothValue_Update(&state->scroll.scroll_v, ui->dt);
+  /* Apply input before advancing the position so wheel input is visible in
+   * this frame. */
+  SmoothValue_UpdateResponsive(&state->scroll.scroll_v, ui->dt,
+                               UI_SCROLL_RESPONSE_RATE);
   state->scroll.offset.y = state->scroll.scroll_v.current;
 
   /* Clip to list area */

@@ -116,6 +116,9 @@ struct drag_drop_state_s;
 void Explorer_Update(explorer_state *state, ui_context *ui,
                      struct drag_drop_state_s *drag, u32 panel_idx);
 
+/* Update pointer-driven scrolling independently of keyboard focus. */
+void Explorer_UpdateScroll(explorer_state *state, ui_context *ui);
+
 /* Render explorer panel in given bounds */
 void Explorer_Render(explorer_state *state, ui_context *ui, rect bounds,
                      b32 has_focus, struct drag_drop_state_s *drag,

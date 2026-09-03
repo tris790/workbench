@@ -22,14 +22,14 @@ A more traditional "timer-based" animation system used for specific durations.
 
 | Feature | Animation Type | Path / State Variable | Description |
 | :--- | :--- | :--- | :--- |
-| **Global Scrolling** | `smooth_value` | `ui_scroll_state.scroll_v/h` | Provides momentum-based smooth vertical/horizontal scrolling in long lists. |
+| **Global Scrolling** | responsive `smooth_value` update | `ui_scroll_state.scroll_v/h` | Provides fast, frame-rate-independent scrolling in long lists while preserving accumulated wheel input. |
 | **UI Hover** | `smooth_value` | `ui_context.hover_anim` | Global transition state for button/selectable hover highlights. |
 | **File Explorer** | `smooth_value` | `explorer_state.selection_anim` | The selection bar slides vertically between files when navigating. |
 | **Quick Filter** | `smooth_value` | `quick_filter_state.fade_anim` | The search bar at the bottom fades in and slides up 10px from the bottom border. |
 | **Terminal Slide** | `smooth_value` | `terminal_panel_state.anim` | The terminal panel slides up/down when toggled (Ctrl + `). |
 | **Terminal Cursor** | `smooth_value` | `terminal_panel_state.cursor_blink` | A smooth opacity fade (0.0 <-> 1.0) rather than a hard binary blink. |
 | **Command Palette** | `smooth_value` | `command_palette_state.fade_anim` | The palette fades in and slides down slightly from the top center. |
-| **Command Palette** | `smooth_value` | `command_palette_state.scroll` | Smooth vertical scrolling through large file/command results. |
+| **Command Palette** | responsive `smooth_value` update | `command_palette_state.scroll` | Fast vertical scrolling through large file/command results. |
 | **Context Menu** | `smooth_value` | `context_menu_state.fade_anim` | Right-click menus fade and shift vertically on appearance. |
 
 ---
