@@ -16,6 +16,7 @@
 #include <string.h>
 
 #define SAVE_DIALOG_ROW_HEIGHT 28
+#define SAVE_DIALOG_BOTTOM_SPACER_HEIGHT 56
 #define SAVE_DIALOG_SIDEBAR_WIDTH 156
 #define SAVE_DIALOG_MAX_COMMON_PATHS SAVE_DIALOG_MAX_COMMON
 #define SAVE_DIALOG_BREADCRUMB_HEIGHT 32
@@ -817,7 +818,9 @@ void SaveDialog_Update(save_dialog_state *state, ui_context *ui) {
 
   if (state->list_bounds.w > 0 && state->list_bounds.h > 0) {
     ScrollContainer_SetContentSize(
-        &state->scroll, (f32)(state->visible_count * SAVE_DIALOG_ROW_HEIGHT));
+        &state->scroll,
+        (f32)(state->visible_count * SAVE_DIALOG_ROW_HEIGHT +
+              SAVE_DIALOG_BOTTOM_SPACER_HEIGHT));
     ScrollContainer_Update(&state->scroll, ui, state->list_bounds);
   }
 
@@ -1204,7 +1207,9 @@ void SaveDialog_Render(save_dialog_state *state, ui_context *ui, rect bounds) {
   rect list = {main.x, main.y, main.w, main.h};
   state->list_bounds = list;
   ScrollContainer_SetContentSize(
-      &state->scroll, (f32)(state->visible_count * SAVE_DIALOG_ROW_HEIGHT));
+      &state->scroll,
+      (f32)(state->visible_count * SAVE_DIALOG_ROW_HEIGHT +
+            SAVE_DIALOG_BOTTOM_SPACER_HEIGHT));
   Render_SetClipRect(ui->renderer, list);
   i32 start = (i32)(state->scroll.offset.y / SAVE_DIALOG_ROW_HEIGHT);
   i32 end = start + list.h / SAVE_DIALOG_ROW_HEIGHT + 2;
