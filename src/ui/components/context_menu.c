@@ -11,6 +11,7 @@
 #include "../../core/input.h"
 #include "../../platform/platform.h"
 #include "explorer.h"
+#include "save_dialog.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -133,7 +134,12 @@ typedef struct {
 
 static void GetMultiSelectLabels(context_menu_state *state,
                                  multi_select_labels *labels) {
-  i32 count = state->explorer ? FS_GetSelectionCount(&state->explorer->fs) : 1;
+  i32 count = 1;
+  if (state->explorer) {
+    count = FS_GetSelectionCount(&state->explorer->fs);
+  } else if (state->save_dialog) {
+    count = FS_GetSelectionCount(&state->save_dialog->fs);
+  }
 
   if (count > 1) {
     snprintf(labels->copy, sizeof(labels->copy), "Copy (%d items)", count);
@@ -353,15 +359,17 @@ void ContextMenu_Init(context_menu_state *state) {
   g_menu = state;
 }
 
-void ContextMenu_Show(context_menu_state *state, v2i position,
-                      context_type type, const char *target_path,
-                      explorer_state *explorer, ui_context *ui) {
+static void ContextMenu_ShowInternal(
+    context_menu_state *state, v2i position, context_type type,
+    const char *target_path, explorer_state *explorer,
+    save_dialog_state *save_dialog, ui_context *ui) {
   state->visible = true;
   state->position = position;
   state->type = type;
   state->selected_index = -1;
   state->selected_action_index = -1;
   state->explorer = explorer;
+  state->save_dialog = save_dialog;
   state->ui = ui;
 
   if (target_path) {
@@ -428,6 +436,21 @@ void ContextMenu_Show(context_menu_state *state, v2i position,
 
   /* Push focus to context menu */
   Input_PushFocus(WB_INPUT_TARGET_CONTEXT_MENU);
+}
+
+void ContextMenu_Show(context_menu_state *state, v2i position,
+                      context_type type, const char *target_path,
+                      explorer_state *explorer, ui_context *ui) {
+  ContextMenu_ShowInternal(state, position, type, target_path, explorer, NULL,
+                           ui);
+}
+
+void ContextMenu_ShowForPicker(context_menu_state *state, v2i position,
+                               context_type type, const char *target_path,
+                               save_dialog_state *save_dialog,
+                               ui_context *ui) {
+  ContextMenu_ShowInternal(state, position, type, target_path, NULL,
+                           save_dialog, ui);
 }
 
 void ContextMenu_Close(context_menu_state *state) {
@@ -743,6 +766,8 @@ static void Action_Copy(void *user_data) {
   context_menu_state *state = (context_menu_state *)user_data;
   if (state->explorer) {
     Explorer_Copy(state->explorer);
+  } else if (state->save_dialog) {
+    SaveDialog_Copy(state->save_dialog);
   }
 }
 
@@ -750,6 +775,8 @@ static void Action_Cut(void *user_data) {
   context_menu_state *state = (context_menu_state *)user_data;
   if (state->explorer) {
     Explorer_Cut(state->explorer);
+  } else if (state->save_dialog) {
+    SaveDialog_Cut(state->save_dialog);
   }
 }
 
@@ -757,6 +784,8 @@ static void Action_Paste(void *user_data) {
   context_menu_state *state = (context_menu_state *)user_data;
   if (state->explorer) {
     Explorer_Paste(state->explorer);
+  } else if (state->save_dialog) {
+    SaveDialog_Paste(state->save_dialog);
   }
 }
 
@@ -764,6 +793,8 @@ static void Action_Rename(void *user_data) {
   context_menu_state *state = (context_menu_state *)user_data;
   if (state->explorer) {
     Explorer_StartRename(state->explorer);
+  } else if (state->save_dialog) {
+    SaveDialog_StartRename(state->save_dialog);
   }
 }
 
@@ -771,6 +802,8 @@ static void Action_Delete(void *user_data) {
   context_menu_state *state = (context_menu_state *)user_data;
   if (state->explorer && state->ui) {
     Explorer_ConfirmDelete(state->explorer, state->ui);
+  } else if (state->save_dialog && state->ui) {
+    SaveDialog_ConfirmDelete(state->save_dialog, state->ui);
   }
 }
 
@@ -785,6 +818,8 @@ static void Action_NewFile(void *user_data) {
   context_menu_state *state = (context_menu_state *)user_data;
   if (state->explorer) {
     Explorer_StartCreateFile(state->explorer);
+  } else if (state->save_dialog) {
+    SaveDialog_StartCreateFile(state->save_dialog);
   }
 }
 
@@ -792,6 +827,8 @@ static void Action_NewDir(void *user_data) {
   context_menu_state *state = (context_menu_state *)user_data;
   if (state->explorer) {
     Explorer_StartCreateDir(state->explorer);
+  } else if (state->save_dialog) {
+    SaveDialog_StartCreateDir(state->save_dialog);
   }
 }
 

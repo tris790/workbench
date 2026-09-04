@@ -239,6 +239,7 @@ int main(int argc, char **argv) {
 
   /* Store context menu reference in layout for explorer access */
   layout.context_menu = &context_menu;
+  layout.save_dialog.context_menu = &context_menu;
   layout.panels[0].explorer.context_menu = &context_menu;
   layout.panels[1].explorer.context_menu = &context_menu;
 
@@ -569,11 +570,11 @@ int main(int argc, char **argv) {
       /* ===== Layout System (Full Window) ===== */
       Layout_Render(&layout, &ui, layout_bounds);
 
-      if (!layout.save_dialog.open) {
-        /* ===== Context Menu (overlay) ===== */
-        ContextMenu_Update(&context_menu, &ui);
-        ContextMenu_Render(&context_menu, &ui, win_width, win_height);
+      /* ===== Context Menu (overlay) ===== */
+      ContextMenu_Update(&context_menu, &ui);
+      ContextMenu_Render(&context_menu, &ui, win_width, win_height);
 
+      if (!layout.save_dialog.open) {
         /* ===== Command Palette (overlay, rendered last) ===== */
         CommandPalette_Update(&palette, &ui);
         if (!layout.save_dialog.open)

@@ -18,6 +18,7 @@
 
 /* Forward declaration for explorer */
 struct explorer_state_s;
+struct save_dialog_state_s;
 
 /* ===== Types ===== */
 
@@ -86,6 +87,7 @@ typedef struct context_menu_state_s {
 
   /* References for action callbacks (set when menu is shown) */
   struct explorer_state_s *explorer;
+  struct save_dialog_state_s *save_dialog;
   ui_context *ui;
 } context_menu_state;
 
@@ -98,6 +100,12 @@ void ContextMenu_Init(context_menu_state *state);
 void ContextMenu_Show(context_menu_state *state, v2i position,
                       context_type type, const char *target_path,
                       struct explorer_state_s *explorer, ui_context *ui);
+
+/* Show the same menu for a file/folder picker. */
+void ContextMenu_ShowForPicker(context_menu_state *state, v2i position,
+                               context_type type, const char *target_path,
+                               struct save_dialog_state_s *save_dialog,
+                               ui_context *ui);
 
 /* Close the context menu */
 void ContextMenu_Close(context_menu_state *state);

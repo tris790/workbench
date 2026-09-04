@@ -15,11 +15,23 @@
 #include "scroll_container.h"
 #include "breadcrumb.h"
 #include "quick_filter.h"
+#include "../../core/text.h"
 
 #define SAVE_DIALOG_SEARCH_SIZE 128
 #define SAVE_DIALOG_ERROR_SIZE 256
 #define SAVE_DIALOG_MAX_COMMON 8
 #define SAVE_DIALOG_MAX_RESULTS 64
+#define SAVE_DIALOG_MAX_CLIPBOARD 64
+
+struct context_menu_state_s;
+
+typedef enum {
+  WB_SAVE_OPERATION_NONE = 0,
+  WB_SAVE_OPERATION_RENAME,
+  WB_SAVE_OPERATION_CREATE_FILE,
+  WB_SAVE_OPERATION_CREATE_DIR,
+  WB_SAVE_OPERATION_DELETE,
+} save_dialog_operation;
 
 typedef enum {
   WB_SAVE_FIELD_NAME = 0,
@@ -34,7 +46,7 @@ typedef enum {
   WB_PICKER_SAVE_FILES,
 } save_dialog_mode;
 
-typedef struct {
+typedef struct save_dialog_state_s {
   memory_arena *arena;
   fs_state fs;
   scroll_container_state scroll;
@@ -77,6 +89,13 @@ typedef struct {
   b32 finished;
   b32 accepted;
   b32 overwrite_pending;
+
+  /* Context-menu file operations. */
+  struct context_menu_state_s *context_menu;
+  save_dialog_operation operation;
+  char operation_buffer[256];
+  ui_text_state operation_input;
+  wrapped_text operation_text;
 } save_dialog_state;
 
 void SaveDialog_Init(save_dialog_state *state, memory_arena *arena);
@@ -100,6 +119,15 @@ void SaveDialog_Cancel(save_dialog_state *state, ui_context *ui);
 
 void SaveDialog_Update(save_dialog_state *state, ui_context *ui);
 void SaveDialog_Render(save_dialog_state *state, ui_context *ui, rect bounds);
+
+/* File operations used by the shared context menu. */
+void SaveDialog_Copy(save_dialog_state *state);
+void SaveDialog_Cut(save_dialog_state *state);
+void SaveDialog_Paste(save_dialog_state *state);
+void SaveDialog_StartRename(save_dialog_state *state);
+void SaveDialog_StartCreateFile(save_dialog_state *state);
+void SaveDialog_StartCreateDir(save_dialog_state *state);
+void SaveDialog_ConfirmDelete(save_dialog_state *state, ui_context *ui);
 
 b32 SaveDialog_IsOpen(const save_dialog_state *state);
 b32 SaveDialog_IsFinished(const save_dialog_state *state);

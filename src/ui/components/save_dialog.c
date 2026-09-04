@@ -7,6 +7,7 @@
 #include "../../core/input.h"
 #include "../../core/theme.h"
 #include "breadcrumb.h"
+#include "context_menu.h"
 #include "file_item.h"
 #include "dialog.h"
 #include "quick_filter.h"
@@ -149,6 +150,163 @@ static void SaveDialog_SetError(save_dialog_state *state, const char *message) {
   SaveDialog_CopyString(state->error, sizeof(state->error), message);
 }
 
+static void SaveDialog_Refresh(save_dialog_state *state) {
+  char current_path[FS_MAX_PATH];
+  SaveDialog_CopyString(current_path, sizeof(current_path),
+                        state->fs.current_path);
+  if (FS_LoadDirectory(&state->fs, current_path)) {
+    state->selected_index = state->fs.selected_index;
+    SaveDialog_RebuildVisible(state);
+  } else {
+    SaveDialog_SetError(state, "Workbench could not refresh that folder.");
+  }
+}
+
+static void SaveDialog_CopySelection(save_dialog_state *state, b32 is_cut) {
+  const char *paths[SAVE_DIALOG_MAX_CLIPBOARD];
+  i32 count = 0;
+
+  for (i32 index = FS_GetFirstSelected(&state->fs);
+       index >= 0 && count < SAVE_DIALOG_MAX_CLIPBOARD;
+       index = FS_GetNextSelected(&state->fs, index)) {
+    fs_entry *entry = FS_GetEntry(&state->fs, index);
+    if (entry && strcmp(entry->name, "..") != 0) {
+      paths[count++] = entry->path;
+    }
+  }
+
+  if (count > 0)
+    Platform_ClipboardSetFiles(paths, count, is_cut);
+}
+
+static void SaveDialog_ResetOperation(save_dialog_state *state) {
+  state->operation = WB_SAVE_OPERATION_NONE;
+  state->operation_buffer[0] = '\0';
+  state->operation_input = (ui_text_state){0};
+  state->operation_input.selection_start = -1;
+  state->operation_text.lines = NULL;
+  state->operation_text.count = 0;
+}
+
+static void SaveDialog_BeginInputOperation(save_dialog_state *state,
+                                           save_dialog_operation operation,
+                                           const char *initial_text) {
+  state->operation = operation;
+  SaveDialog_CopyString(state->operation_buffer,
+                        sizeof(state->operation_buffer), initial_text);
+  state->operation_input = (ui_text_state){0};
+  state->operation_input.cursor_pos = (i32)strlen(state->operation_buffer);
+  state->operation_input.selection_start = -1;
+  state->operation_input.selection_end = state->operation_input.cursor_pos;
+  state->operation_input.has_focus = true;
+  Input_SetFocus(WB_INPUT_TARGET_DIALOG);
+}
+
+void SaveDialog_Copy(save_dialog_state *state) {
+  if (state)
+    SaveDialog_CopySelection(state, false);
+}
+
+void SaveDialog_Cut(save_dialog_state *state) {
+  if (state)
+    SaveDialog_CopySelection(state, true);
+}
+
+void SaveDialog_Paste(save_dialog_state *state) {
+  char *paths[SAVE_DIALOG_MAX_CLIPBOARD];
+  char path_buffers[SAVE_DIALOG_MAX_CLIPBOARD][FS_MAX_PATH];
+  b32 is_cut = false;
+  i32 count;
+  i32 success_count = 0;
+  i32 failure_count = 0;
+
+  if (!state)
+    return;
+
+  for (i32 i = 0; i < SAVE_DIALOG_MAX_CLIPBOARD; i++)
+    paths[i] = path_buffers[i];
+
+  count = Platform_ClipboardGetFiles(paths, SAVE_DIALOG_MAX_CLIPBOARD,
+                                     &is_cut);
+  for (i32 i = 0; i < count; i++) {
+    const char *source = paths[i];
+    const char *filename;
+    char destination[FS_MAX_PATH];
+    b32 success;
+
+    if (!source || source[0] == '\0')
+      continue;
+
+    filename = FS_GetFilename(source);
+    FS_JoinPath(destination, sizeof(destination), state->fs.current_path,
+                filename);
+    success = is_cut ? FS_Rename(source, destination)
+                     : FS_CopyRecursive(source, destination, state->fs.arena);
+    if (success)
+      success_count++;
+    else
+      failure_count++;
+  }
+
+  if (failure_count > 0) {
+    SaveDialog_SetError(state, is_cut ? "Some items could not be moved."
+                                      : "Some items could not be pasted.");
+  }
+  if (success_count > 0)
+    SaveDialog_Refresh(state);
+}
+
+void SaveDialog_StartRename(save_dialog_state *state) {
+  fs_entry *entry;
+  if (!state)
+    return;
+
+  entry = FS_GetSelectedEntry(&state->fs);
+  if (entry && strcmp(entry->name, "..") != 0)
+    SaveDialog_BeginInputOperation(state, WB_SAVE_OPERATION_RENAME,
+                                   entry->name);
+}
+
+void SaveDialog_StartCreateFile(save_dialog_state *state) {
+  if (state)
+    SaveDialog_BeginInputOperation(state, WB_SAVE_OPERATION_CREATE_FILE, "");
+}
+
+void SaveDialog_StartCreateDir(save_dialog_state *state) {
+  if (state)
+    SaveDialog_BeginInputOperation(state, WB_SAVE_OPERATION_CREATE_DIR, "");
+}
+
+void SaveDialog_ConfirmDelete(save_dialog_state *state, ui_context *ui) {
+  i32 count = 0;
+  char message[512];
+
+  if (!state || !ui)
+    return;
+
+  for (i32 index = FS_GetFirstSelected(&state->fs); index >= 0;
+       index = FS_GetNextSelected(&state->fs, index)) {
+    fs_entry *entry = FS_GetEntry(&state->fs, index);
+    if (entry && strcmp(entry->name, "..") != 0)
+      count++;
+  }
+  if (count == 0)
+    return;
+
+  if (count == 1) {
+    fs_entry *entry = FS_GetSelectedEntry(&state->fs);
+    snprintf(message, sizeof(message), "Are you sure you want to delete \"%s\"?",
+             entry && strcmp(entry->name, "..") != 0 ? entry->name : "item");
+  } else {
+    snprintf(message, sizeof(message), "Are you sure you want to delete %d items?",
+             count);
+  }
+
+  state->operation_text = Text_Wrap(state->fs.arena, message, ui->font, 320);
+  state->operation = WB_SAVE_OPERATION_DELETE;
+  Input_SetFocus(WB_INPUT_TARGET_DIALOG);
+}
+
 static void SaveDialog_ResetDirectoryUi(save_dialog_state *state) {
   state->scroll.offset = (v2f){0, 0};
   state->scroll.target_offset = (v2f){0, 0};
@@ -246,6 +404,7 @@ static void SaveDialog_NavigateUp(save_dialog_state *state) {
 
 static void SaveDialog_Finish(save_dialog_state *state, ui_context *ui,
                               b32 accepted) {
+  SaveDialog_ResetOperation(state);
   state->open = false;
   state->finished = true;
   state->accepted = accepted;
@@ -506,6 +665,7 @@ void SaveDialog_OpenAt(save_dialog_state *state, const char *source_path,
   const char *start = NULL;
   b32 was_open = state->open;
 
+  SaveDialog_ResetOperation(state);
   state->open = true;
   state->finished = false;
   state->accepted = false;
@@ -576,6 +736,7 @@ void SaveDialog_OpenPicker(save_dialog_state *state, save_dialog_mode mode,
   const char *start = NULL;
   b32 was_open = state->open;
 
+  SaveDialog_ResetOperation(state);
   state->open = true;
   state->finished = false;
   state->accepted = false;
@@ -648,6 +809,10 @@ void SaveDialog_Cancel(save_dialog_state *state, ui_context *ui) {
 
 void SaveDialog_Update(save_dialog_state *state, ui_context *ui) {
   if (!state->open)
+    return;
+
+  /* An operation dialog is rendered on top of the picker and owns input. */
+  if (state->operation != WB_SAVE_OPERATION_NONE)
     return;
 
   if (state->list_bounds.w > 0 && state->list_bounds.h > 0) {
@@ -742,7 +907,9 @@ static void SaveDialog_RenderRow(save_dialog_state *state, ui_context *ui,
   UI_PushID("SaveRow");
   UI_PushIDInt(actual_index);
   ui_id id = UI_GenID("row");
-  b32 clicked = UI_UpdateInteraction(id, row);
+  b32 menu_open = state->context_menu &&
+                  ContextMenu_IsVisible(state->context_menu);
+  b32 clicked = !menu_open && UI_UpdateInteraction(id, row);
   UI_PopID();
   UI_PopID();
 
@@ -800,9 +967,153 @@ static void SaveDialog_RenderRow(save_dialog_state *state, ui_context *ui,
     state->last_click_time = now;
   }
 
+  if (!menu_open && ui->input.mouse_pressed[WB_MOUSE_RIGHT] &&
+      UI_PointInRect(ui->input.mouse_pos, row) &&
+      strcmp(entry->name, "..") != 0 && state->context_menu) {
+    if (!FS_IsSelected(&state->fs, actual_index))
+      FS_SelectSingle(&state->fs, actual_index);
+    ContextMenu_ShowForPicker(
+        state->context_menu, ui->input.mouse_pos,
+        entry->is_directory ? WB_CONTEXT_DIRECTORY : WB_CONTEXT_FILE,
+        entry->path, state, ui);
+  }
+
   file_item_config config = {.icon_size = 18, .icon_padding = 8, .show_size = true};
   FileItem_Render(ui, entry, row, FS_IsSelected(&state->fs, actual_index), hovered,
                   &config);
+}
+
+static void SaveDialog_ApplyOperation(save_dialog_state *state) {
+  save_dialog_operation operation = state->operation;
+  char path[FS_MAX_PATH];
+  b32 success = false;
+
+  switch (operation) {
+  case WB_SAVE_OPERATION_RENAME: {
+    fs_entry *entry = FS_GetSelectedEntry(&state->fs);
+    if (!entry || strcmp(entry->name, "..") == 0 ||
+        state->operation_buffer[0] == '\0') {
+      SaveDialog_SetError(state, "Choose a valid name first.");
+      break;
+    }
+
+    FS_JoinPath(path, sizeof(path), state->fs.current_path,
+                state->operation_buffer);
+    success = FS_Rename(entry->path, path);
+    if (!success)
+      SaveDialog_SetError(state, "That item could not be renamed.");
+  } break;
+
+  case WB_SAVE_OPERATION_CREATE_FILE:
+    if (state->operation_buffer[0] == '\0') {
+      SaveDialog_SetError(state, "Choose a file name first.");
+      break;
+    }
+    FS_JoinPath(path, sizeof(path), state->fs.current_path,
+                state->operation_buffer);
+    success = FS_CreateFile(path);
+    if (!success)
+      SaveDialog_SetError(state, "That file could not be created.");
+    break;
+
+  case WB_SAVE_OPERATION_CREATE_DIR:
+    if (state->operation_buffer[0] == '\0') {
+      SaveDialog_SetError(state, "Choose a directory name first.");
+      break;
+    }
+    FS_JoinPath(path, sizeof(path), state->fs.current_path,
+                state->operation_buffer);
+    success = FS_CreateDirectory(path);
+    if (!success)
+      SaveDialog_SetError(state, "That directory could not be created.");
+    break;
+
+  case WB_SAVE_OPERATION_DELETE: {
+    char paths[SAVE_DIALOG_MAX_CLIPBOARD][FS_MAX_PATH];
+    i32 count = 0;
+    i32 success_count = 0;
+
+    for (i32 index = FS_GetFirstSelected(&state->fs);
+         index >= 0 && count < SAVE_DIALOG_MAX_CLIPBOARD;
+         index = FS_GetNextSelected(&state->fs, index)) {
+      fs_entry *entry = FS_GetEntry(&state->fs, index);
+      if (entry && strcmp(entry->name, "..") != 0) {
+        SaveDialog_CopyString(paths[count], FS_MAX_PATH, entry->path);
+        count++;
+      }
+    }
+
+    for (i32 i = 0; i < count; i++) {
+      if (FS_Delete(paths[i], state->fs.arena))
+        success_count++;
+    }
+    success = success_count > 0;
+    if (success_count < count)
+      SaveDialog_SetError(state, "Some items could not be deleted.");
+  } break;
+
+  default:
+    break;
+  }
+
+  if (success)
+    SaveDialog_Refresh(state);
+  SaveDialog_ResetOperation(state);
+}
+
+static void SaveDialog_RenderOperation(save_dialog_state *state,
+                                       ui_context *ui, rect bounds) {
+  dialog_config config = {0};
+  dialog_result result = WB_DIALOG_RESULT_NONE;
+  b32 is_input = state->operation == WB_SAVE_OPERATION_RENAME ||
+                state->operation == WB_SAVE_OPERATION_CREATE_FILE ||
+                state->operation == WB_SAVE_OPERATION_CREATE_DIR;
+
+  if (state->operation == WB_SAVE_OPERATION_RENAME) {
+    config.title = "Rename";
+    config.placeholder = "New name";
+  } else if (state->operation == WB_SAVE_OPERATION_CREATE_FILE) {
+    config.title = "New File";
+    config.placeholder = "File name";
+  } else if (state->operation == WB_SAVE_OPERATION_CREATE_DIR) {
+    config.title = "New Directory";
+    config.placeholder = "Directory name";
+  } else {
+    config.title = "Delete";
+    config.is_danger = true;
+    config.message = state->operation_text;
+    config.confirm_label = "Delete";
+  }
+
+  if (is_input) {
+    config.type = WB_DIALOG_TYPE_INPUT;
+    config.input_buffer = state->operation_buffer;
+    config.input_buffer_size = sizeof(state->operation_buffer);
+    config.input_state = &state->operation_input;
+  } else {
+    config.type = WB_DIALOG_TYPE_CONFIRM;
+  }
+
+  /* The picker shell was rendered first, so make this nested dialog the active
+   * modal before its widgets register interaction IDs. */
+  ui->active_modal = UI_GenID("SaveDialogOperation");
+  result = Dialog_Render(ui, bounds, &config);
+
+  if (ui->input.key_pressed[WB_KEY_ESCAPE]) {
+    result = WB_DIALOG_RESULT_CANCEL;
+    ui->input.key_pressed[WB_KEY_ESCAPE] = false;
+  } else if (ui->input.key_pressed[WB_KEY_RETURN]) {
+    result = WB_DIALOG_RESULT_CONFIRM;
+    ui->input.key_pressed[WB_KEY_RETURN] = false;
+  }
+
+  if (result == WB_DIALOG_RESULT_CONFIRM)
+    SaveDialog_ApplyOperation(state);
+  else if (result == WB_DIALOG_RESULT_CANCEL)
+    SaveDialog_ResetOperation(state);
+
+  if (result != WB_DIALOG_RESULT_NONE)
+    ui->next_modal = UI_GenID("SaveDialog");
 }
 
 void SaveDialog_Render(save_dialog_state *state, ui_context *ui, rect bounds) {
@@ -911,6 +1222,15 @@ void SaveDialog_Render(save_dialog_state *state, ui_context *ui, rect bounds) {
   ScrollContainer_RenderScrollbar(&state->scroll, ui);
   QuickFilter_Render(&state->filter, ui, list);
 
+  if (state->context_menu &&
+      !ContextMenu_IsVisible(state->context_menu) &&
+      ui->input.mouse_pressed[WB_MOUSE_RIGHT] &&
+      UI_PointInRect(ui->input.mouse_pos, list)) {
+    ContextMenu_ShowForPicker(state->context_menu, ui->input.mouse_pos,
+                             WB_CONTEXT_EMPTY, state->fs.current_path, state,
+                             ui);
+  }
+
   if (has_name_field) {
     /* Filename editing is explicit.  It never steals the picker's default
      * find-on-type behavior. */
@@ -978,6 +1298,9 @@ void SaveDialog_Render(save_dialog_state *state, ui_context *ui, rect bounds) {
   UI_PopID();
 
   Dialog_EndShell(ui, &shell);
+
+  if (state->operation != WB_SAVE_OPERATION_NONE)
+    SaveDialog_RenderOperation(state, ui, bounds);
 }
 
 b32 SaveDialog_IsOpen(const save_dialog_state *state) {
