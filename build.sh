@@ -49,11 +49,18 @@ fi
 
 # Generate xdg-shell protocol code if needed
 XDG_SHELL_XML="/usr/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml"
+XDG_ACTIVATION_XML="/usr/share/wayland-protocols/staging/xdg-activation/xdg-activation-v1.xml"
 PROTO_DIR="src/platform/protocols"
 if [ ! -f "$PROTO_DIR/xdg-shell-client-protocol.h" ] || [ "$XDG_SHELL_XML" -nt "$PROTO_DIR/xdg-shell-client-protocol.h" ]; then
     echo "Generating xdg-shell protocol code..."
     wayland-scanner client-header "$XDG_SHELL_XML" "$PROTO_DIR/xdg-shell-client-protocol.h"
     wayland-scanner private-code "$XDG_SHELL_XML" "$PROTO_DIR/xdg-shell-protocol.c"
+fi
+
+if [ ! -f "$PROTO_DIR/xdg-activation-client-protocol.h" ] || [ "$XDG_ACTIVATION_XML" -nt "$PROTO_DIR/xdg-activation-client-protocol.h" ]; then
+    echo "Generating xdg-activation protocol code..."
+    wayland-scanner client-header "$XDG_ACTIVATION_XML" "$PROTO_DIR/xdg-activation-client-protocol.h"
+    wayland-scanner private-code "$XDG_ACTIVATION_XML" "$PROTO_DIR/xdg-activation-protocol.c"
 fi
 
 # Compile
