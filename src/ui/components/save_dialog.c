@@ -868,19 +868,17 @@ void SaveDialog_Update(save_dialog_state *state, ui_context *ui) {
       SaveDialog_MoveSelection(state, 1);
       input->key_pressed[WB_KEY_DOWN] = false;
     }
-    if (input->key_pressed[WB_KEY_RETURN] && !filter_is_active) {
+    if (input->key_pressed[WB_KEY_RETURN]) {
       fs_entry *entry = FS_GetEntry(&state->fs, state->selected_index);
       if (entry && entry->is_directory) {
         if (strcmp(entry->name, "..") == 0)
           SaveDialog_NavigateUp(state);
         else
-          SaveDialog_Navigate(state, entry->path, false);
+          SaveDialog_Navigate(state, entry->path, filter_is_active);
       } else {
-        SaveDialog_Commit(state, ui);
+        if (!filter_is_active)
+          SaveDialog_Commit(state, ui);
       }
-      input->key_pressed[WB_KEY_RETURN] = false;
-    } else if (input->key_pressed[WB_KEY_RETURN] && filter_is_active) {
-      /* Return is a file action only after find has been dismissed. */
       input->key_pressed[WB_KEY_RETURN] = false;
     }
   } else if (input->key_pressed[WB_KEY_RETURN] &&
@@ -1097,9 +1095,13 @@ static void SaveDialog_RenderOperation(save_dialog_state *state,
     config.type = WB_DIALOG_TYPE_CONFIRM;
   }
 
-  /* The picker shell was rendered first, so make this nested dialog the active
-   * modal before its widgets register interaction IDs. */
-  ui->active_modal = UI_GenID("SaveDialogOperation");
+  /* The picker shell is the parent modal.  Make the operation dialog the
+   * current and active modal while it renders so its widgets can receive
+   * interaction, while the picker remains blocked underneath. */
+  UI_BeginModal("SaveDialogOperation");
+  ui->active_modal = ui->current_modal;
+  if (is_input)
+    UI_SetFocus(UI_GenID(config.placeholder));
   result = Dialog_Render(ui, bounds, &config);
 
   if (ui->input.key_pressed[WB_KEY_ESCAPE]) {
@@ -1117,6 +1119,8 @@ static void SaveDialog_RenderOperation(save_dialog_state *state,
 
   if (result != WB_DIALOG_RESULT_NONE)
     ui->next_modal = UI_GenID("SaveDialog");
+
+  UI_EndModal();
 }
 
 void SaveDialog_Render(save_dialog_state *state, ui_context *ui, rect bounds) {
@@ -1124,6 +1128,14 @@ void SaveDialog_Render(save_dialog_state *state, ui_context *ui, rect bounds) {
     return;
 
   const theme *th = ui->theme;
+  b32 operation_open = state->operation != WB_SAVE_OPERATION_NONE;
+
+  /* The operation dialog is rendered after the picker shell, but it owns the
+   * whole frame.  Mark it active before drawing the shell so picker widgets
+   * cannot consume the same frame's input. */
+  if (operation_open)
+    ui->active_modal = UI_GenID("SaveDialogOperation");
+
   dialog_shell_config shell_config = {
       .modal_name = "SaveDialog",
       .title = state->title[0] ? state->title : "Save file",
@@ -1304,7 +1316,7 @@ void SaveDialog_Render(save_dialog_state *state, ui_context *ui, rect bounds) {
 
   Dialog_EndShell(ui, &shell);
 
-  if (state->operation != WB_SAVE_OPERATION_NONE)
+  if (operation_open)
     SaveDialog_RenderOperation(state, ui, bounds);
 }
 

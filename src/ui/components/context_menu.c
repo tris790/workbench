@@ -496,12 +496,14 @@ b32 ContextMenu_Update(context_menu_state *state, ui_context *ui) {
   /* Handle escape to close */
   if (input->key_pressed[WB_KEY_ESCAPE]) {
     ContextMenu_Close(state);
+    input->key_pressed[WB_KEY_ESCAPE] = false;
     return true;
   }
 
   /* Handle enter to execute */
   if (input->key_pressed[WB_KEY_RETURN] && state->selected_index >= 0) {
     ContextMenu_ExecuteSelectedItem(state);
+    input->key_pressed[WB_KEY_RETURN] = false;
     return true;
   }
 
@@ -512,6 +514,7 @@ b32 ContextMenu_Update(context_menu_state *state, ui_context *ui) {
     } else if (state->selected_index == -1 && state->item_count > 0) {
       state->selected_index = state->item_count - 1;
     }
+    input->key_pressed[WB_KEY_UP] = false;
     return true;
   }
 
@@ -521,6 +524,7 @@ b32 ContextMenu_Update(context_menu_state *state, ui_context *ui) {
     } else if (state->selected_index == -1 && state->item_count > 0) {
       state->selected_index = 0;
     }
+    input->key_pressed[WB_KEY_DOWN] = false;
     return true;
   }
 

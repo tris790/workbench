@@ -317,8 +317,12 @@ b32 UI_ProcessTextInput(ui_text_state *state, char *buffer, i32 buffer_size,
 b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
                  ui_text_state *state) {
   ui_id id = UI_GenID(placeholder ? placeholder : "##textinput");
+  b32 interaction_allowed =
+      g_ui_ctx->active_modal == UI_ID_NONE ||
+      g_ui_ctx->current_modal == g_ui_ctx->active_modal;
 
-  UI_RegisterFocusable(id);
+  if (interaction_allowed)
+    UI_RegisterFocusable(id);
 
   i32 padding = UI_GetStyleInt(WB_UI_STYLE_PADDING);
   i32 font_height = Font_GetLineHeight(g_ui_ctx->font);
@@ -331,7 +335,8 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
   b32 hovered = UI_PointInRect(g_ui_ctx->input.mouse_pos, bounds);
   b32 changed = false;
 
-  if (hovered && g_ui_ctx->input.mouse_pressed[WB_MOUSE_LEFT]) {
+  if (interaction_allowed && hovered &&
+      g_ui_ctx->input.mouse_pressed[WB_MOUSE_LEFT]) {
     g_ui_ctx->focused = id;
     state->has_focus = true;
 
@@ -357,23 +362,25 @@ b32 UI_TextInput(char *buffer, i32 buffer_size, const char *placeholder,
   }
 
   /* Focus management */
-  if (g_ui_ctx->focused == id) {
-    state->has_focus = true;
-  } else if (state->has_focus) {
-    /* Check if we just lost focus or if we are claiming it */
-    if (g_ui_ctx->last_focused != id) {
-      /* We weren't focused last frame, but state says we should be.
-         Claim focus. */
-      g_ui_ctx->focused = id;
-    } else {
-      /* We were focused and lost it. */
-      state->has_focus = false;
-      state->selection_start = -1;
+  if (interaction_allowed) {
+    if (g_ui_ctx->focused == id) {
+      state->has_focus = true;
+    } else if (state->has_focus) {
+      /* Check if we just lost focus or if we are claiming it */
+      if (g_ui_ctx->last_focused != id) {
+        /* We weren't focused last frame, but state says we should be.
+           Claim focus. */
+        g_ui_ctx->focused = id;
+      } else {
+        /* We were focused and lost it. */
+        state->has_focus = false;
+        state->selection_start = -1;
+      }
     }
   }
 
   /* Handle keyboard input when focused */
-  if (g_ui_ctx->focused == id) {
+  if (interaction_allowed && g_ui_ctx->focused == id) {
     if (UI_ProcessTextInput(state, buffer, buffer_size, &g_ui_ctx->input)) {
       changed = true;
     }
