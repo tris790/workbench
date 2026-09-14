@@ -219,6 +219,10 @@ int main(int argc, char **argv) {
   if (!args.portal_mode)
     Args_Handle(&layout, &args);
 
+  /* Initialize input before opening a startup picker.  Picker opening pushes
+   * dialog focus, so doing this later would discard that focus stack. */
+  Input_Init();
+
   /* External save requests open Workbench directly in its save picker. */
   if (args.picker_mode > WB_APP_PICKER_NONE)
     Main_OpenPicker(&layout, &args);
@@ -242,9 +246,6 @@ int main(int argc, char **argv) {
   layout.save_dialog.context_menu = &context_menu;
   layout.panels[0].explorer.context_menu = &context_menu;
   layout.panels[1].explorer.context_menu = &context_menu;
-
-  /* Initialize Input System */
-  Input_Init();
 
   if (Config_HasErrors()) {
     layout.show_config_diagnostics = true;
@@ -555,10 +556,23 @@ int main(int argc, char **argv) {
       /* Calculate layout bounds early for update */
       rect layout_bounds = {0, 0, win_width, win_height};
 
+      /* Update the context menu before its owner.  Menu actions can open a
+       * dialog, and the menu must consume the frame's keyboard/mouse input
+       * before the picker or explorer sees it. */
+      ContextMenu_Update(&context_menu, &ui);
+
+      /* Context menus are direct-rendered popups rather than UI widgets, so
+       * establish a blocking modal scope before the owner is rendered.  Keep
+       * current_modal empty so all owner widgets fail the modal check. */
+      if (context_menu.visible) {
+        ui.active_modal = UI_GenID("ContextMenu");
+        ui.current_modal = UI_ID_NONE;
+      }
+
       /* Update layout logic (handles splitter interaction, animation).  Both
        * overlays suspend background interaction; the picker also suspends all
        * background processing inside Layout_Update. */
-      if (!CommandPalette_IsOpen(&palette)) {
+      if (!CommandPalette_IsOpen(&palette) && !context_menu.visible) {
         Layout_Update(&layout, &ui, layout_bounds);
       }
 
@@ -571,7 +585,6 @@ int main(int argc, char **argv) {
       Layout_Render(&layout, &ui, layout_bounds);
 
       /* ===== Context Menu (overlay) ===== */
-      ContextMenu_Update(&context_menu, &ui);
       ContextMenu_Render(&context_menu, &ui, win_width, win_height);
 
       if (!layout.save_dialog.open) {
