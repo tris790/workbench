@@ -36,8 +36,12 @@ font *Font_LoadFromFile(const char *path, i32 size_pixels);
 /* Load font from memory */
 font *Font_LoadFromMemory(const void *data, usize size, i32 size_pixels);
 
-/* Free font resources */
+/* Free font resources, including a backend glyph atlas built for it */
 void Font_Free(font *f);
+
+/* Set by a GPU backend while its context is alive so Font_Free can release
+ * the per-font atlas; NULL when no backend caches fonts. */
+void Font_SetReleaseCallback(void (*release_font)(font *f));
 
 /* ===== Font Metrics ===== */
 

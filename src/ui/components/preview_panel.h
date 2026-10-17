@@ -96,6 +96,7 @@ typedef struct {
   void *cond_var;
   b32 shutdown_requested;
   b32 worker_has_request;
+  b32 worker_is_loading;
   preview_request worker_request;
   b32 worker_has_result;
   preview_content worker_result;
@@ -112,6 +113,7 @@ void PreviewPanel_Update(preview_state *state, ui_context *ui,
                          b32 preview_allowed);
 void PreviewPanel_Render(preview_state *state, ui_context *ui, rect bounds);
 b32 PreviewPanel_IsVisible(preview_state *state, b32 preview_allowed);
+b32 PreviewPanel_IsBusy(preview_state *state);
 void PreviewPanel_ComputeBounds(preview_state *state, rect bounds,
                                 rect *out_list_bounds,
                                 rect *out_splitter_bounds,

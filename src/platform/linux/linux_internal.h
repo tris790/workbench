@@ -47,6 +47,7 @@ typedef struct {
   struct wl_data_source *drag_source;
   char *clipboard_content;
   struct wl_data_offer *selection_offer;
+  struct wl_data_offer *dnd_offer; /* Offer of the drag over our surface */
   struct wl_cursor_theme *cursor_theme;
   struct wl_surface *cursor_surface;
   cursor_type current_cursor;

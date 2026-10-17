@@ -90,7 +90,7 @@ void Layout_RefreshConfig(layout_state *layout) {
   PreviewPanel_RefreshConfig(&layout->preview);
 }
 
-void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
+b32 Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
   /* A picker is a true application modal.  Do not advance background task,
    * progress, splitter, watcher, terminal, preview, or explorer state while
    * it owns the window. */
@@ -100,7 +100,7 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
      * a chance to carry next_modal into active_modal. */
     ui->active_modal = ui->current_modal;
     SaveDialog_Update(&layout->save_dialog, ui);
-    return;
+    return false;
   }
 
   /* Update background task queue */
@@ -220,14 +220,24 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
   }
 
   /* Poll file watchers for ALL panels (even inactive ones) */
+  b32 changed = false;
   for (int i = 0; i < 2; i++) {
-    Explorer_PollWatcher(&layout->panels[i].explorer);
+    changed |= Explorer_PollWatcher(&layout->panels[i].explorer);
   }
 
   /* Update terminal panels FIRST (they have input priority when focused) */
   for (int i = 0; i < 2; i++) {
+    terminal_panel_state *terminal = &layout->panels[i].terminal;
+    f32 old_cursor_blink = terminal->cursor_blink.current;
+    b32 old_terminal_dirty = terminal->terminal && terminal->terminal->dirty;
     TerminalPanel_Update(&layout->panels[i].terminal, ui, ui->dt,
                          (u32)i == layout->active_panel_idx, bounds.h);
+    if (TerminalPanel_IsVisible(terminal) &&
+        (old_terminal_dirty ||
+         (terminal->terminal && terminal->terminal->dirty) ||
+         old_cursor_blink != terminal->cursor_blink.current)) {
+      changed = true;
+    }
   }
 
   /* Pointer-driven scrolling follows the hovered explorer, independently of
@@ -253,9 +263,13 @@ void Layout_Update(layout_state *layout, ui_context *ui, rect bounds) {
                     &layout->drag_drop, layout->active_panel_idx);
   }
 
+  u64 old_preview_generation = layout->preview.current_generation;
+  preview_content_type old_preview_type = layout->preview.current.type;
   PreviewPanel_Update(&layout->preview, ui, &layout->panels[0].explorer,
                       layout->mode == WB_LAYOUT_MODE_SINGLE);
-
+  changed |= old_preview_generation != layout->preview.current_generation ||
+             old_preview_type != layout->preview.current.type;
+  return changed;
 }
 
 static void DrawSplitter(ui_context *ui, rect bounds, bool hot, bool active) {

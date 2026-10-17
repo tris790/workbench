@@ -108,7 +108,7 @@ void Explorer_Init(explorer_state *state, memory_arena *arena);
 void Explorer_Shutdown(explorer_state *state);
 
 /* Poll file watcher for external changes (call for ALL panels each frame) */
-void Explorer_PollWatcher(explorer_state *state);
+b32 Explorer_PollWatcher(explorer_state *state);
 
 struct drag_drop_state_s;
 

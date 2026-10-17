@@ -337,12 +337,14 @@ static void *PreviewPanel_WorkerThread(void *arg) {
 
     request = state->worker_request;
     state->worker_has_request = false;
+    state->worker_is_loading = true;
     Platform_UnlockMutex(state->mutex);
 
     preview_content result;
     PreviewBuildResult(state, &request, &result);
 
     Platform_LockMutex(state->mutex);
+    state->worker_is_loading = false;
     if (state->worker_has_result) {
       PreviewContent_Clear(&state->worker_result);
     }
@@ -423,6 +425,20 @@ void PreviewPanel_RefreshConfig(preview_state *state) {
 
 b32 PreviewPanel_IsVisible(preview_state *state, b32 preview_allowed) {
   return state->enabled && preview_allowed;
+}
+
+b32 PreviewPanel_IsBusy(preview_state *state) {
+  if (!state)
+    return false;
+
+  b32 busy = state->has_pending_request;
+  if (state->mutex) {
+    Platform_LockMutex(state->mutex);
+    busy |= state->worker_has_request || state->worker_is_loading ||
+            state->worker_has_result;
+    Platform_UnlockMutex(state->mutex);
+  }
+  return busy;
 }
 
 void PreviewPanel_ComputeBounds(preview_state *state, rect bounds,

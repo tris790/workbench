@@ -61,9 +61,21 @@ image *Image_LoadFromMemory(const u8 *data, usize len) {
   return img;
 }
 
+static void (*g_image_texture_releaser)(u32 texture_id);
+
+void Image_SetTextureReleaser(void (*release_texture)(u32 texture_id)) {
+  g_image_texture_releaser = release_texture;
+}
+
 void Image_Free(image *img) {
   if (!img)
     return;
+
+  /* Only uploaded images carry a texture, and uploads happen on the render
+   * thread, so this never calls into the backend from a worker. */
+  if (img->texture_id != 0 && g_image_texture_releaser) {
+    g_image_texture_releaser(img->texture_id);
+  }
 
   if (img->pixels) {
     stbi_image_free(img->pixels);

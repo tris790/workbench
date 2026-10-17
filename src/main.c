@@ -255,6 +255,7 @@ int main(int argc, char **argv) {
   KeyRepeat_Init();
 
   u64 last_time = Platform_GetTimeMs();
+  u64 last_input_activity_ms = last_time;
   b32 save_exit_requested = false;
   i32 app_exit_code = 0;
 
@@ -265,6 +266,8 @@ int main(int argc, char **argv) {
 
   while (!Platform_WindowShouldClose(window)) {
     platform_event event;
+    b32 received_event = false;
+    b32 layout_changed = false;
 
     /* Input state persists across frames, only reset one-shot events */
     static ui_input input = {0};
@@ -279,6 +282,7 @@ int main(int argc, char **argv) {
 
     /* Process all pending events */
     while (Platform_PollEvent(window, &event)) {
+      received_event = true;
       switch (event.type) {
       case WB_EVENT_QUIT:
         if (args.save_mode || args.portal_mode)
@@ -465,7 +469,8 @@ int main(int argc, char **argv) {
 #endif
 
     /* Poll for configuration changes */
-    if (!layout.save_dialog.open && Config_Poll()) {
+    b32 config_changed = !layout.save_dialog.open && Config_Poll();
+    if (config_changed) {
       if (args.save_mode || args.portal_mode)
         fprintf(stderr, "Configuration reloaded due to file change\n");
       else
@@ -573,7 +578,7 @@ int main(int argc, char **argv) {
        * overlays suspend background interaction; the picker also suspends all
        * background processing inside Layout_Update. */
       if (!CommandPalette_IsOpen(&palette) && !context_menu.visible) {
-        Layout_Update(&layout, &ui, layout_bounds);
+        layout_changed = Layout_Update(&layout, &ui, layout_bounds);
       }
 
 #ifdef __linux__
@@ -582,6 +587,10 @@ int main(int argc, char **argv) {
 #endif
 
       /* ===== Layout System (Full Window) ===== */
+      b32 notification_was_active = false;
+      for (i32 i = 0; i < NOTIFICATION_MAX_COUNT; i++) {
+        notification_was_active |= layout.notifications.items[i].is_active;
+      }
       Layout_Render(&layout, &ui, layout_bounds);
 
       /* ===== Context Menu (overlay) ===== */
@@ -623,11 +632,31 @@ int main(int argc, char **argv) {
       /* End UI frame */
       UI_EndFrame(&ui);
 
+      u64 present_time_ms = Platform_GetTimeMs();
+      if (received_event) {
+        last_input_activity_ms = present_time_ms;
+      }
+
+      b32 task_busy = TaskQueue_IsBusy(&layout.tasks);
+      /* Keep polling and updating at the normal cadence, but present only
+       * while input, work, or a visual transition can change the window. */
+      b32 visual_work = task_busy || PreviewPanel_IsBusy(&layout.preview) ||
+                        notification_was_active ||
+                        layout.drag_drop.state != WB_DRAG_STATE_IDLE ||
+                        layout.target_split_ratio - layout.split_ratio > 0.001f ||
+                        layout.split_ratio - layout.target_split_ratio > 0.001f ||
+                        (present_time_ms - last_input_activity_ms) < 1000;
+      for (i32 i = 0; i < NOTIFICATION_MAX_COUNT; i++) {
+        visual_work |= layout.notifications.items[i].is_active;
+      }
+      b32 should_present = frame_count == 0 || received_event ||
+                           config_changed || layout_changed || visual_work;
+      renderer.present_requested = should_present;
       Render_EndFrame(&renderer);
 
       /* Commit the frame to display if the backend doesn't handle it (e.g.
        * Software) */
-      if (!renderer.backend->presents_frame) {
+      if (should_present && !renderer.backend->presents_frame) {
         Platform_PresentFrame(window);
       }
     }

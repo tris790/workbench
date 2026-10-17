@@ -547,9 +547,18 @@ font *Font_LoadFromMemory(const void *data, usize size, i32 size_pixels) {
   return f;
 }
 
+static void (*g_font_release_callback)(font *f);
+
+void Font_SetReleaseCallback(void (*release_font)(font *f)) {
+  g_font_release_callback = release_font;
+}
+
 void Font_Free(font *f) {
   if (!f)
     return;
+
+  if (g_font_release_callback)
+    g_font_release_callback(f);
 
   for (i32 i = 0; i < GLYPH_CACHE_SIZE; i++) {
     if (f->cache[i].bitmap) {

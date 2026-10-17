@@ -247,6 +247,20 @@ static void RestoreStderr(void) {}
 
 #include "../../core/image.h"
 
+static void FlushBatch(gl_backend_state *state);
+static gl_backend_state g_gl_state;
+
+/* Image_Free hook: without it every previewed image leaked its texture. */
+static void GL_ReleaseImageTexture(u32 texture_id) {
+  gl_backend_state *state = &g_gl_state;
+  if (state->current_texture == texture_id) {
+    /* Draw pending vertices before their texture name goes away. */
+    FlushBatch(state);
+    state->current_texture = 0;
+  }
+  glDeleteTextures(1, &texture_id);
+}
+
 static void UploadImageTexture(gl_backend_state *state, image *img) {
   (void)state;
   if (img->texture_id != 0)
@@ -433,6 +447,29 @@ static gl_font_cache *GetFontCache(gl_backend_state *state, font *f) {
   return cache;
 }
 
+/* Font_Free hook: a font freed and reloaded (config reload, preview zoom)
+ * otherwise kept its atlas texture until the fixed cache table filled up, and
+ * a new font allocated at the same address would reuse the stale atlas. */
+static void GL_ReleaseFontCache(font *f) {
+  gl_backend_state *state = &g_gl_state;
+  for (i32 i = 0; i < state->font_cache_count; i++) {
+    gl_font_cache *cache = &state->font_caches[i];
+    if (cache->font_ptr != f)
+      continue;
+
+    if (state->current_texture == cache->texture_id) {
+      FlushBatch(state);
+      state->current_texture = 0;
+    }
+    if (cache->texture_id)
+      glDeleteTextures(1, &cache->texture_id);
+    state->font_cache_count--;
+    if (i != state->font_cache_count)
+      *cache = state->font_caches[state->font_cache_count];
+    return;
+  }
+}
+
 /* ===== Batch Rendering ===== */
 
 static void FlushBatch(gl_backend_state *state) {
@@ -492,6 +529,8 @@ static void GL_Init(render_context *ctx) {
   }
 
   state->initialized = true;
+  Image_SetTextureReleaser(GL_ReleaseImageTexture);
+  Font_SetReleaseCallback(GL_ReleaseFontCache);
 }
 
 static void GL_Shutdown(render_context *ctx) {
@@ -499,6 +538,11 @@ static void GL_Shutdown(render_context *ctx) {
 
   if (!state->initialized)
     return;
+
+  /* Images and fonts freed after this point have no live context to release
+   * into. */
+  Image_SetTextureReleaser(NULL);
+  Font_SetReleaseCallback(NULL);
 
   /* Delete font textures */
   for (i32 i = 0; i < state->font_cache_count; i++) {
@@ -590,14 +634,16 @@ static void GL_EndFrame(render_context *ctx) {
   FlushBatch(state);
 
 #ifdef WB_USE_EGL
-  /* Swap buffers */
-  if (state->egl_surface) {
+  /* Avoid repeatedly presenting an unchanged Wayland/EGL surface. */
+  if (ctx->present_requested && state->egl_surface) {
     eglSwapBuffers(state->egl_display, state->egl_surface);
   }
 #endif
 
 #ifdef WB_USE_WGL
-  SwapBuffers(state->hdc);
+  if (ctx->present_requested) {
+    SwapBuffers(state->hdc);
+  }
 #endif
 }
 
@@ -766,17 +812,32 @@ b32 GL_InitEGL(gl_backend_state *state, struct wl_display *display,
   state->wl_display = display;
   state->wl_surface = surface;
 
+  /* NVIDIA egl-wayland2 (1.0.2, driver 615) never dispatches the wl_buffer
+   * release events of its swapchain buffers when presenting with explicit
+   * sync: libwayland queues ~200 bytes per frame forever (GBs per day at
+   * 60 fps).  Implicit sync dispatches them.  egl-wayland2 reads this only
+   * while eglInitialize creates the display instance, so it is removed again
+   * afterwards to keep it out of terminal and launched child processes.  An
+   * explicit user value wins. */
+  b32 set_explicit_sync_env = !getenv("__NV_DISABLE_EXPLICIT_SYNC") &&
+                              setenv("__NV_DISABLE_EXPLICIT_SYNC", "1", 0) == 0;
+
   /* Initialize EGL */
   SuppressStderr();
   state->egl_display = eglGetDisplay((EGLNativeDisplayType)display);
   if (state->egl_display == EGL_NO_DISPLAY) {
     RestoreStderr();
+    if (set_explicit_sync_env)
+      unsetenv("__NV_DISABLE_EXPLICIT_SYNC");
     fprintf(stderr, "OpenGL: Failed to get EGL display\n");
     return false;
   }
 
   EGLint major, minor;
-  if (!eglInitialize(state->egl_display, &major, &minor)) {
+  b32 egl_initialized = eglInitialize(state->egl_display, &major, &minor);
+  if (set_explicit_sync_env)
+    unsetenv("__NV_DISABLE_EXPLICIT_SYNC");
+  if (!egl_initialized) {
     RestoreStderr();
     fprintf(stderr, "OpenGL: Failed to initialize EGL\n");
     return false;

@@ -112,11 +112,18 @@ void SmoothValue_UpdateResponsive(smooth_value *sv, f32 dt,
   /* Exponential convergence keeps the initial movement quick while making
    * the settling time independent of the size of the scroll distance. */
   f32 alpha = 1.0f - expf(-response_rate * dt);
+  f32 previous = sv->current;
   sv->current += (sv->target - sv->current) * alpha;
 
-  /* Avoid spending frames converging on an insignificant fraction. */
+  /* Avoid spending frames converging on an insignificant fraction.  At large
+   * offsets one float ulp exceeds the absolute threshold (0.0156 at 131072)
+   * and the step rounds away entirely, so a value that stopped moving settles
+   * once it is within a relative tolerance instead of never arriving. */
   f32 remaining = sv->target - sv->current;
-  if (remaining > -0.01f && remaining < 0.01f)
+  f32 stall_tolerance = Max(0.01f, fabsf(sv->target) * 1e-5f);
+  if ((remaining > -0.01f && remaining < 0.01f) ||
+      (sv->current == previous && remaining > -stall_tolerance &&
+       remaining < stall_tolerance))
     sv->current = sv->target;
 }
 

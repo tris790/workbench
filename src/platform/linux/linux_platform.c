@@ -78,6 +78,9 @@ static const struct xdg_wm_base_listener xdg_wm_base_listener = {
  */
 #include "../../core/assets_embedded.h"
 #include <sys/stat.h>
+#ifdef __GLIBC__
+#include <malloc.h>
+#endif
 
 extern const struct wl_seat_listener seat_listener;
 extern const struct wl_data_device_listener data_device_listener;
@@ -259,6 +262,16 @@ b32 Platform_Init(void) {
   if (g_platform.initialized)
     return true;
 
+#ifdef __GLIBC__
+  /* Runs before any worker thread exists.  Preview decodes and file reads
+   * malloc/free multi-MB buffers on worker threads; contended threads get
+   * extra glibc arenas that retain freed memory, and the dynamic mmap
+   * threshold rises after large frees so big buffers stop returning to the
+   * OS.  One arena and a fixed threshold keep the heap from ratcheting up. */
+  mallopt(M_ARENA_MAX, 1);
+  mallopt(M_MMAP_THRESHOLD, 256 * 1024);
+#endif
+
   g_platform.display = wl_display_connect(NULL);
   if (!g_platform.display) {
     fprintf(stderr, "Failed to connect to Wayland display\n");
@@ -314,6 +327,8 @@ void Platform_Shutdown(void) {
     wl_data_source_destroy(g_platform.drag_source);
   if (g_platform.selection_offer)
     wl_data_offer_destroy(g_platform.selection_offer);
+  if (g_platform.dnd_offer)
+    wl_data_offer_destroy(g_platform.dnd_offer);
   if (g_platform.data_device)
     wl_data_device_destroy(g_platform.data_device);
   if (g_platform.data_device_manager)

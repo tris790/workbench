@@ -852,6 +852,8 @@ void TerminalPanel_Render(terminal_panel_state *state, ui_context *ui,
       Render_DrawRect(r, sb_thumb, thumb_color);
     }
   }
+
+  state->terminal->dirty = false;
 }
 
 i32 TerminalPanel_GetHeight(terminal_panel_state *state, i32 available_height) {

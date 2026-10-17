@@ -952,10 +952,12 @@ static void HandleDialogInput(explorer_state *state, ui_context *ui) {
   }
 }
 
-void Explorer_PollWatcher(explorer_state *state) {
+b32 Explorer_PollWatcher(explorer_state *state) {
+  b32 changed = false;
   /* Poll file watcher for external changes */
   if (FSWatcher_Poll(&state->watcher)) {
     Explorer_Refresh(state);
+    changed = true;
   }
   
   /* Also refresh when background tasks complete (were busy, now idle) */
@@ -964,9 +966,11 @@ void Explorer_PollWatcher(explorer_state *state) {
     if (state->was_task_busy && !is_busy) {
       /* Task just completed - refresh */
       Explorer_Refresh(state);
+      changed = true;
     }
     state->was_task_busy = is_busy;
   }
+  return changed;
 }
 
 void Explorer_UpdateScroll(explorer_state *state, ui_context *ui) {

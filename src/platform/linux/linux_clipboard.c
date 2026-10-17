@@ -127,14 +127,28 @@ static void DataDeviceDataOffer(void *data, struct wl_data_device *device,
   wl_data_offer_add_listener(offer, &data_offer_listener, NULL);
 }
 
+/* Every drag entering the window announces a new wl_data_offer.  Drops are
+ * not accepted from other clients, so the offer is only owned until the drag
+ * leaves or drops; without destroying it each drag-over leaked a proxy. */
+static void ReleaseDndOffer(void) {
+  if (g_platform.dnd_offer) {
+    wl_data_offer_destroy(g_platform.dnd_offer);
+    g_platform.dnd_offer = NULL;
+  }
+}
+
 static void DataDeviceEnter(void *data, struct wl_data_device *device,
                             u32 serial, struct wl_surface *surface,
                             wl_fixed_t x, wl_fixed_t y, struct wl_data_offer *id) {
-  (void)data; (void)device; (void)serial; (void)surface; (void)x; (void)y; (void)id;
+  (void)data; (void)device; (void)serial; (void)surface; (void)x; (void)y;
+  if (id != g_platform.dnd_offer)
+    ReleaseDndOffer();
+  g_platform.dnd_offer = id;
 }
 
 static void DataDeviceLeave(void *data, struct wl_data_device *device) {
   (void)data; (void)device;
+  ReleaseDndOffer();
 }
 
 static void DataDeviceMotion(void *data, struct wl_data_device *device,
@@ -144,6 +158,7 @@ static void DataDeviceMotion(void *data, struct wl_data_device *device,
 
 static void DataDeviceDrop(void *data, struct wl_data_device *device) {
   (void)data; (void)device;
+  ReleaseDndOffer();
 }
 
 static void DataDeviceSelection(void *data, struct wl_data_device *device,

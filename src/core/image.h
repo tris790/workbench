@@ -23,8 +23,12 @@ image *Image_Load(const char *path);
 /* Load image from memory buffer */
 image *Image_LoadFromMemory(const u8 *data, usize len);
 
-/* Free image resources */
+/* Free image resources, including an uploaded texture */
 void Image_Free(image *img);
+
+/* Set by a GPU backend while its context is alive so Image_Free can release
+ * uploaded textures; NULL when no backend owns image textures. */
+void Image_SetTextureReleaser(void (*release_texture)(u32 texture_id));
 
 /* Get pixel color at (x,y) - handling bounds check. Returns 0 if out of bounds.
  * Format: ARGB (Software Renderer native) */

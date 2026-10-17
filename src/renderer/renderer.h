@@ -78,6 +78,7 @@ struct renderer_backend {
 
 struct render_context {
   renderer_backend *backend;
+  b32 present_requested; /* Set by the app before Render_EndFrame. */
 
   /* Framebuffer (for software backend) */
   u32 *pixels;

@@ -91,7 +91,7 @@ void Layout_Init(layout_state *layout, memory_arena *arena);
 void Layout_Shutdown(layout_state *layout);
 
 /* Update layout logic (input handling, animations) - call before render */
-void Layout_Update(layout_state *layout, ui_context *ui, rect bounds);
+b32 Layout_Update(layout_state *layout, ui_context *ui, rect bounds);
 
 /* Update settings from config */
 void Layout_RefreshConfig(layout_state *layout);
